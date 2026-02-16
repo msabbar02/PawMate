@@ -1,0 +1,204 @@
+# ============================================
+# PawMate - Professional .gitignore
+# ============================================
+
+# ============================================
+# SENSITIVE FILES - NEVER COMMIT
+# ============================================
+# Firebase & Google Services
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebaseConfig.js
+**/firebase-adminsdk-*.json
+
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# API Keys & Secrets
+**/*secret*
+**/*credentials*
+**/*apikey*
+**/secrets/
+
+# ============================================
+# NODE MODULES & DEPENDENCIES
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================
+# MOBILE APP (React Native / Expo)
+# ============================================
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Android
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/.idea/
+mobile/android/*.iml
+mobile/android/*.hprof
+mobile/android/.cxx/
+mobile/android/app/release/
+mobile/android/app/debug/
+
+# iOS
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/*.xcworkspace
+mobile/ios/*.xcuserdata
+mobile/ios/DerivedData/
+mobile/ios/*.hmap
+mobile/ios/*.ipa
+mobile/ios/*.dSYM.zip
+mobile/ios/*.dSYM
+
+# Metro bundler
+.metro-health-check*
+
+# ============================================
+# WEB APPLICATION
+# ============================================
+# Next.js / React build
+web/.next/
+web/out/
+web/build/
+web/dist/
+
+# Static files
+web/.cache/
+
+# ============================================
+# ADMIN PANEL
+# ============================================
+# Build output
+admin/.next/
+admin/out/
+admin/build/
+admin/dist/
+
+# ============================================
+# SERVER / BACKEND
+# ============================================
+# Build output
+server/dist/
+server/build/
+
+# Logs
+server/logs/
+*.log
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# ============================================
+# TESTING
+# ============================================
+coverage/
+*.coverage
+.nyc_output/
+.jest/
+
+# ============================================
+# IDE & EDITORS
+# ============================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# WebStorm
+.idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ============================================
+# OPERATING SYSTEM
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================
+# TEMPORARY FILES
+# ============================================
+*.tmp
+*.temp
+*.cache
+*.bak
+*.swp
+*.swo
+
+# ============================================
+# BUILD & DEPLOYMENT
+# ============================================
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Deployment
+.vercel/
+.netlify/
+
+# ============================================
+# DOCUMENTATION (Optional - uncomment if needed)
+# ============================================
+# docs/build/
+# docs/.docusaurus/
+
+# ============================================
+# MISC
+# ============================================
+.turbo/
+.parcel-cache/
+.cache/
