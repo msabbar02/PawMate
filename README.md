@@ -175,4 +175,4 @@ Este proyecto es de uso educativo.
 **Email**: msabbar02@yahoo.com  
 **Móvil**: +34 624 170 100
 
-> **Última actualización**: 21 de Febrero de 2026
+> **Última actualización**: 22 de Febrero de 2026
