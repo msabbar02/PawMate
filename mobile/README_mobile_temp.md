@@ -54,6 +54,8 @@ npm run android
 npm run ios
 ```
 
+**Estado**: 🚧 En desarrollo
+
 ---
 
-**Estado**: 🚧 En desarrollo
+> **Última actualización**: 21 de Febrero de 2026
