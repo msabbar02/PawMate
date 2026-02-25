@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     },
     listContainer: {
         padding: 20,
-        paddingBottom: 100, // Space for FAB
+        paddingBottom: 160, // Space for FAB
     },
     card: {
         backgroundColor: '#1c2a35',
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         right: 25,
-        bottom: 25,
+        bottom: 100, // Changed from 25 to 100 to clear the floating bottom tabs
         backgroundColor: '#1a7a4c',
         borderRadius: 30,
         elevation: 8,

@@ -9,6 +9,8 @@ import SignupScreen from '../screens/SignupScreen';
 import CreatePetScreen from '../screens/CreatePetScreen';
 import MyPetsScreen from '../screens/MyPetsScreen';
 import CommunityScreen from '../screens/CommunityScreen';
+import StoreScreen from '../screens/StoreScreen';
+import CreateStoreItemScreen from '../screens/CreateStoreItemScreen';
 import { Ionicons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
@@ -27,6 +29,8 @@ const MainTabNavigator = () => {
                         iconName = focused ? 'paw' : 'paw-outline';
                     } else if (route.name === 'Comunidad') {
                         iconName = focused ? 'people' : 'people-outline';
+                    } else if (route.name === 'Tienda') {
+                        iconName = focused ? 'cart' : 'cart-outline';
                     } else if (route.name === 'Settings') {
                         iconName = focused ? 'settings' : 'settings-outline';
                     }
@@ -58,6 +62,7 @@ const MainTabNavigator = () => {
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Mascotas" component={MyPetsScreen} />
             <Tab.Screen name="Comunidad" component={CommunityScreen} />
+            <Tab.Screen name="Tienda" component={StoreScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
     );
@@ -72,6 +77,11 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="CreatePet"
                     component={CreatePetScreen}
+                    options={{ presentation: 'modal' }}
+                />
+                <Stack.Screen
+                    name="CreateStoreItem"
+                    component={CreateStoreItemScreen}
                     options={{ presentation: 'modal' }}
                 />
                 <Stack.Screen name="Home" component={MainTabNavigator} />
