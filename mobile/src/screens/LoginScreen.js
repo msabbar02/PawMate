@@ -10,6 +10,7 @@ import {
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
+    Image,
 } from 'react-native';
 
 const LoginScreen = ({ navigation }) => {
@@ -35,6 +36,7 @@ const LoginScreen = ({ navigation }) => {
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View style={styles.inner}>
                     <View style={styles.headerContainer}>
+                        <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
                         <Text style={styles.title}>Welcome Back!</Text>
                         <Text style={styles.subtitle}>Login to your account</Text>
                     </View>
@@ -96,6 +98,14 @@ const styles = StyleSheet.create({
     headerContainer: {
         marginBottom: 40,
         alignItems: 'center',
+    },
+    logo: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        marginBottom: 20,
+        backgroundColor: '#fff',
+        overflow: 'hidden',
     },
     title: {
         fontSize: 32,

@@ -9,6 +9,7 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    Image,
 } from 'react-native';
 
 const SignupScreen = ({ navigation }) => {
@@ -92,6 +93,10 @@ const SignupScreen = ({ navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                <View style={styles.logoContainer}>
+                    <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+                </View>
+
                 <Text style={styles.sectionTitle}>Personal Info</Text>
 
                 <View style={styles.row}>
@@ -262,6 +267,18 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: '#1a7a4c',
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginTop: 10,
+        marginBottom: 20,
+    },
+    logo: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#fff',
+        overflow: 'hidden',
     },
     scrollContent: {
         paddingHorizontal: 20,
