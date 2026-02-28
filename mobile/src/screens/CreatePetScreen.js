@@ -14,6 +14,10 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { ThemeContext } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const PET_TYPES = ['Perro', 'Gato', 'Pájaro', 'Otro'];
 const BREEDS = {
@@ -22,7 +26,16 @@ const BREEDS = {
     Pájaro: ['Canario', 'Loro', 'Periquito', 'Cacatúa', 'Otro'],
 };
 
+const COMMON_ALLERGIES = ['Ninguna', 'Polen', 'Alimentos', 'Polvo', 'Otra (Especificar)'];
+const COMMON_ILLNESSES = ['Ninguna', 'Diabetes', 'Artritis', 'Asma', 'Otra (Especificar)'];
+
 const CreatePetScreen = ({ navigation }) => {
+    const { theme } = React.useContext(ThemeContext);
+    const { user } = React.useContext(AuthContext);
+    const styles = getStyles(theme);
+
+    const [isLoading, setIsLoading] = useState(false);
+
     const [image, setImage] = useState(null);
     const [name, setName] = useState('');
     const [type, setType] = useState('Perro');
@@ -30,8 +43,10 @@ const CreatePetScreen = ({ navigation }) => {
     const [breed, setBreed] = useState('Labrador');
     const [otherBreed, setOtherBreed] = useState('');
     const [weight, setWeight] = useState('');
-    const [allergies, setAllergies] = useState('');
-    const [illnesses, setIllnesses] = useState('');
+    const [allergyType, setAllergyType] = useState('Ninguna');
+    const [otherAllergy, setOtherAllergy] = useState('');
+    const [illnessType, setIllnessType] = useState('Ninguna');
+    const [otherIllness, setOtherIllness] = useState('');
 
     // Date of Birth state
     const [dob, setDob] = useState(new Date());
@@ -82,36 +97,55 @@ const CreatePetScreen = ({ navigation }) => {
         );
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         // Validation
         if (!name || !weight) {
             Alert.alert('Error', 'Por favor ingresa al menos el nombre y peso de la mascota.');
             return;
         }
 
-        const petData = {
-            image,
-            name,
-            type: type === 'Otro' ? otherType : type,
-            breed: breed === 'Otro' ? otherBreed : breed,
-            weight,
-            allergies,
-            illnesses,
-            dob: dob.toISOString().split('T')[0],
-            vaccinations,
-            foodSchedule
-        };
+        if (!user) {
+            Alert.alert('Error', 'Debes iniciar sesión para registrar una mascota.');
+            return;
+        }
 
-        console.log('Guardando mascota (Firebase pronto):', petData);
-        Alert.alert('Éxito', '¡Mascota registrada exitosamente!', [
-            {
-                text: 'OK',
-                onPress: () => {
-                    // Cierra la pantalla de registrar mascota
-                    navigation.goBack();
+        setIsLoading(true);
+
+        try {
+            const allergyValue = allergyType === 'Otra (Especificar)' ? otherAllergy : allergyType;
+            const illnessValue = illnessType === 'Otra (Especificar)' ? otherIllness : illnessType;
+
+            const petData = {
+                ownerId: user.uid,
+                image: image || null,
+                name,
+                type: type === 'Otro' ? otherType : type,
+                breed: breed === 'Otro' ? otherBreed : breed,
+                weight: parseFloat(weight),
+                allergies: allergyValue,
+                illnesses: illnessValue,
+                dob: dob.toISOString().split('T')[0],
+                vaccinations,
+                foodSchedule,
+                createdAt: serverTimestamp()
+            };
+
+            await addDoc(collection(db, 'pets'), petData);
+
+            Alert.alert('Éxito', '¡Mascota registrada exitosamente!', [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        navigation.goBack();
+                    }
                 }
-            }
-        ]);
+            ]);
+        } catch (error) {
+            console.error("Error al registrar mascota: ", error);
+            Alert.alert('Error', 'Hubo un problema al registrar la mascota.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const onDobChange = (event, selectedDate) => {
@@ -153,7 +187,7 @@ const CreatePetScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         placeholder="Ej: Max"
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.textSecondary}
                         value={name}
                         onChangeText={setName}
                     />
@@ -166,7 +200,7 @@ const CreatePetScreen = ({ navigation }) => {
                             <Picker
                                 selectedValue={type}
                                 style={styles.picker}
-                                dropdownIconColor="#fff"
+                                dropdownIconColor={theme.primary}
                                 onValueChange={(itemValue) => {
                                     setType(itemValue);
                                     if (itemValue !== 'Otro') {
@@ -176,7 +210,7 @@ const CreatePetScreen = ({ navigation }) => {
                                     }
                                 }}
                             >
-                                {PET_TYPES.map(t => <Picker.Item key={t} label={t} value={t} color="#fff" />)}
+                                {PET_TYPES.map(t => <Picker.Item key={t} label={t} value={t} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />)}
                             </Picker>
                         </View>
                     </View>
@@ -187,7 +221,7 @@ const CreatePetScreen = ({ navigation }) => {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Ej: Hámster"
-                                placeholderTextColor="#888"
+                                placeholderTextColor={theme.textSecondary}
                                 value={otherType}
                                 onChangeText={setOtherType}
                             />
@@ -199,10 +233,10 @@ const CreatePetScreen = ({ navigation }) => {
                                 <Picker
                                     selectedValue={breed}
                                     style={styles.picker}
-                                    dropdownIconColor="#fff"
+                                    dropdownIconColor={theme.primary}
                                     onValueChange={(itemValue) => setBreed(itemValue)}
                                 >
-                                    {BREEDS[type]?.map(b => <Picker.Item key={b} label={b} value={b} color="#fff" />)}
+                                    {BREEDS[type]?.map(b => <Picker.Item key={b} label={b} value={b} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />)}
                                 </Picker>
                             </View>
                         </View>
@@ -215,7 +249,7 @@ const CreatePetScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Ej: Mezcla"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={otherBreed}
                             onChangeText={setOtherBreed}
                         />
@@ -228,7 +262,7 @@ const CreatePetScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Ej: 12.5"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             keyboardType="numeric"
                             value={weight}
                             onChangeText={setWeight}
@@ -259,33 +293,65 @@ const CreatePetScreen = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>Salud y Cuidados</Text>
 
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Alergias (Opcional)</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ej: Pollo, Polen..."
-                        placeholderTextColor="#888"
-                        value={allergies}
-                        onChangeText={setAllergies}
-                    />
+                    <Text style={styles.label}>Alergias</Text>
+                    <View style={styles.pickerContainer}>
+                        <Picker
+                            selectedValue={allergyType}
+                            style={styles.picker}
+                            dropdownIconColor={theme.primary}
+                            onValueChange={(itemValue) => setAllergyType(itemValue)}
+                        >
+                            {COMMON_ALLERGIES.map(a => <Picker.Item key={a} label={a} value={a} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />)}
+                        </Picker>
+                    </View>
                 </View>
 
+                {allergyType === 'Otra (Especificar)' && (
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Especificar Alergia</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Ej: Pollo"
+                            placeholderTextColor={theme.textSecondary}
+                            value={otherAllergy}
+                            onChangeText={setOtherAllergy}
+                        />
+                    </View>
+                )}
+
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Enfermedades (Opcional)</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ej: Ninguna"
-                        placeholderTextColor="#888"
-                        value={illnesses}
-                        onChangeText={setIllnesses}
-                    />
+                    <Text style={styles.label}>Enfermedades</Text>
+                    <View style={styles.pickerContainer}>
+                        <Picker
+                            selectedValue={illnessType}
+                            style={styles.picker}
+                            dropdownIconColor={theme.primary}
+                            onValueChange={(itemValue) => setIllnessType(itemValue)}
+                        >
+                            {COMMON_ILLNESSES.map(i => <Picker.Item key={i} label={i} value={i} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />)}
+                        </Picker>
+                    </View>
                 </View>
+
+                {illnessType === 'Otra (Especificar)' && (
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Especificar Enfermedad</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Ej: Cáncer"
+                            placeholderTextColor={theme.textSecondary}
+                            value={otherIllness}
+                            onChangeText={setOtherIllness}
+                        />
+                    </View>
+                )}
 
                 <View style={styles.inputContainer}>
                     <Text style={styles.label}>Vacunas (Fechas / Nombres)</Text>
                     <TextInput
                         style={[styles.input, { height: 60 }]}
                         placeholder="Ej: Rabia (12/03/24), Parvo..."
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.textSecondary}
                         multiline
                         value={vaccinations}
                         onChangeText={setVaccinations}
@@ -297,15 +363,21 @@ const CreatePetScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         placeholder="Ej: 2 veces - 08:00 y 20:00"
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.textSecondary}
                         value={foodSchedule}
                         onChangeText={setFoodSchedule}
                     />
                 </View>
 
                 {/* Submit Button */}
-                <TouchableOpacity style={styles.button} onPress={handleSave}>
-                    <Text style={styles.buttonText}>Registrar Mascota</Text>
+                <TouchableOpacity
+                    style={[styles.button, isLoading && { opacity: 0.7 }]}
+                    onPress={handleSave}
+                    disabled={isLoading}
+                >
+                    <Text style={styles.buttonText}>
+                        {isLoading ? 'Guardando...' : 'Registrar Mascota'}
+                    </Text>
                 </TouchableOpacity>
 
             </ScrollView>
@@ -313,10 +385,10 @@ const CreatePetScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     header: {
         flexDirection: 'row',
@@ -324,19 +396,19 @@ const styles = StyleSheet.create({
         paddingTop: 50,
         paddingBottom: 20,
         paddingHorizontal: 20,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     backButton: {
         marginRight: 15,
     },
     backButtonText: {
-        color: '#fff',
+        color: theme.text,
         fontSize: 24,
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#1a7a4c',
+        color: theme.primary,
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -350,9 +422,9 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
         borderRadius: 60,
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderWidth: 2,
-        borderColor: '#1a7a4c',
+        borderColor: theme.primary,
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
@@ -362,17 +434,17 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     imagePlaceholderText: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 14,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.text,
         marginBottom: 15,
         marginTop: 5,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
+        borderBottomColor: theme.border,
         paddingBottom: 5,
     },
     row: {
@@ -383,57 +455,57 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     label: {
-        color: '#ccc',
+        color: theme.textSecondary,
         fontSize: 14,
         marginBottom: 5,
         marginLeft: 5,
     },
     input: {
-        backgroundColor: '#1c2a35',
-        color: '#fff',
+        backgroundColor: theme.cardBackground,
+        color: theme.text,
         padding: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
     },
     pickerContainer: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
         overflow: 'hidden',
     },
     picker: {
-        color: '#fff',
+        color: theme.text,
         height: Platform.OS === 'ios' ? 120 : 50, // iOS picker height adjustment
     },
     datePickerButton: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         padding: 14,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
         alignItems: 'center',
     },
     datePickerText: {
-        color: '#fff',
+        color: theme.text,
         fontSize: 16,
     },
     button: {
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         paddingVertical: 15,
         borderRadius: 10,
         alignItems: 'center',
         marginTop: 20,
         marginBottom: 20,
-        shadowColor: '#1a7a4c',
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
         elevation: 5,
     },
     buttonText: {
-        color: '#fff',
+        color: '#fff', // Keep white since primary is typically dark green
         fontSize: 18,
         fontWeight: 'bold',
     },

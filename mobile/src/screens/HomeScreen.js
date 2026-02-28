@@ -4,14 +4,21 @@ import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemeContext } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
+import { db } from '../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const HomeScreen = ({ navigation, route }) => {
+    const { theme } = React.useContext(ThemeContext);
+    const { userData } = React.useContext(AuthContext);
+    const styles = getStyles(theme);
+
     const [location, setLocation] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
-    const [activeFilter, setActiveFilter] = useState('Todos');
-    const userName = route?.params?.userName || 'User';
-
-    const filters = ['Todos', 'Online', '★ 4.5+', 'Cerca', 'Perros', 'Gatos', 'Pájaros'];
+    const userName = userData?.name || 'User';
+    const [pets, setPets] = useState([]);
+    const { user } = React.useContext(AuthContext);
 
     const fetchLocation = async () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
@@ -28,17 +35,20 @@ const HomeScreen = ({ navigation, route }) => {
         fetchLocation();
     }, []);
 
-    // Placeholder data for caretakers adding online status
-    const caretakers = location ? [
-        { id: '1', title: 'Caregiver Ana', isOnline: true, coordinate: { latitude: location.coords.latitude + 0.005, longitude: location.coords.longitude + 0.005 } },
-        { id: '2', title: 'Caregiver Juan', isOnline: false, coordinate: { latitude: location.coords.latitude - 0.005, longitude: location.coords.longitude - 0.008 } },
-        { id: '3', title: 'Caregiver Maria', isOnline: true, coordinate: { latitude: location.coords.latitude + 0.008, longitude: location.coords.longitude - 0.002 } },
-    ] : [];
+    useEffect(() => {
+        if (!user) return;
+        const q = query(collection(db, 'pets'), where('ownerId', '==', user.uid));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const petsData = [];
+            snapshot.forEach((doc) => {
+                petsData.push({ id: doc.id, ...doc.data() });
+            });
+            setPets(petsData);
+        });
+        return () => unsubscribe();
+    }, [user]);
 
-    const bookings = [
-        { id: '101', name: 'Ana', date: 'Ayer', type: 'Paseo Perro', price: '15€' },
-        { id: '102', name: 'Juan', date: 'Hace 3 días', type: 'Cuidado Gato', price: '25€' },
-    ];
+
 
     let defaultRegion = {
         latitude: 37.78825, // Fallback latitude
@@ -61,7 +71,7 @@ const HomeScreen = ({ navigation, route }) => {
             {/* Header section */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => Alert.alert('Notifications', 'No new notifications')} style={styles.notificationIcon}>
-                    <Ionicons name="notifications-outline" size={28} color="#1a7a4c" />
+                    <Ionicons name="notifications-outline" size={28} color={theme.primary} />
                 </TouchableOpacity>
                 <View style={styles.logoAndTextContainer}>
                     <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="cover" />
@@ -77,20 +87,7 @@ const HomeScreen = ({ navigation, route }) => {
                     <Text style={styles.searchText}>Encuentra el cuidador perfecto...</Text>
                 </TouchableOpacity>
 
-                {/* Filters Row */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContainer}>
-                    {filters.map((filter, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
-                            onPress={() => setActiveFilter(filter)}
-                        >
-                            <Text style={[styles.filterText, activeFilter === filter && styles.filterTextActive]}>
-                                {filter}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+
 
                 {/* Map Section */}
                 <View style={styles.mapContainer}>
@@ -101,79 +98,36 @@ const HomeScreen = ({ navigation, route }) => {
                         showsUserLocation={true}
                         showsMyLocationButton={false} // Disable default so ours doesn't conflict
                     >
-                        {location ? caretakers.map((ct, idx) => (
-                            <Marker
-                                key={ct.id}
-                                coordinate={ct.coordinate}
-                                title={ct.title}
-                            >
-                                <View style={styles.customMarkerContainer}>
-                                    <View style={[styles.markerAvatar, { backgroundColor: ['#284b3b', '#1a3025', '#3b5a4b'][idx % 3] }]}>
-                                        <Ionicons name="person" size={18} color="#fff" />
-                                    </View>
-                                    <View style={[styles.onlineDotMarker, !ct.isOnline && { backgroundColor: '#888' }]} />
-                                    <View style={styles.markerTriangle} />
-                                </View>
-                            </Marker>
-                        )) : null}
                     </MapView>
                     <TouchableOpacity style={styles.locateButton} onPress={fetchLocation}>
-                        <Ionicons name="locate" size={24} color="#1a7a4c" />
+                        <Ionicons name="locate" size={24} color={theme.primary} />
                     </TouchableOpacity>
                 </View>
 
-                {/* Modern UI Section Below Map */}
-                <View style={styles.sectionContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Cuidadores Top Cerca</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.seeAllText}>Ver todos</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsContainer}>
-                        {caretakers.length > 0 ? caretakers.map((ct, idx) => (
-                            <TouchableOpacity key={ct.id} style={styles.caregiverCard}>
-                                <View style={styles.avatarContainer}>
-                                    <View style={[styles.caregiverAvatar, { backgroundColor: ['#284b3b', '#1a3025', '#3b5a4b'][idx % 3] }]}>
-                                        <Ionicons name="person" size={30} color="#fff" />
-                                    </View>
-                                    <View style={[styles.onlineDot, !ct.isOnline && { backgroundColor: '#888' }]} />
-                                </View>
-                                <Text style={styles.caregiverName}>{ct.title}</Text>
-                                <Text style={styles.caregiverRole}>Pet Sitter / Paseador</Text>
-                                <View style={styles.ratingRow}>
-                                    <Ionicons name="star" size={14} color="#f4c150" />
-                                    <Text style={styles.ratingText}>4.{9 - idx} ({120 - idx * 15} reseñas)</Text>
-                                </View>
-                            </TouchableOpacity>
-                        )) : (
-                            <View style={styles.skeletonCard} />
-                        )}
-                    </ScrollView>
-                </View>
-
-                {/* Últimas Reservas / Recent Bookings */}
-                <View style={[styles.sectionContainer, { marginTop: 25 }]}>
-                    <Text style={[styles.sectionTitle, { paddingHorizontal: 20, marginBottom: 15 }]}>Últimas Reservas</Text>
-                    {bookings.map((booking) => (
-                        <View key={booking.id} style={styles.bookingCard}>
-                            <View style={styles.bookingRow}>
-                                <View style={styles.bookingIcon}>
-                                    <Ionicons name="paw" size={20} color="#1a7a4c" />
-                                </View>
-                                <View style={styles.bookingInfo}>
-                                    <Text style={styles.bookingName}>Con cuidador {booking.name}</Text>
-                                    <Text style={styles.bookingTime}>{booking.type} • {booking.date}</Text>
-                                </View>
-                                <Text style={styles.bookingPrice}>{booking.price}</Text>
-                            </View>
-                            <TouchableOpacity style={styles.rebookBtn}>
-                                <Text style={styles.rebookText}>Volver a reservar</Text>
-                            </TouchableOpacity>
+                {/* Tus Mascotas - Para Pasear */}
+                {pets.length > 0 ? (
+                    <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Tus Mascotas</Text>
                         </View>
-                    ))}
-                </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsContainer}>
+                            {pets.map((pet) => (
+                                <View key={pet.id} style={styles.petCard}>
+                                    <Image source={{ uri: pet.photo || 'https://via.placeholder.com/150' }} style={styles.petAvatar} />
+                                    <Text style={styles.petName}>{pet.name}</Text>
+                                    <TouchableOpacity
+                                        style={styles.walkButton}
+                                        onPress={() => navigation.navigate('WalkTracking', { petId: pet.id, petName: pet.name })}
+                                    >
+                                        <Text style={styles.walkButtonText}>Pasear</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+                ) : null}
+
+
 
                 <View style={{ height: 100 }} /> {/* Spacer for Bottom Tabs & FAB */}
             </ScrollView>
@@ -188,10 +142,10 @@ const HomeScreen = ({ navigation, route }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     header: {
         flexDirection: 'row',
@@ -200,7 +154,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 15,
         paddingTop: 10,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
         zIndex: 10,
     },
     notificationIcon: {
@@ -220,7 +174,7 @@ const styles = StyleSheet.create({
     greetingTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: '#1a7a4c',
+        color: theme.primary,
     },
     scrollBody: {
         flex: 1,
@@ -228,7 +182,7 @@ const styles = StyleSheet.create({
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         marginHorizontal: 20,
         marginTop: 10,
         marginBottom: 15,
@@ -236,10 +190,10 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
     },
     searchText: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 16,
     },
     filtersContainer: {
@@ -247,20 +201,20 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     filterChip: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
         marginHorizontal: 5,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
     },
     filterChipActive: {
-        backgroundColor: '#1a7a4c',
-        borderColor: '#1a7a4c',
+        backgroundColor: theme.primary,
+        borderColor: theme.primary,
     },
     filterText: {
-        color: '#ccc',
+        color: theme.textSecondary,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -275,7 +229,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginTop: 15,
         marginBottom: 20,
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         position: 'relative',
     },
     map: {
@@ -286,7 +240,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 15,
         right: 15,
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         width: 44,
         height: 44,
         borderRadius: 22,
@@ -298,7 +252,7 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         elevation: 5,
         borderWidth: 1,
-        borderColor: '#2a3b47',
+        borderColor: theme.border,
     },
     customMarkerContainer: {
         alignItems: 'center',
@@ -311,7 +265,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: '#1a7a4c',
+        borderColor: theme.primary,
     },
     onlineDotMarker: {
         position: 'absolute',
@@ -322,7 +276,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         backgroundColor: '#4caf50',
         borderWidth: 2,
-        borderColor: '#101820', // To add border effect around it contrasting the map
+        borderColor: theme.background, // To add border effect around it contrasting the map
     },
     markerTriangle: {
         width: 0,
@@ -334,7 +288,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 8,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderBottomColor: '#1a7a4c',
+        borderBottomColor: theme.primary,
         transform: [{ rotate: '180deg' }],
         marginTop: -1,
     },
@@ -351,10 +305,10 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.text,
     },
     seeAllText: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontSize: 14,
         fontWeight: 'bold',
     },
@@ -362,17 +316,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
     },
     caregiverCard: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 15,
         padding: 15,
         marginHorizontal: 5,
         width: 160,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2a3b47',
+        borderColor: theme.border,
     },
     skeletonCard: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 15,
         marginHorizontal: 5,
         width: 160,
@@ -398,16 +352,16 @@ const styles = StyleSheet.create({
         borderRadius: 7,
         backgroundColor: '#4caf50',
         borderWidth: 2,
-        borderColor: '#1c2a35',
+        borderColor: theme.cardBackground,
     },
     caregiverName: {
-        color: '#fff',
+        color: theme.text,
         fontSize: 16,
         fontWeight: 'bold',
         textAlign: 'center',
     },
     caregiverRole: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 12,
         marginTop: 4,
         marginBottom: 8,
@@ -417,18 +371,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     ratingText: {
-        color: '#ccc',
+        color: theme.textSecondary,
         fontSize: 12,
         marginLeft: 4,
     },
     bookingCard: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         marginHorizontal: 20,
         marginBottom: 15,
         padding: 15,
         borderRadius: 15,
         borderWidth: 1,
-        borderColor: '#2a3b47',
+        borderColor: theme.border,
     },
     bookingRow: {
         flexDirection: 'row',
@@ -439,7 +393,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(26, 122, 76, 0.2)',
+        backgroundColor: theme.primary + '33', // 20% opacity using hex
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 15,
@@ -448,30 +402,30 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     bookingName: {
-        color: '#fff',
+        color: theme.text,
         fontSize: 16,
         fontWeight: 'bold',
         marginBottom: 4,
     },
     bookingTime: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 13,
     },
     bookingPrice: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontSize: 16,
         fontWeight: 'bold',
     },
     rebookBtn: {
-        backgroundColor: 'rgba(26, 122, 76, 0.1)',
+        backgroundColor: theme.primary + '1A', // 10% opacity
         paddingVertical: 10,
         borderRadius: 10,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(26, 122, 76, 0.5)',
+        borderColor: theme.primary + '80', // 50% opacity
     },
     rebookText: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontWeight: 'bold',
         fontSize: 14,
     },
@@ -483,10 +437,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         right: 25,
         bottom: 30,
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         borderRadius: 30,
         elevation: 8,
-        shadowColor: '#1a7a4c',
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 5,
@@ -496,6 +450,39 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
         marginTop: -3,
+    },
+    petCard: {
+        backgroundColor: theme.cardBackground,
+        borderRadius: 15,
+        padding: 15,
+        marginHorizontal: 5,
+        width: 140,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: theme.border,
+    },
+    petAvatar: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        marginBottom: 10,
+    },
+    petName: {
+        color: theme.text,
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    walkButton: {
+        backgroundColor: theme.primary,
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    walkButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
     }
 });
 

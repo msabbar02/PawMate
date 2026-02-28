@@ -1,64 +1,46 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ThemeContext } from '../context/ThemeContext';
+import { db } from '../config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
-
-const MOCK_PRODUCTS = [
-    {
-        id: '1',
-        title: 'Correa Extensible 5m',
-        price: '15.00',
-        category: 'Accesorios',
-        state: 'Nuevo',
-        description: 'Correa extensible resistente hasta 20kg. Color rojo.',
-        images: ['https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80'],
-    },
-    {
-        id: '2',
-        title: 'Pienso Premium Cachorros 10kg',
-        price: '45.50',
-        category: 'Comida',
-        state: 'Nuevo',
-        description: 'Pienso sabor salmón sin cereales para cachorros. Saco cerrado.',
-        images: ['https://images.unsplash.com/photo-1589924691995-400dc9ecc119?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80'],
-    },
-    {
-        id: '3',
-        title: 'Rascador para Gatos 1.5m',
-        price: '20.00',
-        category: 'Accesorios',
-        state: 'Segunda mano',
-        description: 'Rascador con cueva y varias plataformas. Poco uso.',
-        images: ['https://images.unsplash.com/photo-1545249390-6bdfa286032f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80'],
-    },
-    {
-        id: '4',
-        title: 'Pelotas de Tenis x3',
-        price: '5.00',
-        category: 'Juguetes',
-        state: 'Nuevo',
-        description: 'Pack de 3 pelotas de tenis extra resistentes.',
-        images: ['https://images.unsplash.com/photo-1550159930-40066082a4fc?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80'],
-    },
-    {
-        id: '5',
-        title: 'Transportín Mediano',
-        price: '25.00',
-        category: 'Accesorios',
-        state: 'Segunda mano',
-        description: 'Transportín rígido homologado para avión. Medidas 60x40x40cm.',
-        images: ['https://images.unsplash.com/photo-1599571171887-21cc551069ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80'],
-    }
-];
 
 const CATEGORIES = ['Todos', 'Accesorios', 'Comida', 'Juguetes', 'Salud', 'Higiene'];
 const STATES = ['Cualquiera', 'Nuevo', 'Segunda mano'];
 
 const StoreScreen = ({ navigation }) => {
-    const [products, setProducts] = useState(MOCK_PRODUCTS);
+    const { theme } = React.useContext(ThemeContext);
+    const styles = getStyles(theme);
+
+    const [products, setProducts] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState('Todos');
     const [selectedState, setSelectedState] = useState('Cualquiera');
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const querySnapshot = await getDocs(collection(db, 'products'));
+                const productsData = [];
+                querySnapshot.forEach((doc) => {
+                    productsData.push({ id: doc.id, ...doc.data() });
+                });
+                setProducts(productsData);
+            } catch (error) {
+                console.error("Error fetching products: ", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchProducts();
+        });
+
+        return unsubscribe;
+    }, [navigation]);
 
     const filteredProducts = products.filter(product => {
         const categoryMatch = selectedCategory === 'Todos' || product.category === selectedCategory;
@@ -67,9 +49,13 @@ const StoreScreen = ({ navigation }) => {
     });
 
     const renderProduct = ({ item }) => (
-        <TouchableOpacity style={styles.productCard} activeOpacity={0.8}>
+        <TouchableOpacity
+            style={styles.productCard}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('ProductDetails', { item: item })}
+        >
             <Image
-                source={{ uri: item.images[0] }}
+                source={{ uri: item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/150' }}
                 style={styles.productImage}
                 resizeMode="cover"
             />
@@ -130,9 +116,13 @@ const StoreScreen = ({ navigation }) => {
                 </ScrollView>
             </View>
 
-            {filteredProducts.length === 0 ? (
+            {isLoading ? (
+                <View style={[styles.emptyContainer, { justifyContent: 'center' }]}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            ) : filteredProducts.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                    <Ionicons name="cart-outline" size={60} color="#334155" />
+                    <Ionicons name="cart-outline" size={60} color={theme.border} />
                     <Text style={styles.emptyText}>No hay productos que coincidan con los filtros.</Text>
                 </View>
             ) : (
@@ -157,34 +147,34 @@ const StoreScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#101820', // Tema oscuro de PawMate
+        backgroundColor: theme.background,
     },
     header: {
         paddingTop: 60,
         paddingBottom: 20,
         paddingHorizontal: 20,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
         borderBottomWidth: 1,
-        borderBottomColor: '#1c2a35',
+        borderBottomColor: theme.border,
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#1a7a4c', // Verde primario
+        color: theme.primary,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#888',
+        color: theme.textSecondary,
         marginTop: 5,
     },
     filtersContainer: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#334155',
+        borderBottomColor: theme.border,
     },
     filterScroll: {
         paddingHorizontal: 15,
@@ -194,21 +184,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#2d3748',
+        backgroundColor: theme.background,
         marginRight: 10,
         borderWidth: 1,
-        borderColor: '#4a5568',
+        borderColor: theme.border,
     },
     stateFilterBadge: {
         borderRadius: 8, // Diferenciar visualmente
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     filterBadgeActive: {
-        backgroundColor: '#1a7a4c',
-        borderColor: '#1a7a4c',
+        backgroundColor: theme.primary,
+        borderColor: theme.primary,
     },
     filterText: {
-        color: '#a0aec0',
+        color: theme.textSecondary,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -225,12 +215,12 @@ const styles = StyleSheet.create({
     },
     productCard: {
         width: (width - 45) / 2, // 2 columnas con padding
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 12,
         marginBottom: 15,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#2d3748',
+        borderColor: theme.border,
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -240,7 +230,7 @@ const styles = StyleSheet.create({
     productImage: {
         width: '100%',
         height: 150,
-        backgroundColor: '#2d3748',
+        backgroundColor: theme.border,
     },
     stateBadge: {
         position: 'absolute',
@@ -263,19 +253,19 @@ const styles = StyleSheet.create({
     productTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFF',
+        color: theme.text,
         marginBottom: 6,
         height: 40, // Fija para alineación
     },
     productPrice: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#1a7a4c',
+        color: theme.primary,
         marginBottom: 4,
     },
     productCategory: {
         fontSize: 12,
-        color: '#888',
+        color: theme.textSecondary,
     },
     emptyContainer: {
         flex: 1,
@@ -284,7 +274,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     emptyText: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 16,
         textAlign: 'center',
         marginTop: 15,
@@ -297,10 +287,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         right: 25,
         bottom: 100, // Alto para sortear la barra inferior
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         borderRadius: 30,
         elevation: 8,
-        shadowColor: '#1a7a4c',
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 5,

@@ -11,21 +11,39 @@ import {
     TouchableWithoutFeedback,
     Keyboard,
     Image,
+    ActivityIndicator,
 } from 'react-native';
+import { ThemeContext } from '../context/ThemeContext';
+import { auth } from '../config/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 const LoginScreen = ({ navigation }) => {
+    const { theme } = React.useContext(ThemeContext);
+    const styles = getStyles(theme);
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         // Basic validation
         if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert('Error', 'Por favor llena todos los campos');
             return;
         }
-        // Placeholder for actual login logic
-        console.log('Login attempt:', { email, password });
-        navigation.replace('Home'); // Navigate to Home on success (temporary)
+
+        setIsLoading(true);
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            // On success, AuthContext will update and AppNavigator will automatically switch to MainTabNavigator
+        } catch (error) {
+            let msg = 'Error al iniciar sesión';
+            if (error.code === 'auth/invalid-credential') msg = 'Credenciales incorrectas';
+            if (error.code === 'auth/invalid-email') msg = 'Email inválido';
+            Alert.alert('Error', msg);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -37,44 +55,52 @@ const LoginScreen = ({ navigation }) => {
                 <View style={styles.inner}>
                     <View style={styles.headerContainer}>
                         <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-                        <Text style={styles.title}>Welcome Back!</Text>
-                        <Text style={styles.subtitle}>Login to your account</Text>
+                        <Text style={styles.title}>¡Bienvenido!</Text>
+                        <Text style={styles.subtitle}>Inicia sesión en tu cuenta</Text>
                     </View>
 
                     <View style={styles.formContainer}>
-                        <Text style={styles.label}>Email</Text>
+                        <Text style={styles.label}>Correo Electrónico</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="Enter your email"
-                            placeholderTextColor="#888"
+                            placeholder="tucorreo@ejemplo.com"
+                            placeholderTextColor={theme.textSecondary}
                             keyboardType="email-address"
                             autoCapitalize="none"
                             value={email}
                             onChangeText={setEmail}
                         />
 
-                        <Text style={styles.label}>Password</Text>
+                        <Text style={styles.label}>Contraseña</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="Enter your password"
-                            placeholderTextColor="#888"
+                            placeholder="Ingresa tu contraseña"
+                            placeholderTextColor={theme.textSecondary}
                             secureTextEntry
                             value={password}
                             onChangeText={setPassword}
                         />
 
                         <TouchableOpacity style={styles.forgotPassword}>
-                            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                            <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                            <Text style={styles.buttonText}>Login</Text>
+                        <TouchableOpacity
+                            style={[styles.button, isLoading && { opacity: 0.7 }]}
+                            onPress={handleLogin}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.buttonText}>Iniciar Sesión</Text>
+                            )}
                         </TouchableOpacity>
 
                         <View style={styles.signupContainer}>
-                            <Text style={styles.signupText}>Don't have an account? </Text>
+                            <Text style={styles.signupText}>¿No tienes una cuenta? </Text>
                             <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                                <Text style={styles.signupLink}>Sign Up</Text>
+                                <Text style={styles.signupLink}>Regístrate</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -84,10 +110,10 @@ const LoginScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#101820', // Dark background
+        backgroundColor: theme.background,
     },
     inner: {
         flex: 1,
@@ -110,48 +136,48 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: 'bold',
-        color: '#1a7a4c', // Green accent
+        color: theme.primary,
         marginBottom: 10,
     },
     subtitle: {
         fontSize: 16,
-        color: '#ccc',
+        color: theme.textSecondary,
     },
     formContainer: {
         width: '100%',
     },
     label: {
-        color: '#fff',
+        color: theme.text,
         marginBottom: 5,
         marginLeft: 5,
         fontSize: 14,
         fontWeight: '600',
     },
     input: {
-        backgroundColor: '#1c2a35', // Slightly lighter dark for inputs
-        color: '#fff',
+        backgroundColor: theme.cardBackground,
+        color: theme.text,
         padding: 15,
         borderRadius: 10,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
     },
     forgotPassword: {
         alignSelf: 'flex-end',
         marginBottom: 30,
     },
     forgotPasswordText: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontSize: 14,
     },
     button: {
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         paddingVertical: 15,
         borderRadius: 10,
         alignItems: 'center',
         marginBottom: 20,
-        elevation: 5, // Android shadow
-        shadowColor: '#1a7a4c', // iOS shadow
+        elevation: 5,
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
@@ -167,11 +193,11 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     signupText: {
-        color: '#ccc',
+        color: theme.textSecondary,
         fontSize: 14,
     },
     signupLink: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontSize: 14,
         fontWeight: 'bold',
     },

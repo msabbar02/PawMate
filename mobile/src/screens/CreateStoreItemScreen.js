@@ -3,10 +3,14 @@ import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Image,
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker'; // Ensure you have this installed
+import { ThemeContext } from '../context/ThemeContext';
 
 const CATEGORIES = ['Accesorios', 'Comida', 'Juguetes', 'Salud', 'Higiene', 'Ropa', 'Otros'];
 
 const CreateStoreItemScreen = ({ navigation }) => {
+    const { theme } = React.useContext(ThemeContext);
+    const styles = getStyles(theme);
+
     const [title, setTitle] = useState('');
     const [price, setPrice] = useState('');
     const [description, setDescription] = useState('');
@@ -95,7 +99,7 @@ const CreateStoreItemScreen = ({ navigation }) => {
                     ))}
                     {images.length < 5 && (
                         <TouchableOpacity style={styles.addImageBtn} onPress={pickImage}>
-                            <Ionicons name="camera-outline" size={32} color="#1a7a4c" />
+                            <Ionicons name="camera-outline" size={32} color={theme.primary} />
                             <Text style={styles.addImageText}>Añadir</Text>
                         </TouchableOpacity>
                     )}
@@ -108,7 +112,7 @@ const CreateStoreItemScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         placeholder="Ej. Correa extensible 5m"
-                        placeholderTextColor="#666"
+                        placeholderTextColor={theme.textSecondary}
                         value={title}
                         onChangeText={setTitle}
                         maxLength={50}
@@ -121,7 +125,7 @@ const CreateStoreItemScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="0.00"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.textSecondary}
                             keyboardType="decimal-pad"
                             value={price}
                             onChangeText={setPrice}
@@ -154,10 +158,10 @@ const CreateStoreItemScreen = ({ navigation }) => {
                             selectedValue={category}
                             onValueChange={(itemValue) => setCategory(itemValue)}
                             style={styles.picker}
-                            dropdownIconColor="#1a7a4c"
+                            dropdownIconColor={theme.primary}
                         >
                             {CATEGORIES.map(cat => (
-                                <Picker.Item label={cat} value={cat} key={cat} color={Platform.OS === 'ios' ? '#FFF' : '#000'} />
+                                <Picker.Item label={cat} value={cat} key={cat} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />
                             ))}
                         </Picker>
                     </View>
@@ -168,7 +172,7 @@ const CreateStoreItemScreen = ({ navigation }) => {
                     <TextInput
                         style={[styles.input, styles.textArea]}
                         placeholder="Describe el producto, sus características, tiempo de uso, etc."
-                        placeholderTextColor="#666"
+                        placeholderTextColor={theme.textSecondary}
                         multiline
                         numberOfLines={4}
                         textAlignVertical="top"
@@ -192,7 +196,7 @@ const CreateStoreItemScreen = ({ navigation }) => {
                     )}
                 </TouchableOpacity>
                 {images.length < 3 && (
-                    <Text style={[styles.helperText, { textAlign: 'center', color: '#EF4444', marginTop: 10 }]}>
+                    <Text style={[styles.helperText, { textAlign: 'center', color: theme.error, marginTop: 10 }]}>
                         Faltan fotos (Mínimo 3)
                     </Text>
                 )}
@@ -203,7 +207,7 @@ const CreateStoreItemScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -211,9 +215,9 @@ const styles = StyleSheet.create({
         paddingTop: 50,
         paddingBottom: 15,
         paddingHorizontal: 20,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
         borderBottomWidth: 1,
-        borderBottomColor: '#1c2a35',
+        borderBottomColor: theme.border,
     },
     backButton: {
         padding: 5,
@@ -221,11 +225,11 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#FFF',
+        color: theme.text,
     },
     container: {
         flex: 1,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     scrollContent: {
         padding: 20,
@@ -233,11 +237,11 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFF',
+        color: theme.text,
         marginBottom: 10,
     },
     required: {
-        color: '#1a7a4c',
+        color: theme.primary,
     },
     imagesScroll: {
         flexDirection: 'row',
@@ -251,13 +255,13 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 10,
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
     },
     removeImageBtn: {
         position: 'absolute',
         top: -10,
         right: -10,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
         borderRadius: 12,
     },
     addImageBtn: {
@@ -265,20 +269,20 @@ const styles = StyleSheet.create({
         height: 100,
         borderRadius: 10,
         borderWidth: 2,
-        borderColor: '#1a7a4c',
+        borderColor: theme.primary,
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(26, 122, 76, 0.1)',
+        backgroundColor: theme.primary + '1A', // Using 10% opacity via hex
     },
     addImageText: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontSize: 12,
         marginTop: 5,
         fontWeight: 'bold',
     },
     helperText: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 12,
         marginBottom: 20,
     },
@@ -292,38 +296,38 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#FFF',
+        color: theme.text,
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 10,
         padding: 15,
-        color: '#FFF',
+        color: theme.text,
         borderWidth: 1,
-        borderColor: '#334155',
+        borderColor: theme.border,
         fontSize: 16,
     },
     textArea: {
         height: 120,
     },
     pickerContainer: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#334155',
+        borderColor: theme.border,
         overflow: 'hidden',
     },
     picker: {
-        color: '#FFF',
+        color: theme.text,
         height: 55,
     },
     stateSelector: {
         flexDirection: 'row',
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#334155',
+        borderColor: theme.border,
         overflow: 'hidden',
         height: 55,
     },
@@ -333,31 +337,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     stateBtnActive: {
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
     },
     stateBtnText: {
-        color: '#888',
+        color: theme.textSecondary,
         fontWeight: '500',
     },
     stateBtnTextActive: {
-        color: '#FFF',
+        color: '#FFF', // Keeping white for active button text explicitly
         fontWeight: 'bold',
     },
     submitButton: {
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         borderRadius: 12,
         padding: 18,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 10,
-        shadowColor: '#1a7a4c',
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
         elevation: 5,
     },
     submitButtonDisabled: {
-        backgroundColor: '#2d3748',
+        backgroundColor: theme.border,
         shadowOpacity: 0,
         elevation: 0,
     },

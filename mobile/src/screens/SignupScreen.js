@@ -8,11 +8,20 @@ import {
     ScrollView,
     Alert,
     KeyboardAvoidingView,
-    Platform,
+    Keyboard,
     Image,
+    ActivityIndicator,
+    Platform,
 } from 'react-native';
+import { ThemeContext } from '../context/ThemeContext';
+import { auth, db } from '../config/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 const SignupScreen = ({ navigation }) => {
+    const { theme } = React.useContext(ThemeContext);
+    const styles = getStyles(theme);
+
     const [formData, setFormData] = useState({
         name: '',
         surname: '',
@@ -27,12 +36,13 @@ const SignupScreen = ({ navigation }) => {
     });
 
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleChange = (name, value) => {
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleSignup = () => {
+    const handleSignup = async () => {
         const {
             name,
             surname,
@@ -63,15 +73,46 @@ const SignupScreen = ({ navigation }) => {
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            Alert.alert('Error', 'Las contraseñas no coinciden');
             return;
         }
 
-        // Placeholder for actual signup logic
-        console.log('Signup data:', formData);
-        Alert.alert('Success', 'Account created successfully!', [
-            { text: 'OK', onPress: () => navigation.navigate('Home') }, // Navigate to Home
-        ]);
+        setIsLoading(true);
+        try {
+            // 1. Create user in Firebase Auth
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // 2. Save additional user data in Firestore
+            await setDoc(doc(db, 'users', user.uid), {
+                name,
+                surname,
+                email,
+                avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                address: {
+                    city,
+                    province,
+                    street,
+                    door,
+                    floor
+                },
+                role: 'user', // Default role is normal user
+                createdAt: new Date().toISOString()
+            });
+
+            Alert.alert('Éxito', '¡Cuenta creada correctamente!', [
+                { text: 'OK', onPress: () => navigation.replace('HomeMain') }, // Navigate to HomeMain
+            ]);
+        } catch (error) {
+            let msg = 'Error al crear la cuenta';
+            if (error.code === 'auth/email-already-in-use') msg = 'El correo ya está en uso';
+            if (error.code === 'auth/invalid-email') msg = 'Correo inválido';
+            if (error.code === 'auth/weak-password') msg = 'La contraseña es muy débil (mínimo 6 caracteres)';
+            Alert.alert('Error', msg);
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -105,7 +146,7 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Name"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={formData.name}
                             onChangeText={(text) => handleChange('name', text)}
                         />
@@ -115,7 +156,7 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Surname"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={formData.surname}
                             onChangeText={(text) => handleChange('surname', text)}
                         />
@@ -127,7 +168,7 @@ const SignupScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         placeholder="example@email.com"
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.textSecondary}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         value={formData.email}
@@ -141,7 +182,7 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.passwordInput}
                             placeholder="Create a password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             secureTextEntry={!showPassword}
                             value={formData.password}
                             onChangeText={(text) => handleChange('password', text)}
@@ -159,7 +200,7 @@ const SignupScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         placeholder="Confirm your password"
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.textSecondary}
                         secureTextEntry={!showPassword}
                         value={formData.confirmPassword}
                         onChangeText={(text) => handleChange('confirmPassword', text)}
@@ -177,7 +218,7 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="City"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={formData.city}
                             onChangeText={(text) => handleChange('city', text)}
                         />
@@ -187,7 +228,7 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Province"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={formData.province}
                             onChangeText={(text) => handleChange('province', text)}
                         />
@@ -199,7 +240,7 @@ const SignupScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         placeholder="Street Name"
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.textSecondary}
                         value={formData.street}
                         onChangeText={(text) => handleChange('street', text)}
                     />
@@ -211,7 +252,7 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Door"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={formData.door}
                             onChangeText={(text) => handleChange('door', text)}
                         />
@@ -221,15 +262,23 @@ const SignupScreen = ({ navigation }) => {
                         <TextInput
                             style={styles.input}
                             placeholder="Floor"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.textSecondary}
                             value={formData.floor}
                             onChangeText={(text) => handleChange('floor', text)}
                         />
                     </View>
                 </View>
 
-                <TouchableOpacity style={styles.button} onPress={handleSignup}>
-                    <Text style={styles.buttonText}>Sign Up</Text>
+                <TouchableOpacity
+                    style={[styles.button, isLoading && { opacity: 0.7 }]}
+                    onPress={handleSignup}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator color="#FFF" />
+                    ) : (
+                        <Text style={styles.buttonText}>Registrarse</Text>
+                    )}
                 </TouchableOpacity>
 
                 <View style={styles.loginContainer}>
@@ -243,10 +292,10 @@ const SignupScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     header: {
         flexDirection: 'row',
@@ -254,19 +303,19 @@ const styles = StyleSheet.create({
         paddingTop: 50,
         paddingBottom: 20,
         paddingHorizontal: 20,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
     },
     backButton: {
         marginRight: 15,
     },
     backButtonText: {
-        color: '#fff',
+        color: theme.text,
         fontSize: 24,
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#1a7a4c',
+        color: theme.primary,
     },
     logoContainer: {
         alignItems: 'center',
@@ -277,7 +326,7 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#fff',
+        backgroundColor: theme.cardBackground,
         overflow: 'hidden',
     },
     scrollContent: {
@@ -287,13 +336,13 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.text,
         marginBottom: 5,
         marginTop: 10,
     },
     sectionSubtitle: {
         fontSize: 14,
-        color: '#888',
+        color: theme.textSecondary,
         marginBottom: 15,
     },
     row: {
@@ -304,45 +353,45 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     label: {
-        color: '#ccc',
+        color: theme.text,
         fontSize: 14,
         marginBottom: 5,
         marginLeft: 5,
     },
     input: {
-        backgroundColor: '#1c2a35',
-        color: '#fff',
+        backgroundColor: theme.cardBackground,
+        color: theme.text,
         padding: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
     },
     passwordContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
     },
     passwordInput: {
         flex: 1,
-        color: '#fff',
+        color: theme.text,
         padding: 12,
     },
     showHideText: {
-        color: '#1a7a4c',
+        color: theme.primary,
         padding: 10,
         fontWeight: 'bold',
     },
     button: {
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         paddingVertical: 15,
         borderRadius: 10,
         alignItems: 'center',
         marginTop: 30,
         marginBottom: 20,
-        shadowColor: '#1a7a4c',
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
@@ -359,10 +408,10 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     loginText: {
-        color: '#ccc',
+        color: theme.textSecondary,
     },
     loginLink: {
-        color: '#1a7a4c',
+        color: theme.primary,
         fontWeight: 'bold',
     },
 });

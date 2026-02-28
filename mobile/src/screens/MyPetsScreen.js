@@ -1,31 +1,49 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
-
-const MOCK_PETS = [
-    {
-        id: '1',
-        name: 'Max',
-        type: 'Perro',
-        breed: 'Labrador',
-        age: '3 años',
-        image: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
-    },
-    {
-        id: '2',
-        name: 'Luna',
-        type: 'Gato',
-        breed: 'Siamés',
-        age: '1 año',
-        image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
-    }
-];
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator } from 'react-native';
+import { ThemeContext } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const MyPetsScreen = ({ navigation }) => {
-    // Para cuando haya integración real: const [pets, setPets] = useState([]);
-    const [pets, setPets] = useState(MOCK_PETS);
+    const { theme } = useContext(ThemeContext);
+    const { user } = useContext(AuthContext);
+    const styles = getStyles(theme);
+
+    const [pets, setPets] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+
+        // Query pets belonging to the current user
+        const q = query(
+            collection(db, 'pets'),
+            where('ownerId', '==', user.uid)
+        );
+
+        // Real-time listener
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedPets = [];
+            snapshot.forEach((doc) => {
+                fetchedPets.push({ id: doc.id, ...doc.data() });
+            });
+            setPets(fetchedPets);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching pets: ", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
 
     const renderPetCard = ({ item }) => (
-        <View style={styles.card}>
+        <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('PetDetails', { pet: item })}
+        >
             <Image
                 source={{ uri: item.image }}
                 style={styles.petImage}
@@ -34,9 +52,9 @@ const MyPetsScreen = ({ navigation }) => {
             <View style={styles.cardContent}>
                 <Text style={styles.petName}>{item.name}</Text>
                 <Text style={styles.petDetails}>{item.type} • {item.breed}</Text>
-                <Text style={styles.petAge}>{item.age}</Text>
+                <Text style={styles.petAge}>{item.weight} kg</Text>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 
     return (
@@ -48,7 +66,11 @@ const MyPetsScreen = ({ navigation }) => {
                 </Text>
             </View>
 
-            {pets.length === 0 ? (
+            {loading ? (
+                <View style={styles.emptyContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            ) : pets.length === 0 ? (
                 <View style={styles.emptyContainer}>
                     <Text style={styles.emptyText}>No tienes mascotas registradas aún.</Text>
                 </View>
@@ -72,27 +94,27 @@ const MyPetsScreen = ({ navigation }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#101820', // Dark theme background
+        backgroundColor: theme.background,
     },
     header: {
         paddingTop: 60,
         paddingBottom: 20,
         paddingHorizontal: 20,
-        backgroundColor: '#101820',
+        backgroundColor: theme.background,
         borderBottomWidth: 1,
-        borderBottomColor: '#1c2a35',
+        borderBottomColor: theme.border,
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#1a7a4c', // Primary green
+        color: theme.primary,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#888',
+        color: theme.textSecondary,
         marginTop: 5,
     },
     listContainer: {
@@ -100,13 +122,13 @@ const styles = StyleSheet.create({
         paddingBottom: 160, // Space for FAB
     },
     card: {
-        backgroundColor: '#1c2a35',
+        backgroundColor: theme.cardBackground,
         borderRadius: 15,
         marginBottom: 15,
         flexDirection: 'row',
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: theme.border,
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -125,17 +147,17 @@ const styles = StyleSheet.create({
     petName: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.text,
         marginBottom: 4,
     },
     petDetails: {
         fontSize: 14,
-        color: '#ccc',
+        color: theme.textSecondary,
         marginBottom: 4,
     },
     petAge: {
         fontSize: 14,
-        color: '#1a7a4c',
+        color: theme.primary,
         fontWeight: '600',
     },
     emptyContainer: {
@@ -145,7 +167,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     emptyText: {
-        color: '#888',
+        color: theme.textSecondary,
         fontSize: 16,
         textAlign: 'center',
     },
@@ -157,10 +179,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         right: 25,
         bottom: 100, // Changed from 25 to 100 to clear the floating bottom tabs
-        backgroundColor: '#1a7a4c',
+        backgroundColor: theme.primary,
         borderRadius: 30,
         elevation: 8,
-        shadowColor: '#1a7a4c',
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 5,
