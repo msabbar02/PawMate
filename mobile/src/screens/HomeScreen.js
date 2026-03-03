@@ -18,6 +18,7 @@ const HomeScreen = ({ navigation, route }) => {
     const [errorMsg, setErrorMsg] = useState(null);
     const userName = userData?.name || 'User';
     const [pets, setPets] = useState([]);
+    const [caregivers, setCaregivers] = useState([]);
     const { user } = React.useContext(AuthContext);
 
     const fetchLocation = async () => {
@@ -48,6 +49,21 @@ const HomeScreen = ({ navigation, route }) => {
         return () => unsubscribe();
     }, [user]);
 
+    useEffect(() => {
+        const q = query(collection(db, 'users'), where('role', '==', 'caregiver'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = [];
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (data.isOnline && data.location?.latitude != null && data.location?.longitude != null) {
+                    list.push({ id: docSnap.id, ...data });
+                }
+            });
+            setCaregivers(list);
+        });
+        return () => unsubscribe();
+    }, []);
+
 
 
     let defaultRegion = {
@@ -68,76 +84,69 @@ const HomeScreen = ({ navigation, route }) => {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header section */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => Alert.alert('Notifications', 'No new notifications')} style={styles.notificationIcon}>
-                    <Ionicons name="notifications-outline" size={28} color={theme.primary} />
-                </TouchableOpacity>
+                <View style={{ width: 40 }} />
                 <View style={styles.logoAndTextContainer}>
                     <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="cover" />
                     <Text style={styles.greetingTitle}>Hola {userName}</Text>
                 </View>
-                <View style={{ width: 28 }} />
+                <TouchableOpacity onPress={() => navigation.navigate('Mensajes')} style={styles.notificationBell}>
+                    <Ionicons name="notifications-outline" size={26} color={theme.primary} />
+                    <View style={styles.notificationBadge} />
+                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
-                {/* Search Bar / Button */}
-                <TouchableOpacity style={styles.searchBar} onPress={() => Alert.alert('Buscar', 'Search Caregivers screen coming soon!')}>
-                    <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
-                    <Text style={styles.searchText}>Encuentra el cuidador perfecto...</Text>
-                </TouchableOpacity>
 
-
-
-                {/* Map Section */}
+                {/* Mapa */}
                 <View style={styles.mapContainer}>
                     <MapView
                         provider={PROVIDER_DEFAULT}
                         style={styles.map}
                         region={defaultRegion}
                         showsUserLocation={true}
-                        showsMyLocationButton={false} // Disable default so ours doesn't conflict
+                        showsMyLocationButton={false}
                     >
+                        {caregivers.map((c) => (
+                            <Marker
+                                key={c.id}
+                                coordinate={{ latitude: c.location.latitude, longitude: c.location.longitude }}
+                                title={c.name || 'Cuidador'}
+                                description={c.isOnline ? 'Disponible' : ''}
+                            >
+                                <View style={styles.markerWrap}>
+                                    <Image
+                                        source={{ uri: c.avatar || 'https://via.placeholder.com/80' }}
+                                        style={styles.markerAvatar}
+                                    />
+                                    <View style={[styles.markerDot, c.isOnline ? styles.markerDotOnline : styles.markerDotOffline]} />
+                                </View>
+                            </Marker>
+                        ))}
                     </MapView>
                     <TouchableOpacity style={styles.locateButton} onPress={fetchLocation}>
                         <Ionicons name="locate" size={24} color={theme.primary} />
                     </TouchableOpacity>
                 </View>
 
-                {/* Tus Mascotas - Para Pasear */}
-                {pets.length > 0 ? (
-                    <View style={styles.sectionContainer}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Tus Mascotas</Text>
-                        </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardsContainer}>
-                            {pets.map((pet) => (
-                                <View key={pet.id} style={styles.petCard}>
-                                    <Image source={{ uri: pet.photo || 'https://via.placeholder.com/150' }} style={styles.petAvatar} />
-                                    <Text style={styles.petName}>{pet.name}</Text>
-                                    <TouchableOpacity
-                                        style={styles.walkButton}
-                                        onPress={() => navigation.navigate('WalkTracking', { petId: pet.id, petName: pet.name })}
-                                    >
-                                        <Text style={styles.walkButtonText}>Pasear</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                ) : null}
+                <TouchableOpacity
+                    style={styles.startWalkButton}
+                    onPress={() => navigation.navigate('SelectPetWalk')}
+                >
+                    <Ionicons name="walk" size={28} color="#FFF" style={{ marginRight: 12 }} />
+                    <Text style={styles.startWalkButtonText}>Iniciar paseo</Text>
+                </TouchableOpacity>
 
+                <TouchableOpacity
+                    style={styles.searchCaregiversButton}
+                    onPress={() => navigation.navigate('SearchCaregivers')}
+                >
+                    <Ionicons name="search" size={24} color={theme.primary} style={{ marginRight: 10 }} />
+                    <Text style={styles.searchCaregiversButtonText}>Buscar cuidadores</Text>
+                </TouchableOpacity>
 
-
-                <View style={{ height: 100 }} /> {/* Spacer for Bottom Tabs & FAB */}
+                <View style={{ height: 100 }} /> {/* Spacer for Bottom Tabs */}
             </ScrollView>
-
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => navigation.navigate('CreatePet')}
-            >
-                <Text style={styles.fabIcon}>+</Text>
-            </TouchableOpacity>
         </SafeAreaView>
     );
 };
@@ -156,9 +165,6 @@ const getStyles = (theme) => StyleSheet.create({
         paddingTop: 10,
         backgroundColor: theme.background,
         zIndex: 10,
-    },
-    notificationIcon: {
-        padding: 5,
     },
     logoAndTextContainer: {
         alignItems: 'center',
@@ -196,34 +202,36 @@ const getStyles = (theme) => StyleSheet.create({
         color: theme.textSecondary,
         fontSize: 16,
     },
-    filtersContainer: {
-        paddingHorizontal: 15,
-        marginBottom: 10,
-    },
-    filterChip: {
-        backgroundColor: theme.cardBackground,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        marginHorizontal: 5,
-        borderWidth: 1,
-        borderColor: theme.border,
-    },
-    filterChipActive: {
+    startWalkButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 20,
+        marginTop: 20,
+        paddingVertical: 18,
         backgroundColor: theme.primary,
+        borderRadius: 16,
+        elevation: 4,
+        shadowColor: theme.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+    },
+    startWalkButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+    searchCaregiversButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 20,
+        marginTop: 14,
+        paddingVertical: 16,
+        backgroundColor: theme.cardBackground,
+        borderRadius: 16,
+        borderWidth: 2,
         borderColor: theme.primary,
     },
-    filterText: {
-        color: theme.textSecondary,
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    filterTextActive: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
+    searchCaregiversButtonText: { color: theme.primary, fontSize: 17, fontWeight: 'bold' },
     mapContainer: {
-        height: 240, // Map takes decent vertical space
         borderRadius: 20,
         overflow: 'hidden',
         marginHorizontal: 20,
@@ -254,18 +262,38 @@ const getStyles = (theme) => StyleSheet.create({
         borderWidth: 1,
         borderColor: theme.border,
     },
+    markerWrap: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    markerAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#FFF',
+        backgroundColor: theme.cardBackground,
+    },
+    markerDot: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        borderWidth: 2,
+        borderColor: '#FFF',
+    },
+    markerDotOnline: {
+        backgroundColor: '#4caf50',
+    },
+    markerDotOffline: {
+        backgroundColor: '#f44336',
+    },
     customMarkerContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    markerAvatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: theme.primary,
     },
     onlineDotMarker: {
         position: 'absolute',

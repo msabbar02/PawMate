@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +42,15 @@ const WalkTrackingScreen = ({ route, navigation }) => {
     const mapRef = useRef(null);
 
     useEffect(() => {
+        // Request notifications permission immediately
+        const requestNotifPermissions = async () => {
+            const { status } = await Notifications.requestPermissionsAsync();
+            if (status !== 'granted') {
+                console.log("Notification permissions not granted");
+            }
+        };
+        requestNotifPermissions();
+
         const checkLocationAuth = async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
@@ -125,10 +135,21 @@ const WalkTrackingScreen = ({ route, navigation }) => {
 
         try {
             await addDoc(collection(db, 'walks'), walkData);
+
+            // Trigger local notification
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: "¡Paseo Completado! 🐾",
+                    body: `Has terminado el paseo con ${petName}. Total: ${distance.toFixed(2)} km.`,
+                    sound: true,
+                },
+                trigger: null, // Send immediately
+            });
+
             navigation.replace('WalkSummary', { walkData });
         } catch (error) {
             console.error("Error saving walk:", error);
-            Alert.alert('Error', 'No se pudo guardar el paseo guardado de red.');
+            Alert.alert('Error', 'No se pudo guardar el paseo.');
         }
     };
 

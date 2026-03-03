@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -61,21 +61,25 @@ const ChatScreen = ({ route, navigation }) => {
         initChat();
     }, [recipientId, user]);
 
-    // Listen to messages
+    // Listen to messages (sin orderBy para evitar índice compuesto; ordenamos en memoria)
     useEffect(() => {
         if (!chatId) return;
 
-        const q = query(
-            collection(db, 'chats', chatId, 'messages'),
-            orderBy('createdAt', 'desc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        const unsubscribe = onSnapshot(messagesRef, (snapshot) => {
             const msgs = [];
-            snapshot.forEach((doc) => {
-                msgs.push({ id: doc.id, ...doc.data() });
+            snapshot.forEach((docSnap) => {
+                msgs.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            msgs.sort((a, b) => {
+                const tA = (a.createdAt && typeof a.createdAt.toMillis === 'function') ? a.createdAt.toMillis() : (a.createdAt?.seconds ?? 0) * 1000;
+                const tB = (b.createdAt && typeof b.createdAt.toMillis === 'function') ? b.createdAt.toMillis() : (b.createdAt?.seconds ?? 0) * 1000;
+                return tA - tB;
             });
             setMessages(msgs);
+            setLoading(false);
+        }, (err) => {
+            console.error('Chat messages error:', err);
             setLoading(false);
         });
 
@@ -95,24 +99,49 @@ const ChatScreen = ({ route, navigation }) => {
                 createdAt: serverTimestamp()
             });
 
-            // Update thread's last message
-            /* await updateDoc(doc(db, 'chats', chatId), {
+            await updateDoc(doc(db, 'chats', chatId), {
                 lastMessage: text,
                 updatedAt: serverTimestamp()
-            }); */ // Skipping strict thread updates for simplicity, but ideal in production
+            });
         } catch (error) {
             console.error("Error sending message:", error);
         }
     };
 
-    const renderMessage = ({ item }) => {
+    const renderMessage = ({ item, index }) => {
         const isMyMessage = item.senderId === user.uid;
 
+        let showDate = false;
+        if (index === 0) {
+            showDate = true;
+        } else {
+            const prevMsg = messages[index - 1]; // Messages are inverted, so index - 1 is older
+            if (item.createdAt && prevMsg?.createdAt && typeof item.createdAt.toMillis === 'function' && typeof prevMsg.createdAt.toMillis === 'function') {
+                const currentDate = new Date(item.createdAt.toMillis()).toLocaleDateString();
+                const prevDate = new Date(prevMsg.createdAt.toMillis()).toLocaleDateString();
+                if (currentDate !== prevDate) showDate = true;
+            }
+        }
+
         return (
-            <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage]}>
-                <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.theirMessageText]}>
-                    {item.text}
-                </Text>
+            <View>
+                {showDate && item.createdAt && typeof item.createdAt.toMillis === 'function' && (
+                    <Text style={styles.dateSeparator}>
+                        {new Date(item.createdAt.toMillis()).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </Text>
+                )}
+                <View style={[styles.messageWrapper, isMyMessage ? styles.messageWrapperMe : styles.messageWrapperOther]}>
+                    <View style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage]}>
+                        <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.theirMessageText]}>
+                            {item.text ?? ''}
+                        </Text>
+                        <Text style={[styles.messageTime, isMyMessage ? styles.messageTimeMe : styles.messageTimeOther]}>
+                            {item.createdAt && typeof item.createdAt.toMillis === 'function' ?
+                                new Date(item.createdAt.toMillis()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                                ''}
+                        </Text>
+                    </View>
+                </View>
             </View>
         );
     };
@@ -127,7 +156,10 @@ const ChatScreen = ({ route, navigation }) => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{recipientName || 'Chat'}</Text>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle}>{recipientName || 'Chat'}</Text>
+                    <Text style={styles.headerStatus}>En línea</Text>
+                </View>
                 <View style={{ width: 24 }} />
             </View>
 
@@ -166,28 +198,39 @@ const getStyles = (theme) => StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingTop: 50, paddingBottom: 15, paddingHorizontal: 20,
-        backgroundColor: theme.cardBackground, borderBottomWidth: 1, borderBottomColor: theme.border
+        backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 3, zIndex: 10
     },
     backButton: { padding: 5 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.text },
+    headerTitleContainer: { flex: 1, alignItems: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: theme.text },
+    headerStatus: { fontSize: 12, color: '#4caf50', marginTop: 2, fontWeight: '500' },
     listContent: { padding: 15 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 20, marginBottom: 10 },
-    myMessage: { alignSelf: 'flex-end', backgroundColor: theme.primary, borderBottomRightRadius: 5 },
-    theirMessage: { alignSelf: 'flex-start', backgroundColor: theme.cardBackground, borderWidth: 1, borderColor: theme.border, borderBottomLeftRadius: 5 },
-    messageText: { fontSize: 16, lineHeight: 22 },
+    dateSeparator: { alignSelf: 'center', marginVertical: 15, fontSize: 12, color: theme.textSecondary, fontWeight: '600', backgroundColor: theme.cardBackground, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden' },
+    messageWrapper: { marginBottom: 15, flexDirection: 'row' },
+    messageWrapperMe: { justifyContent: 'flex-end' },
+    messageWrapperOther: { justifyContent: 'flex-start' },
+    messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 },
+    myMessage: { backgroundColor: theme.primary, borderBottomRightRadius: 4 },
+    theirMessage: { backgroundColor: theme.cardBackground, borderWidth: 1, borderColor: theme.border, borderBottomLeftRadius: 4 },
+    messageText: { fontSize: 15, lineHeight: 22 },
     myMessageText: { color: '#FFF' },
     theirMessageText: { color: theme.text },
+    messageTime: { fontSize: 11, alignSelf: 'flex-end', marginTop: 4 },
+    messageTimeMe: { color: 'rgba(255,255,255,0.7)' },
+    messageTimeOther: { color: theme.textSecondary },
     inputArea: {
-        flexDirection: 'row', alignItems: 'flex-end', padding: 15,
-        backgroundColor: theme.cardBackground, borderTopWidth: 1, borderTopColor: theme.border
+        flexDirection: 'row', alignItems: 'flex-end', padding: 10,
+        backgroundColor: theme.background, borderTopWidth: 1, borderTopColor: theme.border,
+        paddingBottom: Platform.OS === 'ios' ? 25 : 10
     },
     input: {
-        flex: 1, backgroundColor: theme.background, color: theme.text,
-        borderRadius: 20, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 12,
-        maxHeight: 100, minHeight: 45, borderWidth: 1, borderColor: theme.border, marginRight: 10
+        flex: 1, backgroundColor: theme.cardBackground, color: theme.text,
+        borderRadius: 24, paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 10 : 12, paddingBottom: Platform.OS === 'ios' ? 10 : 12,
+        maxHeight: 100, minHeight: 45, borderWidth: 1, borderColor: theme.border, marginRight: 10, fontSize: 16
     },
-    sendButton: { backgroundColor: theme.primary, width: 45, height: 45, borderRadius: 22.5, justifyContent: 'center', alignItems: 'center' }
+    sendButton: { backgroundColor: theme.primary, width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 }
 });
 
 export default ChatScreen;

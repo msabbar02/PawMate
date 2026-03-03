@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -39,22 +40,41 @@ const MyPetsScreen = ({ navigation }) => {
     }, [user]);
 
     const renderPetCard = ({ item }) => (
-        <TouchableOpacity
-            style={styles.card}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('PetDetails', { pet: item })}
-        >
+        <View style={styles.card}>
             <Image
-                source={{ uri: item.image }}
+                source={{ uri: item.image || item.photo || 'https://via.placeholder.com/400' }}
                 style={styles.petImage}
                 resizeMode="cover"
             />
+            {/* Overlay Gradient equivalent using View to keep text legible */}
             <View style={styles.cardContent}>
-                <Text style={styles.petName}>{item.name}</Text>
-                <Text style={styles.petDetails}>{item.type} • {item.breed}</Text>
-                <Text style={styles.petAge}>{item.weight} kg</Text>
+                <View style={styles.cardHeaderInfo}>
+                    <Text style={styles.petName} numberOfLines={1}>{item.name}</Text>
+                    <View style={styles.petDetailsRow}>
+                        <Text style={styles.petDetails}>{item.type} • {item.breed}</Text>
+                        <View style={styles.weightBadge}>
+                            <Text style={styles.weightText}>{item.weight} kg</Text>
+                        </View>
+                    </View>
+                </View>
+                <View style={styles.cardActions}>
+                    <TouchableOpacity
+                        style={[styles.cardBtn, styles.editBtn]}
+                        onPress={() => navigation.navigate('EditPet', { petId: item.id })}
+                    >
+                        <Ionicons name="create-outline" size={16} color={theme.text} />
+                        <Text style={styles.editBtnText}>Editar Datos</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.cardBtn, styles.viewBtn]}
+                        onPress={() => navigation.navigate('PetDetails', { petId: item.id })}
+                    >
+                        <Ionicons name="eye-outline" size={16} color={theme.primary} />
+                        <Text style={styles.viewBtnText}>Ver Perfil</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-        </TouchableOpacity>
+        </View>
     );
 
     return (
@@ -62,7 +82,7 @@ const MyPetsScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Mis Mascotas</Text>
                 <Text style={styles.headerSubtitle}>
-                    {pets.length} de 5 mascotas registradas
+                    {`${pets.length} de 5 mascotas registradas`}
                 </Text>
             </View>
 
@@ -123,42 +143,83 @@ const getStyles = (theme) => StyleSheet.create({
     },
     card: {
         backgroundColor: theme.cardBackground,
-        borderRadius: 15,
-        marginBottom: 15,
-        flexDirection: 'row',
+        borderRadius: 24,
+        marginBottom: 20,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: theme.border,
-        elevation: 3,
+        elevation: 6,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
     },
     petImage: {
-        width: 100,
-        height: 100,
+        width: '100%',
+        height: 200,
     },
     cardContent: {
-        flex: 1,
-        padding: 15,
-        justifyContent: 'center',
+        padding: 20,
+    },
+    cardHeaderInfo: {
+        marginBottom: 16,
     },
     petName: {
-        fontSize: 18,
+        fontSize: 24,
         fontWeight: 'bold',
         color: theme.text,
-        marginBottom: 4,
+        marginBottom: 6,
+    },
+    petDetailsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     petDetails: {
-        fontSize: 14,
+        fontSize: 15,
         color: theme.textSecondary,
-        marginBottom: 4,
     },
-    petAge: {
+    weightBadge: {
+        backgroundColor: theme.primary + '15',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    weightText: {
         fontSize: 14,
         color: theme.primary,
+        fontWeight: '700',
+    },
+    cardActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    cardBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    editBtn: {
+        backgroundColor: theme.background,
+        borderWidth: 1,
+        borderColor: theme.border,
+    },
+    viewBtn: {
+        backgroundColor: theme.primary + '15',
+    },
+    editBtnText: {
+        fontSize: 14,
         fontWeight: '600',
+        color: theme.text,
+    },
+    viewBtnText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.primary,
     },
     emptyContainer: {
         flex: 1,

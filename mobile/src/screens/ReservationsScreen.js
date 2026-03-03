@@ -4,7 +4,9 @@ import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { notifyReservationStatus, API_BASE_URL } from '../config/api';
 import { Ionicons } from '@expo/vector-icons';
+// import { useStripe, PlatformPay } from '@stripe/stripe-react-native';
 
 const ReservationsScreen = ({ navigation }) => {
     const { theme } = useContext(ThemeContext);
@@ -13,6 +15,9 @@ const ReservationsScreen = ({ navigation }) => {
 
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
+    // const { confirmPlatformPayPayment, isPlatformPaySupported } = useStripe();
+    const isPlatformPaySupported = async () => false;
+    const confirmPlatformPayPayment = async () => ({ error: { message: 'Deshabilitado en Expo Go' } });
 
     const isCaregiver = userData?.role === 'caregiver';
 
@@ -50,17 +55,146 @@ const ReservationsScreen = ({ navigation }) => {
 
         try {
             await updateDoc(doc(db, 'reservations', id), { status: 'accepted' });
-            Alert.alert('Aceptado', 'Reserva confirmada. Se ha generado un QR para escanear.');
+            await notifyReservationStatus(id);
+            Alert.alert('Aceptado', 'Reserva confirmada. Se ha notificado al dueño por email y puedes generar el QR.');
         } catch (error) {
             console.error(error);
+            Alert.alert('Error', 'No se pudo aceptar la reserva.');
         }
     };
 
     const handleReject = async (id) => {
         try {
             await updateDoc(doc(db, 'reservations', id), { status: 'rejected' });
+            await notifyReservationStatus(id);
+            Alert.alert('Rechazada', 'Se ha notificado al dueño por email.');
         } catch (error) {
             console.error(error);
+        }
+    };
+
+    const handlePaymentSelection = (item) => {
+        Alert.alert(
+            'Seleccionar Método de Pago',
+            '¿Cómo deseas pagar esta reserva?',
+            [
+                { text: 'Efectivo', onPress: () => processCashPayment(item) },
+                { text: 'Apple / Google Pay', onPress: () => processStripePayment(item) },
+                { text: 'Cancelar', style: 'cancel' }
+            ]
+        );
+    };
+
+    const processCashPayment = async (item) => {
+        try {
+            await updateDoc(doc(db, 'reservations', item.id), { paymentMethod: 'cash', paymentStatus: 'paid' });
+            Alert.alert('Éxito', 'Pago registrado en efectivo. Ya puedes escanear el QR.');
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo registrar el pago.');
+        }
+    };
+
+    const processStripePayment = async (item) => {
+        try {
+            const isSupported = await isPlatformPaySupported();
+            if (!isSupported) {
+                Alert.alert('Error', 'Google Pay / Apple Pay no está soportado en este dispositivo.');
+                return;
+            }
+
+            const amount = item.price || 15; // Placeholder si no tiene precio guardado
+
+            const response = await fetch(`${API_BASE_URL}/api/payments/payment-intent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, currency: 'eur' })
+            });
+
+            const data = await response.json();
+
+            if (!data.clientSecret) {
+                Alert.alert('Error', 'No se pudo generar la intención de pago.');
+                return;
+            }
+
+            const { error, paymentIntent } = await confirmPlatformPayPayment(data.clientSecret, {
+                googlePay: {
+                    testEnv: true,
+                    merchantName: 'PawMate',
+                    merchantCountryCode: 'ES',
+                    currencyCode: 'EUR',
+                    billingAddressConfig: {
+                        format: PlatformPay.BillingAddressFormat.Min,
+                        isPhoneNumberRequired: false,
+                        isRequired: false,
+                    },
+                },
+                applePay: {
+                    merchantCountryCode: 'ES',
+                    currencyCode: 'EUR',
+                    cartItems: [
+                        {
+                            label: 'Servicio PawMate',
+                            amount: amount.toString(),
+                            paymentType: PlatformPay.PaymentType.Immediate,
+                        },
+                    ],
+                }
+            });
+
+            if (error) {
+                Alert.alert('Pago cancelado', error.message);
+                return;
+            }
+
+            if (paymentIntent && paymentIntent.status === 'Succeeded') {
+                await updateDoc(doc(db, 'reservations', item.id), {
+                    paymentMethod: 'stripe',
+                    paymentStatus: 'paid',
+                    paymentId: paymentIntent.id
+                });
+                Alert.alert('Éxito', 'Pago procesado correctamente. Ya puedes escanear el QR.');
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Ocurrió un error procesando el pago.');
+        }
+    };
+
+    const handleCancelReservation = (item) => {
+        Alert.alert(
+            'Cancelar Reserva',
+            '¿Estás seguro de que deseas cancelar esta reserva?',
+            [
+                { text: 'No', style: 'cancel' },
+                { text: 'Sí, Cancelar', onPress: () => processCancellation(item), style: 'destructive' }
+            ]
+        );
+    };
+
+    const processCancellation = async (item) => {
+        try {
+            if (item.paymentStatus === 'paid' && item.paymentMethod === 'stripe' && item.paymentId) {
+                // Process refund via backend
+                const response = await fetch(`${API_BASE_URL}/api/payments/refund`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentIntentId: item.paymentId })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    Alert.alert('Error', 'No se pudo procesar el reembolso.');
+                    return;
+                }
+                Alert.alert('Cancelada', 'Reserva cancelada y reembolso procesado correctamente.');
+                await updateDoc(doc(db, 'reservations', item.id), { status: 'cancelled', paymentStatus: 'refunded' });
+            } else {
+                Alert.alert('Cancelada', 'La reserva ha sido cancelada.');
+                await updateDoc(doc(db, 'reservations', item.id), { status: 'cancelled' });
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'No se pudo cancelar la reserva.');
         }
     };
 
@@ -78,6 +212,7 @@ const ReservationsScreen = ({ navigation }) => {
                     item.status === 'accepted' && { backgroundColor: '#4caf50' },
                     item.status === 'active' && { backgroundColor: theme.primary },
                     item.status === 'completed' && { backgroundColor: '#9e9e9e' },
+                    item.status === 'cancelled' && { backgroundColor: '#f44336' },
                     item.status === 'rejected' && { backgroundColor: '#f44336' },
                     ]}>
                         <Text style={styles.statusText}>{item.status}</Text>
@@ -98,6 +233,12 @@ const ReservationsScreen = ({ navigation }) => {
                     <Ionicons name="calendar" size={16} color={theme.textSecondary} />
                     <Text style={styles.detailText}>Inicio: {new Date(item.startDate).toLocaleString()}</Text>
                 </View>
+                {item.ownerMessage ? (
+                    <View style={styles.messageBox}>
+                        <Text style={styles.messageLabel}>Mensaje del cliente:</Text>
+                        <Text style={styles.messageText}>{item.ownerMessage}</Text>
+                    </View>
+                ) : null}
 
                 {/* Actions for Caregiver */}
                 {isCaregiver && isPending && (
@@ -111,7 +252,7 @@ const ReservationsScreen = ({ navigation }) => {
                     </View>
                 )}
 
-                {/* QR Generation/Scanning Flow */}
+                {/* QR Generation/Scanning Flow or Payment */}
                 {isAccepted && isCaregiver && (
                     <TouchableOpacity
                         style={styles.qrBtnPrimary}
@@ -122,13 +263,34 @@ const ReservationsScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 )}
 
-                {isAccepted && !isCaregiver && (
+                {isAccepted && !isCaregiver && item.paymentStatus !== 'paid' && (
+                    <TouchableOpacity
+                        style={[styles.qrBtnPrimary, { backgroundColor: '#000' }]}
+                        onPress={() => handlePaymentSelection(item)}
+                    >
+                        <Ionicons name="card" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                        <Text style={styles.btnText}>Realizar Pago</Text>
+                    </TouchableOpacity>
+                )}
+
+                {isAccepted && !isCaregiver && item.paymentStatus === 'paid' && (
                     <TouchableOpacity
                         style={styles.qrBtnSecondary}
                         onPress={() => navigation.navigate('QRScanner', { expectedId: item.id, purpose: 'start' })}
                     >
                         <Ionicons name="scan" size={20} color={theme.primary} style={{ marginRight: 8 }} />
                         <Text style={[styles.btnText, { color: theme.primary }]}>Escanear QR para Iniciar</Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Cancel option for accepted reservations */}
+                {(isAccepted || isPending) && (
+                    <TouchableOpacity
+                        style={[styles.qrBtnSecondary, { borderColor: '#f44336', marginTop: 10 }]}
+                        onPress={() => handleCancelReservation(item)}
+                    >
+                        <Ionicons name="close-circle" size={20} color="#f44336" style={{ marginRight: 8 }} />
+                        <Text style={[styles.btnText, { color: '#f44336' }]}>Cancelar Reserva</Text>
                     </TouchableOpacity>
                 )}
 
@@ -207,6 +369,9 @@ const getStyles = (theme) => StyleSheet.create({
     statusText: { color: '#FFF', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
     detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
     detailText: { marginLeft: 8, fontSize: 14, color: theme.textSecondary },
+    messageBox: { backgroundColor: theme.background, padding: 12, borderRadius: 10, marginTop: 10, marginBottom: 5, borderLeftWidth: 4, borderLeftColor: theme.primary },
+    messageLabel: { fontSize: 12, fontWeight: '600', color: theme.textSecondary, marginBottom: 4 },
+    messageText: { fontSize: 14, color: theme.text },
     actionRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 },
     actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginHorizontal: 5 },
     rejectBtn: { backgroundColor: '#f44336' },

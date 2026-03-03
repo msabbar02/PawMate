@@ -44,21 +44,21 @@ const WalkSummaryScreen = ({ route, navigation }) => {
                             <View style={styles.petAvatar}>
                                 <Ionicons name="paw" size={30} color="#FFF" />
                             </View>
-                            <Text style={styles.petName}>{walkData.petName}</Text>
+                            <Text style={styles.petName}>{walkData?.petName ?? 'Mascota'}</Text>
                             <Text style={styles.tagline}>¡Ha completado un gran paseo!</Text>
                         </View>
 
                         <View style={styles.statsGrid}>
                             <View style={styles.statBox}>
-                                <Text style={styles.statValue}>{walkData.distanceKm} km</Text>
+                                <Text style={styles.statValue}>{walkData?.distanceKm != null ? String(walkData.distanceKm) : '0'} km</Text>
                                 <Text style={styles.statLabel}>Distancia</Text>
                             </View>
                             <View style={styles.statBox}>
-                                <Text style={styles.statValue}>{walkData.durationMins} min</Text>
+                                <Text style={styles.statValue}>{walkData?.durationMins != null ? String(walkData.durationMins) : '0'} min</Text>
                                 <Text style={styles.statLabel}>Tiempo</Text>
                             </View>
                             <View style={styles.statBox}>
-                                <Text style={styles.statValue}>{(walkData.distanceKm * 60).toFixed(0)}</Text>
+                                <Text style={styles.statValue}>{walkData?.distanceKm != null ? String(Math.round(walkData.distanceKm * 60)) : '0'}</Text>
                                 <Text style={styles.statLabel}>Kcal Pet</Text>
                             </View>
                         </View>
@@ -72,7 +72,18 @@ const WalkSummaryScreen = ({ route, navigation }) => {
 
                 <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
                     <Ionicons name="share-social-outline" size={24} color="#FFF" />
-                    <Text style={styles.shareBtnText}>Compartir en Redes</Text>
+                    <Text style={styles.shareBtnText}>Compartir Externo</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.shareBtn, { backgroundColor: theme.primary, marginTop: -5 }]}
+                    onPress={() => {
+                        // In a real app we'd pass the walk data or image to CreatePostScreen
+                        navigation.navigate('CreatePost');
+                    }}
+                >
+                    <Ionicons name="people-outline" size={24} color="#FFF" />
+                    <Text style={styles.shareBtnText}>Compartir en Comunidad</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.navigate('HomeMain')}>

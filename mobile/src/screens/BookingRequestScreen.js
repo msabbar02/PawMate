@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput } from 'react-native';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -9,17 +9,19 @@ import { Picker } from '@react-native-picker/picker';
 
 const BookingRequestScreen = ({ route, navigation }) => {
     const { theme } = useContext(ThemeContext);
-    const { user } = useContext(AuthContext);
+    const { user, userData } = useContext(AuthContext);
     const styles = getStyles(theme);
 
-    const { caregiverId, caregiverName } = route.params;
+    const params = route.params || {};
+    const { caregiverId, caregiverName } = params;
 
     const [pets, setPets] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState('');
     const [loadingPets, setLoadingPets] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [bookingType, setBookingType] = useState('paseo'); // 'paseo' or 'guarderia'
+    const [bookingType, setBookingType] = useState('paseo');
+    const [ownerMessage, setOwnerMessage] = useState('');
 
     // Dates
     const [startDate, setStartDate] = useState(new Date());
@@ -62,41 +64,48 @@ const BookingRequestScreen = ({ route, navigation }) => {
     };
 
     const handleBook = async () => {
+        if (!user) {
+            Alert.alert('Error', 'Debes iniciar sesión para enviar una solicitud.');
+            return;
+        }
+        if (!caregiverId || !caregiverName) {
+            Alert.alert('Error', 'Faltan datos del cuidador. Vuelve atrás e inténtalo de nuevo.');
+            return;
+        }
         if (!selectedPetId) {
-            Alert.alert('Error', 'Debes añadir y seleccionar una mascota primero.');
+            Alert.alert('Error', 'Debes seleccionar una mascota.');
             return;
         }
 
         setIsSubmitting(true);
         try {
             const pet = pets.find(p => p.id === selectedPetId);
-
             const bookingData = {
                 ownerId: user.uid,
-                caregiverId,
-                caregiverName,
-                petId: selectedPetId,
+                ownerName: [userData?.name, userData?.surname].filter(Boolean).join(' ') || 'Cliente',
+                ownerEmail: user.email || userData?.email || null,
+                caregiverId: String(caregiverId),
+                caregiverName: String(caregiverName),
+                petId: String(selectedPetId),
                 petName: pet?.name || 'Mascota',
-                type: bookingType,
-                status: 'pending', // pending -> accepted -> active -> completed -> reviewed
+                type: String(bookingType),
+                status: 'pending',
                 startDate: startDate.toISOString(),
                 endDate: bookingType === 'guarderia' ? endDate.toISOString() : null,
+                ownerMessage: ownerMessage.trim() || null,
                 createdAt: serverTimestamp()
             };
 
             await addDoc(collection(db, 'reservations'), bookingData);
 
             Alert.alert(
-                '¡Solicitud Enviada con Éxito!',
-                `Hemos notificado a ${caregiverName} sobre tu solicitud para ${pet?.name || 'tu mascota'}. Te avisaremos en cuanto el cuidador confirme la reserva.`,
-                [
-                    { text: 'Aceptar', onPress: () => navigation.goBack() }
-                ]
+                'Solicitud enviada',
+                `Se ha notificado a ${caregiverName}. Te avisaremos cuando confirme o cancele la reserva.`,
+                [{ text: 'Entendido', onPress: () => navigation.goBack() }]
             );
-
         } catch (error) {
-            console.error(error);
-            Alert.alert('Error', 'No se pudo enviar la solicitud.');
+            console.error('Error sending reservation:', error);
+            Alert.alert('Error', 'No se pudo enviar la solicitud. Comprueba tu conexión y las reglas de Firestore.');
         } finally {
             setIsSubmitting(false);
         }
@@ -112,7 +121,7 @@ const BookingRequestScreen = ({ route, navigation }) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.title}>Reservar con {caregiverName}</Text>
+                <Text style={styles.title}>Reservar con {caregiverName || 'Cuidador'}</Text>
 
                 <View style={styles.section}>
                     <Text style={styles.label}>Selecciona tu Mascota</Text>
@@ -190,6 +199,20 @@ const BookingRequestScreen = ({ route, navigation }) => {
                     </View>
                 )}
 
+                <View style={styles.section}>
+                    <Text style={styles.label}>Mensaje para el cuidador (opcional)</Text>
+                    <TextInput
+                        style={styles.messageInput}
+                        placeholder="Ej: Necesito un paseo de 1h por la mañana. Mi perro es tranquilo."
+                        placeholderTextColor={theme.textSecondary}
+                        value={ownerMessage}
+                        onChangeText={setOwnerMessage}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                    />
+                </View>
+
                 <TouchableOpacity
                     style={[styles.submitButton, (isSubmitting || pets.length === 0) && { opacity: 0.6 }]}
                     disabled={isSubmitting || pets.length === 0}
@@ -236,6 +259,16 @@ const getStyles = (theme) => StyleSheet.create({
         backgroundColor: theme.cardBackground, padding: 15, borderRadius: 10, borderWidth: 1, borderColor: theme.border, alignItems: 'center'
     },
     dateText: { fontSize: 16, color: theme.text, fontWeight: 'bold' },
+    messageInput: {
+        backgroundColor: theme.cardBackground,
+        borderRadius: 10,
+        padding: 15,
+        borderWidth: 1,
+        borderColor: theme.border,
+        fontSize: 15,
+        color: theme.text,
+        minHeight: 80,
+    },
     submitButton: { backgroundColor: theme.primary, paddingVertical: 15, borderRadius: 10, alignItems: 'center', marginTop: 20 },
     submitButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
     errorText: { color: '#f44336', fontSize: 14, fontStyle: 'italic' }

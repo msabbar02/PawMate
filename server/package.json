@@ -1,28 +1,30 @@
 {
-    "name": "pawmate-server",
-    "version": "1.0.0",
-    "description": "Backend API for PawMate application",
-    "main": "src/index.js",
-    "scripts": {
-        "start": "node src/index.js",
-        "dev": "nodemon src/index.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
-    "keywords": [
-        "pawmate",
-        "api",
-        "express",
-        "firebase"
-    ],
-    "author": "Mohamed Sabbar",
-    "license": "ISC",
-    "dependencies": {
-        "express": "^4.18.2",
-        "firebase-admin": "^12.0.0",
-        "cors": "^2.8.5",
-        "dotenv": "^16.3.1"
-    },
-    "devDependencies": {
-        "nodemon": "^3.0.2"
-    }
+  "name": "pawmate-server",
+  "version": "1.0.0",
+  "description": "Backend API for PawMate application",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "pawmate",
+    "api",
+    "express",
+    "firebase"
+  ],
+  "author": "Mohamed Sabbar",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.0.0",
+    "nodemailer": "^6.9.7",
+    "stripe": "^20.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
 }

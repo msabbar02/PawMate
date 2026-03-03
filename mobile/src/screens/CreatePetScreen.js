@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import CustomMultiSelect from '../components/CustomMultiSelect';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -43,10 +44,8 @@ const CreatePetScreen = ({ navigation }) => {
     const [breed, setBreed] = useState('Labrador');
     const [otherBreed, setOtherBreed] = useState('');
     const [weight, setWeight] = useState('');
-    const [allergyType, setAllergyType] = useState('Ninguna');
-    const [otherAllergy, setOtherAllergy] = useState('');
-    const [illnessType, setIllnessType] = useState('Ninguna');
-    const [otherIllness, setOtherIllness] = useState('');
+    const [allergies, setAllergies] = useState([]);
+    const [illnesses, setIllnesses] = useState([]);
 
     // Date of Birth state
     const [dob, setDob] = useState(new Date());
@@ -112,9 +111,6 @@ const CreatePetScreen = ({ navigation }) => {
         setIsLoading(true);
 
         try {
-            const allergyValue = allergyType === 'Otra (Especificar)' ? otherAllergy : allergyType;
-            const illnessValue = illnessType === 'Otra (Especificar)' ? otherIllness : illnessType;
-
             const petData = {
                 ownerId: user.uid,
                 image: image || null,
@@ -122,8 +118,8 @@ const CreatePetScreen = ({ navigation }) => {
                 type: type === 'Otro' ? otherType : type,
                 breed: breed === 'Otro' ? otherBreed : breed,
                 weight: parseFloat(weight),
-                allergies: allergyValue,
-                illnesses: illnessValue,
+                allergies,
+                illnesses,
                 dob: dob.toISOString().split('T')[0],
                 vaccinations,
                 foodSchedule,
@@ -292,59 +288,21 @@ const CreatePetScreen = ({ navigation }) => {
                 {/* Health section */}
                 <Text style={styles.sectionTitle}>Salud y Cuidados</Text>
 
-                <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Alergias</Text>
-                    <View style={styles.pickerContainer}>
-                        <Picker
-                            selectedValue={allergyType}
-                            style={styles.picker}
-                            dropdownIconColor={theme.primary}
-                            onValueChange={(itemValue) => setAllergyType(itemValue)}
-                        >
-                            {COMMON_ALLERGIES.map(a => <Picker.Item key={a} label={a} value={a} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />)}
-                        </Picker>
-                    </View>
-                </View>
+                <CustomMultiSelect
+                    label="Alérgenos conocidos"
+                    options={COMMON_ALLERGIES.filter(a => a !== 'Otra (Especificar)' && a !== 'Ninguna')}
+                    selectedValues={allergies}
+                    onSelectionChange={setAllergies}
+                    theme={theme}
+                />
 
-                {allergyType === 'Otra (Especificar)' && (
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>Especificar Alergia</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Ej: Pollo"
-                            placeholderTextColor={theme.textSecondary}
-                            value={otherAllergy}
-                            onChangeText={setOtherAllergy}
-                        />
-                    </View>
-                )}
-
-                <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Enfermedades</Text>
-                    <View style={styles.pickerContainer}>
-                        <Picker
-                            selectedValue={illnessType}
-                            style={styles.picker}
-                            dropdownIconColor={theme.primary}
-                            onValueChange={(itemValue) => setIllnessType(itemValue)}
-                        >
-                            {COMMON_ILLNESSES.map(i => <Picker.Item key={i} label={i} value={i} color={Platform.OS === 'ios' ? theme.text : (theme.isDark ? theme.text : '#000')} />)}
-                        </Picker>
-                    </View>
-                </View>
-
-                {illnessType === 'Otra (Especificar)' && (
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>Especificar Enfermedad</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Ej: Cáncer"
-                            placeholderTextColor={theme.textSecondary}
-                            value={otherIllness}
-                            onChangeText={setOtherIllness}
-                        />
-                    </View>
-                )}
+                <CustomMultiSelect
+                    label="Condiciones Médicas / Enfermedades"
+                    options={COMMON_ILLNESSES.filter(i => i !== 'Otra (Especificar)' && i !== 'Ninguna')}
+                    selectedValues={illnesses}
+                    onSelectionChange={setIllnesses}
+                    theme={theme}
+                />
 
                 <View style={styles.inputContainer}>
                     <Text style={styles.label}>Vacunas (Fechas / Nombres)</Text>

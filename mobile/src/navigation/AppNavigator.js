@@ -9,9 +9,11 @@ import SignupScreen from '../screens/SignupScreen';
 import CreatePetScreen from '../screens/CreatePetScreen';
 import MyPetsScreen from '../screens/MyPetsScreen';
 import MessagesScreen from '../screens/MessagesScreen';
-import StoreScreen from '../screens/StoreScreen';
+import CommunityScreen from '../screens/CommunityScreen';
+import CreatePostScreen from '../screens/CreatePostScreen';
+import SearchGroupsScreen from '../screens/SearchGroupsScreen';
+import GroupDetailsScreen from '../screens/GroupDetailsScreen';
 import PetDetailsScreen from '../screens/PetDetailsScreen';
-import ProductDetailsScreen from '../screens/ProductDetailsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import UpgradeRoleScreen from '../screens/UpgradeRoleScreen';
 import BookingRequestScreen from '../screens/BookingRequestScreen';
@@ -21,7 +23,10 @@ import QRScannerScreen from '../screens/QRScannerScreen';
 import WalkTrackingScreen from '../screens/WalkTrackingScreen';
 import WalkSummaryScreen from '../screens/WalkSummaryScreen';
 import ChatScreen from '../screens/ChatScreen';
-import CreateStoreItemScreen from '../screens/CreateStoreItemScreen';
+import SearchCaregiversScreen from '../screens/SearchCaregiversScreen';
+import SelectPetWalkScreen from '../screens/SelectPetWalkScreen';
+import ProfileEditScreen from '../screens/ProfileEditScreen';
+import EditPetScreen from '../screens/EditPetScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
@@ -45,8 +50,8 @@ const MainTabNavigator = () => {
                         iconName = focused ? 'paw' : 'paw-outline';
                     } else if (route.name === 'Mensajes') {
                         iconName = focused ? 'chatbubble' : 'chatbubble-outline';
-                    } else if (route.name === 'Tienda') {
-                        iconName = focused ? 'cart' : 'cart-outline';
+                    } else if (route.name === 'Comunidad') {
+                        iconName = focused ? 'people' : 'people-outline';
                     } else if (route.name === 'Settings') {
                         iconName = focused ? 'settings' : 'settings-outline';
                     }
@@ -78,7 +83,7 @@ const MainTabNavigator = () => {
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Mascotas" component={MyPetsScreen} />
             <Tab.Screen name="Mensajes" component={MessagesScreen} />
-            <Tab.Screen name="Tienda" component={StoreScreen} />
+            <Tab.Screen name="Comunidad" component={CommunityScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
     );
@@ -109,12 +114,17 @@ const AppNavigator = () => {
                             options={{ presentation: 'modal' }}
                         />
                         <Stack.Screen
-                            name="CreateStoreItem"
-                            component={CreateStoreItemScreen}
+                            name="CreatePost"
+                            component={CreatePostScreen}
                             options={{ presentation: 'modal' }}
                         />
+                        <Stack.Screen
+                            name="SearchGroups"
+                            component={SearchGroupsScreen}
+                            options={{ presentation: 'fullScreenModal' }}
+                        />
+                        <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
                         <Stack.Screen name="PetDetails" component={PetDetailsScreen} />
-                        <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
                         <Stack.Screen name="UserProfile" component={UserProfileScreen} />
                         <Stack.Screen name="UpgradeRole" component={UpgradeRoleScreen} />
                         <Stack.Screen
@@ -123,6 +133,10 @@ const AppNavigator = () => {
                             options={{ presentation: 'modal' }}
                         />
                         <Stack.Screen name="Reservations" component={ReservationsScreen} />
+                        <Stack.Screen name="SearchCaregivers" component={SearchCaregiversScreen} />
+                        <Stack.Screen name="SelectPetWalk" component={SelectPetWalkScreen} />
+                        <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+                        <Stack.Screen name="EditPet" component={EditPetScreen} />
                         <Stack.Screen
                             name="QRGenerator"
                             component={QRGeneratorScreen}
