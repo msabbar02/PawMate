@@ -1,97 +1,142 @@
 import React, { useContext } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
-import HomeScreen from '../screens/HomeScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import LoginScreen from '../screens/LoginScreen';
-import SignupScreen from '../screens/SignupScreen';
-import CreatePetScreen from '../screens/CreatePetScreen';
-import MyPetsScreen from '../screens/MyPetsScreen';
-import MessagesScreen from '../screens/MessagesScreen';
-import CommunityScreen from '../screens/CommunityScreen';
-import CreatePostScreen from '../screens/CreatePostScreen';
-import SearchGroupsScreen from '../screens/SearchGroupsScreen';
-import GroupDetailsScreen from '../screens/GroupDetailsScreen';
-import PetDetailsScreen from '../screens/PetDetailsScreen';
-import UserProfileScreen from '../screens/UserProfileScreen';
-import UpgradeRoleScreen from '../screens/UpgradeRoleScreen';
-import BookingRequestScreen from '../screens/BookingRequestScreen';
-import ReservationsScreen from '../screens/ReservationsScreen';
-import QRGeneratorScreen from '../screens/QRGeneratorScreen';
-import QRScannerScreen from '../screens/QRScannerScreen';
-import WalkTrackingScreen from '../screens/WalkTrackingScreen';
-import WalkSummaryScreen from '../screens/WalkSummaryScreen';
-import ChatScreen from '../screens/ChatScreen';
-import SearchCaregiversScreen from '../screens/SearchCaregiversScreen';
-import SelectPetWalkScreen from '../screens/SelectPetWalkScreen';
-import ProfileEditScreen from '../screens/ProfileEditScreen';
-import EditPetScreen from '../screens/EditPetScreen';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
-import { ActivityIndicator, View } from 'react-native';
+
+import HomeScreen from '../screens/HomeScreen';
+import LoginScreen from '../screens/LoginScreen';
+import SignupScreen from '../screens/SignupScreen';
+import MyPetsScreen from '../screens/MyPetsScreen';
+import CommunityScreen from '../screens/CommunityScreen';
+import BookingScreen from '../screens/BookingScreen';
+import VerifyOwnerScreen from '../screens/VerifyOwnerScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const MainTabNavigator = () => {
+// Wrapper that locks the Booking tab for 'normal' users
+function BookingTabScreen() {
+    const { userData } = useContext(AuthContext);
     const { theme } = useContext(ThemeContext);
+    const navigation = useNavigation();
+    const role = userData?.role;
+
+    if (!role || role === 'normal') {
+        return (
+            <View style={[styles.lockContainer, { backgroundColor: theme.background }]}>
+                <View style={[styles.lockCard, { backgroundColor: theme.cardBackground }]}>
+                    <Ionicons name="lock-closed" size={52} color={theme.primary} />
+                    <Text style={[styles.lockTitle, { color: theme.text }]}>Acceso restringido</Text>
+                    <Text style={[styles.lockSubtitle, { color: theme.textSecondary }]}>
+                        Para acceder a Reservas necesitas verificar tu cuenta como Dueño o Cuidador.
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.lockBtn, { backgroundColor: theme.primary }]}
+                        onPress={() => navigation.navigate('Verify')}
+                    >
+                        <Text style={styles.lockBtnText}>Verificar mi cuenta</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+
+    return <BookingScreen />;
+}
+
+const MainTabNavigator = () => {
+    const { userData } = useContext(AuthContext);
+    const { theme } = useContext(ThemeContext);
+    const role = userData?.role;
+    const isLocked = !role || role === 'normal';
 
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName;
-
                     if (route.name === 'Home') {
                         iconName = focused ? 'home' : 'home-outline';
                     } else if (route.name === 'Mascotas') {
                         iconName = focused ? 'paw' : 'paw-outline';
-                    } else if (route.name === 'Mensajes') {
-                        iconName = focused ? 'chatbubble' : 'chatbubble-outline';
+                    } else if (route.name === 'Reservas') {
+                        if (isLocked) {
+                            return (
+                                <View style={{ position: 'relative' }}>
+                                    <Ionicons name="calendar-outline" size={size} color={color} />
+                                    <View style={styles.lockBadge}>
+                                        <Ionicons name="lock-closed" size={8} color="#fff" />
+                                    </View>
+                                </View>
+                            );
+                        }
+                        iconName = focused ? 'calendar' : 'calendar-outline';
                     } else if (route.name === 'Comunidad') {
-                        iconName = focused ? 'people' : 'people-outline';
-                    } else if (route.name === 'Settings') {
+                        iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+                    } else if (route.name === 'Ajustes') {
                         iconName = focused ? 'settings' : 'settings-outline';
                     }
-
-                    return <Ionicons name={iconName} size={focused ? 28 : 24} color={color} />;
+                    return <Ionicons name={iconName} size={size} color={color} />;
                 },
                 tabBarActiveTintColor: theme.tabBarActive,
                 tabBarInactiveTintColor: theme.tabBarInactive,
-                tabBarShowLabel: false, // Ocultar etiquetas para un look más limpio
                 tabBarStyle: {
                     backgroundColor: theme.tabBar,
-                    borderTopWidth: 0,
-                    elevation: 10,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 5,
-                    position: 'absolute', // Barra flotante
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    borderRadius: 30, // Bordes muy redondeados
-                    height: 65,
-                    paddingBottom: 0, // Ajuste para que los íconos queden centrados verticalmente
+                    borderTopColor: theme.border,
+                    borderTopWidth: 1,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                    height: Platform.OS === 'ios' ? 84 : 60,
+                    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+                    paddingTop: 8,
+                },
+                tabBarLabelStyle: {
+                    fontSize: 11,
+                    fontWeight: '600',
                 },
                 headerShown: false,
             })}
         >
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Mascotas" component={MyPetsScreen} />
-            <Tab.Screen name="Mensajes" component={MessagesScreen} />
-            <Tab.Screen name="Comunidad" component={CommunityScreen} />
-            <Tab.Screen name="Settings" component={SettingsScreen} />
+            <Tab.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{ tabBarLabel: 'Inicio' }}
+            />
+            <Tab.Screen
+                name="Mascotas"
+                component={MyPetsScreen}
+                options={{ tabBarLabel: 'Mascotas' }}
+            />
+            <Tab.Screen
+                name="Reservas"
+                component={BookingTabScreen}
+                options={{ tabBarLabel: 'Reservas' }}
+            />
+            <Tab.Screen
+                name="Comunidad"
+                component={CommunityScreen}
+                options={{ tabBarLabel: 'Comunidad' }}
+            />
+            <Tab.Screen
+                name="Ajustes"
+                component={SettingsScreen}
+                options={{ tabBarLabel: 'Ajustes' }}
+            />
         </Tab.Navigator>
     );
 };
 
-const AppNavigator = () => {
-    const { theme } = useContext(ThemeContext);
+export default function AppNavigator() {
     const { user, isLoading } = useContext(AuthContext);
+    const { theme } = useContext(ThemeContext);
 
     if (isLoading) {
         return (
@@ -105,65 +150,30 @@ const AppNavigator = () => {
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {user ? (
-                    // App Screens (User is signed in)
                     <>
-                        <Stack.Screen name="HomeMain" component={MainTabNavigator} />
+                        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
                         <Stack.Screen
-                            name="CreatePet"
-                            component={CreatePetScreen}
-                            options={{ presentation: 'modal' }}
+                            name="Verify"
+                            component={VerifyOwnerScreen}
+                            options={{ headerShown: true, title: 'Verificar cuenta', headerTintColor: theme.primary }}
                         />
                         <Stack.Screen
-                            name="CreatePost"
-                            component={CreatePostScreen}
-                            options={{ presentation: 'modal' }}
-                        />
-                        <Stack.Screen
-                            name="SearchGroups"
-                            component={SearchGroupsScreen}
-                            options={{ presentation: 'fullScreenModal' }}
-                        />
-                        <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
-                        <Stack.Screen name="PetDetails" component={PetDetailsScreen} />
-                        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-                        <Stack.Screen name="UpgradeRole" component={UpgradeRoleScreen} />
-                        <Stack.Screen
-                            name="BookingRequest"
-                            component={BookingRequestScreen}
-                            options={{ presentation: 'modal' }}
-                        />
-                        <Stack.Screen name="Reservations" component={ReservationsScreen} />
-                        <Stack.Screen name="SearchCaregivers" component={SearchCaregiversScreen} />
-                        <Stack.Screen name="SelectPetWalk" component={SelectPetWalkScreen} />
-                        <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-                        <Stack.Screen name="EditPet" component={EditPetScreen} />
-                        <Stack.Screen
-                            name="QRGenerator"
-                            component={QRGeneratorScreen}
-                            options={{ presentation: 'modal', headerShown: false }}
-                        />
-                        <Stack.Screen
-                            name="QRScanner"
-                            component={QRScannerScreen}
-                            options={{ presentation: 'modal', headerShown: false }}
-                        />
-                        <Stack.Screen
-                            name="WalkTracking"
-                            component={WalkTrackingScreen}
+                            name="Notifications"
+                            component={NotificationsScreen}
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen
-                            name="WalkSummary"
-                            component={WalkSummaryScreen}
+                            name="Profile"
+                            component={ProfileScreen}
                             options={{ headerShown: false }}
                         />
                         <Stack.Screen
-                            name="ChatScreen"
-                            component={ChatScreen}
+                            name="Settings"
+                            component={SettingsScreen}
+                            options={{ headerShown: false }}
                         />
                     </>
                 ) : (
-                    // Auth Screens (User is not signed in)
                     <>
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Signup" component={SignupScreen} />
@@ -172,6 +182,57 @@ const AppNavigator = () => {
             </Stack.Navigator>
         </NavigationContainer>
     );
-};
+}
 
-export default AppNavigator;
+const styles = StyleSheet.create({
+    lockContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 32,
+    },
+    lockCard: {
+        borderRadius: 20,
+        padding: 36,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 4,
+        width: '100%',
+    },
+    lockTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        marginTop: 16,
+        marginBottom: 10,
+    },
+    lockSubtitle: {
+        fontSize: 15,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 28,
+    },
+    lockBtn: {
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 14,
+    },
+    lockBtnText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 15,
+    },
+    lockBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -6,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#ef4444',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+});

@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { registerForPushNotifications } from '../utils/pushNotifications';
 
 export const AuthContext = createContext({
     user: null, // The Firebase user object
@@ -26,7 +27,10 @@ export const AuthProvider = ({ children }) => {
                 const docRef = doc(db, 'users', authenticatedUser.uid);
                 unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
-                        setUserData({ id: docSnap.id, ...docSnap.data() });
+                        const data = { id: docSnap.id, ...docSnap.data() };
+                        setUserData(data);
+                        // Register push token once on first load
+                        registerForPushNotifications().catch(() => {});
                     } else {
                         console.log("No such user document!");
                         setUserData(null);
