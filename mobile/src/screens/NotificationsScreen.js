@@ -13,6 +13,7 @@ import {
     doc, updateDoc, serverTimestamp, getDocs, where,
 } from 'firebase/firestore';
 import { createNotification } from '../utils/notificationHelpers';
+import { acceptFriendRequest, rejectFriendRequest } from '../utils/friendHelpers';
 
 // Relative time helper
 function relativeTime(ts) {
@@ -160,7 +161,34 @@ export default function NotificationsScreen({ navigation }) {
 
     const isCaregiver = userData?.role === 'caregiver';
 
-    // ── ACCEPT/REJECT BUTTONS ─────────────────────
+    // ── ACCEPT/REJECT FRIEND REQUEST ────────────────
+    const handleAcceptFriend = async (notif) => {
+        try {
+            await acceptFriendRequest(
+                notif.requestId || notif.id,
+                notif.fromUid,
+                notif.fromName || 'Usuario',
+                notif.fromPhotoURL,
+                userData
+            );
+            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+            Alert.alert('¡Amigo añadido! 🎉', 'Ahora podréis ver los posts del otro.');
+            if (activeNotif?.id === notif.id) setActiveNotif(null);
+        } catch (e) {
+            Alert.alert('Error', 'No se pudo aceptar la solicitud.');
+        }
+    };
+
+    const handleRejectFriend = async (notif) => {
+        try {
+            await rejectFriendRequest(notif.requestId || notif.id);
+            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+            if (activeNotif?.id === notif.id) setActiveNotif(null);
+        } catch {
+            Alert.alert('Error', 'No se pudo rechazar la solicitud.');
+        }
+    };
+
     const renderBookingActions = (notif) => {
         if (notif.type !== 'booking_request' || !isCaregiver) return null;
         return (
@@ -176,6 +204,21 @@ export default function NotificationsScreen({ navigation }) {
         );
     };
 
+    const renderFriendActions = (notif) => {
+        if (notif.type !== 'friend_request') return null;
+        return (
+            <View style={styles.bookingActions}>
+                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptFriend(notif)}>
+                    <Ionicons name="checkmark" size={15} color="#FFF" />
+                    <Text style={styles.acceptBtnText}>Aceptar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectFriend(notif)}>
+                    <Text style={styles.rejectBtnText}>Rechazar</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
     // ── DETAIL VIEW ───────────────────────────────
     if (activeNotif) {
         return (
@@ -183,9 +226,9 @@ export default function NotificationsScreen({ navigation }) {
                 <StatusBar style={isDarkMode ? 'light' : 'dark'} />
                 <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                     <TouchableOpacity onPress={() => setActiveNotif(null)} style={styles.iconBtn}>
-                        <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+                        <Ionicons name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Notificación</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Notificación</Text>
                     <View style={{ width: 38 }} />
                 </View>
 
@@ -193,12 +236,13 @@ export default function NotificationsScreen({ navigation }) {
                     <View style={[styles.detailIconBox, { backgroundColor: activeNotif.iconBg || COLORS.primaryBg }]}>
                         <Ionicons name={activeNotif.icon || 'notifications-outline'} size={38} color={activeNotif.iconColor || COLORS.primary} />
                     </View>
-                    <Text style={styles.detailTitle}>{activeNotif.title}</Text>
-                    <Text style={styles.detailTime}>{relativeTime(activeNotif.createdAt)}</Text>
-                    <View style={styles.detailBodyCard}>
-                        <Text style={styles.detailBody}>{activeNotif.body}</Text>
+                    <Text style={[styles.detailTitle, { color: theme.text }]}>{activeNotif.title}</Text>
+                    <Text style={[styles.detailTime, { color: theme.textSecondary }]}>{relativeTime(activeNotif.createdAt)}</Text>
+                    <View style={[styles.detailBodyCard, { backgroundColor: theme.cardBackground }]}>
+                        <Text style={[styles.detailBody, { color: theme.text }]}>{activeNotif.body}</Text>
                     </View>
                     {renderBookingActions(activeNotif)}
+                    {renderFriendActions(activeNotif)}
                 </ScrollView>
             </View>
         );
@@ -212,10 +256,10 @@ export default function NotificationsScreen({ navigation }) {
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                    <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <View style={{ alignItems: 'center' }}>
-                    <Text style={styles.headerTitle}>Notificaciones</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>Notificaciones</Text>
                     {unreadCount > 0 && (
                         <Text style={styles.unreadBadgeText}>{unreadCount} sin leer</Text>
                     )}
@@ -237,11 +281,11 @@ export default function NotificationsScreen({ navigation }) {
             )}
 
             {/* Select all */}
-            <TouchableOpacity style={styles.selectAllRow} onPress={selectAll}>
+            <TouchableOpacity style={[styles.selectAllRow, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]} onPress={selectAll}>
                 <View style={[styles.checkbox, allSelected && styles.checkboxActive]}>
                     {allSelected && <Ionicons name="checkmark" size={13} color="#FFF" />}
                 </View>
-                <Text style={styles.selectAllText}>
+                <Text style={[styles.selectAllText, { color: theme.text }]}>
                     {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
                 </Text>
             </TouchableOpacity>
@@ -258,7 +302,7 @@ export default function NotificationsScreen({ navigation }) {
                     showsVerticalScrollIndicator={false}
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            style={[styles.notifCard, !item.read && styles.notifCardUnread]}
+                            style={[styles.notifCard, { backgroundColor: theme.cardBackground }, !item.read && [styles.notifCardUnread, { backgroundColor: theme.primaryBg }]]}
                             onPress={() => openNotif(item)}
                             onLongPress={() => toggleSelect(item.id)}
                             activeOpacity={0.82}
@@ -280,16 +324,15 @@ export default function NotificationsScreen({ navigation }) {
                             <View style={styles.notifContent}>
                                 <View style={styles.notifTopRow}>
                                     <Text
-                                        style={[styles.notifTitle, !item.read && styles.notifTitleUnread]}
+                                        style={[styles.notifTitle, { color: theme.textSecondary }, !item.read && { color: theme.text, fontWeight: '800' }]}
                                         numberOfLines={1}
                                     >
                                         {item.title}
                                     </Text>
-                                    <Text style={styles.notifTime}>{relativeTime(item.createdAt)}</Text>
+                                    <Text style={[styles.notifTime, { color: theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
                                 </View>
                                 <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
 
-                                {/* Inline accept/reject for booking_request in list view */}
                                 {item.type === 'booking_request' && isCaregiver && (
                                     <View style={styles.bookingActions}>
                                         <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptBooking(item)}>
@@ -301,16 +344,29 @@ export default function NotificationsScreen({ navigation }) {
                                         </TouchableOpacity>
                                     </View>
                                 )}
+
+                                {/* Friend request inline actions */}
+                                {item.type === 'friend_request' && (
+                                    <View style={styles.bookingActions}>
+                                        <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptFriend(item)}>
+                                            <Ionicons name="checkmark" size={13} color="#FFF" />
+                                            <Text style={styles.acceptBtnText}>Aceptar</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectFriend(item)}>
+                                            <Text style={styles.rejectBtnText}>Rechazar</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
 
-                            <Ionicons name="chevron-forward" size={15} color={COLORS.border} />
+                            <Ionicons name="chevron-forward" size={15} color={theme.border} />
                         </TouchableOpacity>
                     )}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <Text style={{ fontSize: 56 }}>🔔</Text>
-                            <Text style={styles.emptyTitle}>Sin notificaciones</Text>
-                            <Text style={styles.emptyDesc}>Cuando recibas alertas aparecerán aquí.</Text>
+                             <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin notificaciones</Text>
+                             <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Cuando recibas alertas aparecerán aquí.</Text>
                         </View>
                     }
                 />

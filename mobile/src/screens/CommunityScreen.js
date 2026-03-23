@@ -2,11 +2,10 @@ import React, { useState, useContext, useEffect, useCallback, useRef } from 'rea
 import {
     StyleSheet, View, Text, TouchableOpacity, FlatList, Image,
     Dimensions, ActivityIndicator, TextInput, Alert, Modal,
-    KeyboardAvoidingView, Platform, ScrollView, Share,
+    KeyboardAvoidingView, Platform, ScrollView, Clipboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { Video, ResizeMode } from 'expo-av';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { auth, db } from '../config/firebase';
@@ -14,12 +13,13 @@ import {
     collection, query, onSnapshot, addDoc, doc,
     updateDoc, arrayUnion, arrayRemove, serverTimestamp,
     orderBy, limit, where, increment, deleteDoc, getDoc,
+    getDocs, setDoc,
 } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToStorage } from '../utils/storageHelpers';
+import { createNotification } from '../utils/notificationHelpers';
 
-const { width, height } = Dimensions.get('window');
-const POST_IMG_SIZE = (width - 3) / 3;
+const { width } = Dimensions.get('window');
 
 const SPECIES_TAGS = [
     { value: 'all',    label: '🌍 Todos' },
@@ -33,7 +33,6 @@ const SPECIES_TAGS = [
 const FEED_TABS = [
     { id: 'forYou', label: 'Para Ti' },
     { id: 'global', label: 'Global' },
-    { id: 'reels',  label: 'Reels' },
 ];
 
 export default function CommunityScreen() {
@@ -41,17 +40,19 @@ export default function CommunityScreen() {
     const { theme, isDarkMode } = useContext(ThemeContext);
 
     // Feed
-    const [feedType, setFeedType]           = useState('forYou'); // 'forYou' | 'global' | 'reels'
-    const [viewMode, setViewMode]           = useState('feed');   // 'feed' | 'grid'
+    const [feedType, setFeedType]           = useState('global');
     const [posts, setPosts]                 = useState([]);
-    const [reels, setReels]                 = useState([]);
     const [loading, setLoading]             = useState(true);
     const [speciesFilter, setSpeciesFilter] = useState('all');
+    const [filtersOpen, setFiltersOpen]     = useState(false);
+
+    // Friends (for "Para Ti")
+    const [friendIds, setFriendIds] = useState([]);
 
     // Upload
     const [isUploadVisible, setIsUploadVisible] = useState(false);
     const [uploadForm, setUploadForm] = useState({
-        caption: '', species: 'dog', imageUri: null, videoUri: null, isVideo: false,
+        caption: '', species: 'dog', images: [],
     });
     const [uploading, setUploading] = useState(false);
 
@@ -60,12 +61,14 @@ export default function CommunityScreen() {
     const [commentsData, setCommentsData]     = useState([]);
     const [commentInput, setCommentInput]     = useState('');
     const [sendingComment, setSendingComment] = useState(false);
+    const [replyingTo, setReplyingTo]         = useState(null); // { id, authorName }
     const commentsListRef = useRef(null);
 
     // Post options
     const [optionsPost, setOptionsPost]   = useState(null);
-    const [showEditModal, setShowEditModal] = useState(null); // post object
+    const [showEditModal, setShowEditModal] = useState(null);
     const [editCaption, setEditCaption]    = useState('');
+    const [editImageUri, setEditImageUri]  = useState(null);
     const [editingPost, setEditingPost]    = useState(false);
 
     // Likers
@@ -74,44 +77,72 @@ export default function CommunityScreen() {
     const [loadingLikers, setLoadingLikers] = useState(false);
 
     // ─────────────────────────────────────────────────
-    // FETCH POSTS
+    // FETCH FRIEND IDS
     // ─────────────────────────────────────────────────
     useEffect(() => {
-        if (feedType === 'reels') return;
-        setLoading(true);
-
-        let constraints = feedType === 'global'
-            ? [orderBy('createdAt', 'desc'), limit(30)]
-            : [orderBy('engagementScore', 'desc'), limit(30)];
-
-        if (speciesFilter !== 'all') {
-            constraints = [
-                where('speciesTags', 'array-contains', speciesFilter),
-                ...constraints,
-            ];
-        }
-
-        const q = query(collection(db, 'posts'), ...constraints);
-        const unsub = onSnapshot(q,
-            snap => { setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
-            ()   => setLoading(false)
+        if (!auth.currentUser) return;
+        const unsub = onSnapshot(
+            collection(db, 'users', auth.currentUser.uid, 'friends'),
+            snap => {
+                setFriendIds(snap.docs.map(d => d.id));
+            }
         );
-        return () => unsub();
-    }, [feedType, speciesFilter]);
-
-    // ─────────────────────────────────────────────────
-    // FETCH REELS
-    // ─────────────────────────────────────────────────
-    useEffect(() => {
-        const q = query(collection(db, 'reels'), orderBy('likesCount', 'desc'), limit(20));
-        const unsub = onSnapshot(q, snap => {
-            setReels(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
         return () => unsub();
     }, []);
 
     // ─────────────────────────────────────────────────
-    // LIKE / UNLIKE
+    // FETCH POSTS
+    // ─────────────────────────────────────────────────
+    useEffect(() => {
+        setLoading(true);
+
+        if (feedType === 'forYou') {
+            // Show friends' posts + own posts
+            const uidsToShow = [...friendIds];
+            if (auth.currentUser) uidsToShow.push(auth.currentUser.uid);
+
+            if (uidsToShow.length === 0) {
+                setPosts([]);
+                setLoading(false);
+                return;
+            }
+
+            // Firestore 'in' supports max 30 values
+            const batchUids = uidsToShow.slice(0, 30);
+            let constraints = [
+                where('authorUid', 'in', batchUids),
+                orderBy('createdAt', 'desc'),
+                limit(30),
+            ];
+
+            const q = query(collection(db, 'posts'), ...constraints);
+            const unsub = onSnapshot(q,
+                snap => { setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
+                ()   => setLoading(false)
+            );
+            return () => unsub();
+        } else {
+            // Global
+            let constraints = [orderBy('createdAt', 'desc'), limit(30)];
+
+            if (speciesFilter !== 'all') {
+                constraints = [
+                    where('speciesTags', 'array-contains', speciesFilter),
+                    ...constraints,
+                ];
+            }
+
+            const q = query(collection(db, 'posts'), ...constraints);
+            const unsub = onSnapshot(q,
+                snap => { setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
+                ()   => setLoading(false)
+            );
+            return () => unsub();
+        }
+    }, [feedType, speciesFilter, friendIds]);
+
+    // ─────────────────────────────────────────────────
+    // LIKE / UNLIKE (also updates user preferences)
     // ─────────────────────────────────────────────────
     const toggleLike = async (post) => {
         if (!auth.currentUser) return;
@@ -123,18 +154,17 @@ export default function CommunityScreen() {
                 likesCount:      (post.likesCount || 0) + (liked ? -1 : 1),
                 engagementScore: Math.max(0, (post.engagementScore || 0) + (liked ? -2 : 2)),
             });
-        } catch { /* ignore */ }
-    };
-
-    const toggleReelLike = async (reel) => {
-        if (!auth.currentUser) return;
-        const uid   = auth.currentUser.uid;
-        const liked = reel.likedBy?.includes(uid);
-        try {
-            await updateDoc(doc(db, 'reels', reel.id), {
-                likedBy:    liked ? arrayRemove(uid) : arrayUnion(uid),
-                likesCount: Math.max(0, (reel.likesCount || 0) + (liked ? -1 : 1)),
-            });
+            // Update user species preference for recommendations
+            const species = post.speciesTags?.[0];
+            if (species) {
+                const prefRef = doc(db, 'users', uid, 'preferences', species);
+                const prefSnap = await getDoc(prefRef);
+                if (prefSnap.exists()) {
+                    await updateDoc(prefRef, { count: increment(liked ? -1 : 1) });
+                } else if (!liked) {
+                    await setDoc(prefRef, { species, count: 1 });
+                }
+            }
         } catch { /* ignore */ }
     };
 
@@ -158,6 +188,57 @@ export default function CommunityScreen() {
     };
 
     // ─────────────────────────────────────────────────
+    // FRIEND REQUESTS (from likers modal)
+    // ─────────────────────────────────────────────────
+    const sendFriendRequest = async (toUid, toName) => {
+        if (!auth.currentUser || toUid === auth.currentUser.uid) return;
+        try {
+            // Check if already friends
+            const friendDoc = await getDoc(doc(db, 'users', auth.currentUser.uid, 'friends', toUid));
+            if (friendDoc.exists()) {
+                Alert.alert('Ya sois amigos', `${toName} ya está en tu lista de amigos.`);
+                return;
+            }
+            // Check if already sent
+            const existing = await getDocs(query(
+                collection(db, 'friendRequests'),
+                where('fromUid', '==', auth.currentUser.uid),
+                where('toUid', '==', toUid),
+                where('status', '==', 'pending')
+            ));
+            if (!existing.empty) {
+                Alert.alert('Ya enviada', 'Ya tienes una solicitud pendiente.');
+                return;
+            }
+
+            await addDoc(collection(db, 'friendRequests'), {
+                fromUid: auth.currentUser.uid,
+                fromName: userData?.fullName || 'Usuario',
+                fromPhotoURL: userData?.photoURL || null,
+                toUid,
+                toName,
+                status: 'pending',
+                createdAt: serverTimestamp(),
+            });
+
+            await createNotification(toUid, {
+                type: 'friend_request',
+                title: 'Solicitud de amistad 🤝',
+                body: `${userData?.fullName || 'Un usuario'} quiere ser tu amigo.`,
+                fromUid: auth.currentUser.uid,
+                icon: 'person-add-outline',
+                iconBg: '#EFF6FF',
+                iconColor: '#3B82F6',
+            });
+
+            Alert.alert('¡Solicitud enviada! 🤝', `Se envió la solicitud a ${toName}.`);
+        } catch (e) {
+            console.error('sendFriendRequest error:', e);
+            Alert.alert('Error', 'No se pudo enviar la solicitud.');
+        }
+    };
+
+    // ─────────────────────────────────────────────────
     // POST OPTIONS
     // ─────────────────────────────────────────────────
     const handleDeletePost = (post) => {
@@ -177,104 +258,159 @@ export default function CommunityScreen() {
     const handleEditPost = (post) => {
         setOptionsPost(null);
         setEditCaption(post.caption || '');
+        setEditImageUri(post.imageUrl || null);
         setShowEditModal(post);
+    };
+
+    const pickEditImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
+        });
+        if (!result.canceled) {
+            setEditImageUri(result.assets[0].uri);
+        }
     };
 
     const handleSaveEdit = async () => {
         if (!editCaption.trim() || !showEditModal) return;
         setEditingPost(true);
         try {
-            await updateDoc(doc(db, 'posts', showEditModal.id), { caption: editCaption.trim() });
+            const updates = { caption: editCaption.trim() };
+
+            // If user picked a new image (local URI)
+            if (editImageUri && !editImageUri.startsWith('https://')) {
+                const uid = auth.currentUser.uid;
+                const timestamp = Date.now();
+                const newUrl = await uploadImageToStorage(editImageUri, `posts/${uid}/${timestamp}.jpg`);
+                updates.imageUrl = newUrl;
+            }
+
+            await updateDoc(doc(db, 'posts', showEditModal.id), updates);
             setShowEditModal(null);
         } catch { Alert.alert('Error', 'No se pudo editar el post.'); }
         finally { setEditingPost(false); }
     };
 
-    const handleSharePost = async (post) => {
+    const handleCopyLink = (post) => {
         setOptionsPost(null);
+        const link = `pawmate://post/${post.id}`;
+        if (Clipboard.setString) {
+            Clipboard.setString(link);
+        }
+        Alert.alert('✅ Enlace copiado', 'El enlace ha sido copiado.');
+    };
+
+    const handleReportPost = async (post) => {
+        setOptionsPost(null);
+        if (!auth.currentUser) return;
         try {
-            await Share.share({
-                message: `🐾 ${post.caption || ''}\n\nCompartido desde PawMate`,
-                title:   'PawMate',
+            await addDoc(collection(db, 'reports'), {
+                postId: post.id,
+                reporterUid: auth.currentUser.uid,
+                reporterName: userData?.fullName || 'Usuario',
+                authorUid: post.authorUid,
+                authorName: post.authorName,
+                reason: 'Contenido inapropiado',
+                status: 'pending',
+                createdAt: serverTimestamp(),
             });
-        } catch { /* user cancelled */ }
+            // Notify admin (first admin found or system)
+            try {
+                const adminSnap = await getDocs(query(
+                    collection(db, 'users'),
+                    where('role', '==', 'admin'),
+                    limit(1)
+                ));
+                if (!adminSnap.empty) {
+                    const adminUid = adminSnap.docs[0].id;
+                    await createNotification(adminUid, {
+                        type: 'post_report',
+                        title: '⚠️ Post reportado',
+                        body: `${userData?.fullName || 'Un usuario'} ha reportado un post de ${post.authorName}.`,
+                        postId: post.id,
+                        icon: 'flag-outline',
+                        iconBg: '#FEF2F2',
+                        iconColor: '#EF4444',
+                    });
+                }
+            } catch { /* no admin found */ }
+            Alert.alert('Reportado', 'Gracias por reportar. Nuestro equipo revisará el contenido.');
+        } catch {
+            Alert.alert('Error', 'No se pudo enviar el reporte.');
+        }
     };
 
     // ─────────────────────────────────────────────────
-    // PICK MEDIA
+    // PICK MEDIA (up to 5 photos)
     // ─────────────────────────────────────────────────
     const pickImage = async () => {
+        if (uploadForm.images.length >= 5) {
+            Alert.alert('Límite alcanzado', 'Puedes subir máximo 5 fotos por publicación.');
+            return;
+        }
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
         });
         if (!result.canceled) {
-            setUploadForm(f => ({ ...f, imageUri: result.assets[0].uri, videoUri: null, isVideo: false }));
+            setUploadForm(f => ({ ...f, images: [...f.images, result.assets[0].uri] }));
         }
     };
 
-    const pickVideo = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['videos'], allowsEditing: true, quality: 0.7,
-        });
-        if (!result.canceled) {
-            setUploadForm(f => ({ ...f, videoUri: result.assets[0].uri, imageUri: null, isVideo: true }));
-        }
+    const removeUploadImage = (index) => {
+        setUploadForm(f => ({ ...f, images: f.images.filter((_, i) => i !== index) }));
     };
 
     // ─────────────────────────────────────────────────
-    // UPLOAD POST / REEL
+    // UPLOAD POST
     // ─────────────────────────────────────────────────
     const handleUploadPost = async () => {
-        const hasMedia = uploadForm.imageUri || uploadForm.videoUri;
-        if (!hasMedia) return Alert.alert('Error', 'Selecciona una imagen o video');
+        if (uploadForm.images.length === 0) return Alert.alert('Error', 'Selecciona al menos una imagen');
         if (!uploadForm.caption.trim()) return Alert.alert('Error', 'Escribe una descripción');
         setUploading(true);
         try {
             const uid       = auth.currentUser.uid;
             const timestamp = Date.now();
 
-            if (uploadForm.isVideo) {
-                const videoUrl = await uploadImageToStorage(
-                    uploadForm.videoUri, `reels/${uid}/${timestamp}.mp4`
-                );
-                await addDoc(collection(db, 'reels'), {
-                    authorUid:      uid,
-                    authorName:     userData?.fullName || 'Usuario',
-                    authorRole:     userData?.role || 'normal',
-                    authorPhotoURL: userData?.photoURL || null,
-                    videoUrl,
-                    thumbnailUrl:   null,
-                    caption:        uploadForm.caption,
-                    speciesTags:    [uploadForm.species],
-                    likesCount:     0,
-                    commentsCount:  0,
-                    likedBy:        [],
-                    createdAt:      serverTimestamp(),
-                });
-                Alert.alert('¡Reel publicado! 🎬');
-            } else {
-                const imageUrl = await uploadImageToStorage(
-                    uploadForm.imageUri, `posts/${uid}/${timestamp}.jpg`
-                );
-                await addDoc(collection(db, 'posts'), {
-                    authorUid:      uid,
-                    authorName:     userData?.fullName || 'Usuario',
-                    authorRole:     userData?.role || 'normal',
-                    authorPhotoURL: userData?.photoURL || null,
-                    imageUrl,
-                    caption:        uploadForm.caption,
-                    speciesTags:    [uploadForm.species],
-                    likesCount:     0,
-                    commentsCount:  0,
-                    likedBy:        [],
-                    engagementScore: 0,
-                    createdAt:      serverTimestamp(),
-                });
-                Alert.alert('¡Publicado! 🎉');
+            // Upload all images in parallel
+            const imageUrls = await Promise.all(
+                uploadForm.images.map((uri, i) =>
+                    uploadImageToStorage(uri, `posts/${uid}/${timestamp}_${i}.jpg`)
+                )
+            );
+
+            await addDoc(collection(db, 'posts'), {
+                authorUid:      uid,
+                authorName:     userData?.fullName || 'Usuario',
+                authorRole:     userData?.role || 'normal',
+                authorPhotoURL: userData?.photoURL || null,
+                imageUrl:       imageUrls[0],   // keep for backward compat
+                imageUrls,                       // new multi-photo array
+                caption:        uploadForm.caption,
+                speciesTags:    [uploadForm.species],
+                likesCount:     0,
+                commentsCount:  0,
+                likedBy:        [],
+                engagementScore: 0,
+                createdAt:      serverTimestamp(),
+            });
+
+            // Notify friends about new post
+            if (friendIds.length > 0) {
+                Promise.all(friendIds.map(fid =>
+                    createNotification(fid, {
+                        type: 'friend_post',
+                        title: 'Nuevo post de tu amigo 📸',
+                        body: `${userData?.fullName || 'Tu amigo'} publicó algo nuevo.`,
+                        icon: 'image-outline',
+                        iconBg: '#E8F5EE',
+                        iconColor: '#1a7a4c',
+                    }).catch(() => {})
+                ));
             }
 
+            Alert.alert('¡Publicado! 🎉');
             setIsUploadVisible(false);
-            setUploadForm({ caption: '', species: 'dog', imageUri: null, videoUri: null, isVideo: false });
+            setUploadForm({ caption: '', species: 'dog', images: [] });
         } catch (e) {
             console.error('Upload error:', e);
             Alert.alert('Error', 'No se pudo publicar. Verifica tu conexión.');
@@ -302,6 +438,7 @@ export default function CommunityScreen() {
         if (!commentInput.trim() || !commentsPostId || !auth.currentUser) return;
         const text = commentInput.trim();
         setCommentInput('');
+        setReplyingTo(null);
         setSendingComment(true);
         try {
             await addDoc(collection(db, 'posts', commentsPostId, 'comments'), {
@@ -309,7 +446,10 @@ export default function CommunityScreen() {
                 authorName:     userData?.fullName || 'Usuario',
                 authorPhotoURL: userData?.photoURL || null,
                 text,
-                createdAt: serverTimestamp(),
+                replyTo:        replyingTo ? { id: replyingTo.id, authorName: replyingTo.authorName } : null,
+                likedBy:        [],
+                likesCount:     0,
+                createdAt:      serverTimestamp(),
             });
             await updateDoc(doc(db, 'posts', commentsPostId), {
                 commentsCount:   increment(1),
@@ -319,8 +459,38 @@ export default function CommunityScreen() {
         } catch { /* ignore */ } finally { setSendingComment(false); }
     };
 
+    const toggleCommentLike = async (comment) => {
+        if (!auth.currentUser || !commentsPostId) return;
+        const uid = auth.currentUser.uid;
+        const liked = comment.likedBy?.includes(uid);
+        try {
+            await updateDoc(doc(db, 'posts', commentsPostId, 'comments', comment.id), {
+                likedBy:    liked ? arrayRemove(uid) : arrayUnion(uid),
+                likesCount: Math.max(0, (comment.likesCount || 0) + (liked ? -1 : 1)),
+            });
+        } catch { /* ignore */ }
+    };
+
+    const handleDeleteComment = (comment) => {
+        if (comment.authorUid !== auth.currentUser?.uid) return;
+        Alert.alert('Eliminar comentario', '¿Seguro que quieres eliminar este comentario?', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Eliminar', style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await deleteDoc(doc(db, 'posts', commentsPostId, 'comments', comment.id));
+                        await updateDoc(doc(db, 'posts', commentsPostId), {
+                            commentsCount: increment(-1),
+                        });
+                    } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+                },
+            },
+        ]);
+    };
+
     // ─────────────────────────────────────────────────
-    // RENDER: Feed Post Card (Instagram style)
+    // RENDER: Feed Post Card
     // ─────────────────────────────────────────────────
     const renderFeedPost = useCallback(({ item: post }) => {
         const uid         = auth.currentUser?.uid;
@@ -351,10 +521,34 @@ export default function CommunityScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Image */}
-                {post.imageUrl && (
-                    <Image source={{ uri: post.imageUrl }} style={s.feedImage} resizeMode="cover" />
-                )}
+                {/* Images: carousel if multiple, single if one */}
+                {(() => {
+                    const imgs = post.imageUrls?.length > 0 ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+                    if (imgs.length === 0) return null;
+                    if (imgs.length === 1) {
+                        return <Image source={{ uri: imgs[0] }} style={s.feedImage} resizeMode="cover" />;
+                    }
+                    return (
+                        <View>
+                            <ScrollView
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                style={{ width }}
+                            >
+                                {imgs.map((uri, i) => (
+                                    <Image key={i} source={{ uri }} style={[s.feedImage, { width }]} resizeMode="cover" />
+                                ))}
+                            </ScrollView>
+                            {/* Dot indicators */}
+                            <View style={s.dotRow}>
+                                {imgs.map((_, i) => (
+                                    <View key={i} style={[s.dot, { backgroundColor: theme.primary }]} />
+                                ))}
+                            </View>
+                        </View>
+                    );
+                })()}
 
                 {/* Action bar */}
                 <View style={s.feedActions}>
@@ -368,19 +562,10 @@ export default function CommunityScreen() {
                     <TouchableOpacity onPress={() => setCommentsPostId(post.id)} style={s.feedActionBtn}>
                         <Ionicons name="chatbubble-outline" size={26} color={theme.textSecondary} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleSharePost(post)} style={s.feedActionBtn}>
-                        <Ionicons name="paper-plane-outline" size={26} color={theme.textSecondary} />
-                    </TouchableOpacity>
                     <View style={{ flex: 1 }} />
-                    {/* Species chip */}
-                    <View style={[s.speciesChip, { backgroundColor: theme.primaryBg }]}>
-                        <Text style={[s.speciesChipText, { color: theme.primary }]}>
-                            {SPECIES_TAGS.find(t => t.value === post.speciesTags?.[0])?.label || '🐾'}
-                        </Text>
-                    </View>
                 </View>
 
-                {/* Likes - tappable to see who liked */}
+                {/* Likes */}
                 {likesCount > 0 && (
                     <TouchableOpacity style={s.likesRow} onPress={() => showLikers(post)}>
                         <Ionicons name="heart" size={13} color="#EF4444" />
@@ -390,7 +575,7 @@ export default function CommunityScreen() {
                     </TouchableOpacity>
                 )}
 
-                {/* Caption — author bold + text */}
+                {/* Caption */}
                 <View style={s.feedCaption}>
                     <Text style={[s.captionText, { color: theme.text }]}>
                         <Text style={[s.captionAuthor, { color: theme.text }]}>{post.authorName} </Text>
@@ -410,75 +595,7 @@ export default function CommunityScreen() {
                 <View style={{ height: 14 }} />
             </View>
         );
-    }, [theme, isDarkMode]);
-
-    // ─────────────────────────────────────────────────
-    // RENDER: Grid Cell
-    // ─────────────────────────────────────────────────
-    const renderGridCell = useCallback(({ item: post }) => (
-        <TouchableOpacity style={s.gridCell}>
-            {post.imageUrl
-                ? <Image source={{ uri: post.imageUrl }} style={s.gridImage} resizeMode="cover" />
-                : <View style={[s.gridImage, { backgroundColor: theme.primaryBg, justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text style={{ fontSize: 28 }}>🐾</Text>
-                </View>
-            }
-            <View style={s.gridOverlay}>
-                <Ionicons name="heart" size={11} color="#FFF" />
-                <Text style={s.gridLikes}>{post.likesCount || 0}</Text>
-            </View>
-        </TouchableOpacity>
-    ), [theme]);
-
-    // ─────────────────────────────────────────────────
-    // RENDER: Reel
-    // ─────────────────────────────────────────────────
-    const renderReel = useCallback(({ item: reel }) => {
-        const uid   = auth.currentUser?.uid;
-        const liked = reel.likedBy?.includes(uid);
-        return (
-            <View style={{ width, height: height - 180, position: 'relative', backgroundColor: '#000' }}>
-                {reel.videoUrl
-                    ? <ReelVideoPlayer videoUrl={reel.videoUrl} />
-                    : <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                        {reel.thumbnailUrl
-                            ? <Image source={{ uri: reel.thumbnailUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                            : <Text style={{ fontSize: 64 }}>🎬</Text>
-                        }
-                    </View>
-                }
-
-                {/* Side actions */}
-                <View style={s.reelSideBar}>
-                    <TouchableOpacity style={s.reelAction} onPress={() => toggleReelLike(reel)}>
-                        <Ionicons name={liked ? 'heart' : 'heart-outline'} size={32} color={liked ? '#EF4444' : '#FFF'} />
-                        <Text style={s.reelActionCount}>{reel.likesCount || 0}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.reelAction}>
-                        <Ionicons name="chatbubble-outline" size={28} color="#FFF" />
-                        <Text style={s.reelActionCount}>{reel.commentsCount || 0}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.reelAction} onPress={() => handleSharePost(reel)}>
-                        <Ionicons name="paper-plane-outline" size={28} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Bottom info */}
-                <View style={s.reelBottom}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                            {reel.authorPhotoURL
-                                ? <Image source={{ uri: reel.authorPhotoURL }} style={StyleSheet.absoluteFillObject} />
-                                : <Text style={{ fontSize: 14 }}>🐾</Text>
-                            }
-                        </View>
-                        <Text style={s.reelAuthor}>@{reel.authorName || 'Usuario'}</Text>
-                    </View>
-                    <Text style={s.reelCaption} numberOfLines={2}>{reel.caption || ''}</Text>
-                </View>
-            </View>
-        );
-    }, []);
+    }, [theme, isDarkMode, friendIds]);
 
     // ─────────────────────────────────────────────────
     // MAIN RENDER
@@ -490,16 +607,24 @@ export default function CommunityScreen() {
             {/* ── HEADER ── */}
             <View style={[s.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <Text style={[s.headerTitle, { color: theme.text }]}>Comunidad</Text>
-                <TouchableOpacity
-                    style={[s.publishBtn, { backgroundColor: theme.primary }]}
-                    onPress={() => setIsUploadVisible(true)}
-                >
-                    <Ionicons name="add" size={18} color="#FFF" />
-                    <Text style={s.publishBtnText}>Publicar</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                        style={[s.filterToggleBtn, { backgroundColor: filtersOpen ? theme.primary : theme.primaryBg }]}
+                        onPress={() => setFiltersOpen(f => !f)}
+                    >
+                        <Ionicons name="filter" size={18} color={filtersOpen ? '#FFF' : theme.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[s.publishBtn, { backgroundColor: theme.primary }]}
+                        onPress={() => setIsUploadVisible(true)}
+                    >
+                        <Ionicons name="add" size={18} color="#FFF" />
+                        <Text style={s.publishBtnText}>Publicar</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
-            {/* ── TIKTOK-STYLE FEED TABS ── */}
+            {/* ── FEED TABS ── */}
             <View style={[s.feedTabsBar, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 {FEED_TABS.map(tab => {
                     const active = feedType === tab.id;
@@ -524,108 +649,63 @@ export default function CommunityScreen() {
                 })}
             </View>
 
-            {/* ── POSTS (Para Ti / Global) ── */}
-            {feedType !== 'reels' && (
-                <>
-                    {/* Species filter row */}
-                    <View style={[s.filterRow, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ gap: 8, paddingHorizontal: 14, paddingVertical: 10 }}
-                        >
-                            {SPECIES_TAGS.map(tag => {
-                                const active = speciesFilter === tag.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={tag.value}
-                                        style={[
-                                            s.filterChip,
-                                            { backgroundColor: theme.background, borderColor: theme.border },
-                                            active && { backgroundColor: theme.primary, borderColor: theme.primary },
-                                        ]}
-                                        onPress={() => setSpeciesFilter(tag.value)}
-                                    >
-                                        <Text style={[
-                                            s.filterChipText,
-                                            { color: theme.textSecondary },
-                                            active && { color: '#FFF' },
-                                        ]}>
-                                            {tag.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
-                        <TouchableOpacity
-                            style={[s.viewToggleBtn, { backgroundColor: theme.primaryBg }]}
-                            onPress={() => setViewMode(v => v === 'feed' ? 'grid' : 'feed')}
-                        >
-                            <Ionicons
-                                name={viewMode === 'feed' ? 'grid-outline' : 'list-outline'}
-                                size={19}
-                                color={theme.primary}
-                            />
-                        </TouchableOpacity>
-                    </View>
-
-                    {loading ? (
-                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                            <ActivityIndicator size="large" color={theme.primary} />
-                        </View>
-                    ) : viewMode === 'feed' ? (
-                        <FlatList
-                            key="feed"
-                            data={posts}
-                            keyExtractor={item => item.id}
-                            renderItem={renderFeedPost}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 100 }}
-                            ListEmptyComponent={
-                                <View style={s.emptyState}>
-                                    <Text style={{ fontSize: 56 }}>📸</Text>
-                                    <Text style={[s.emptyTitle, { color: theme.text }]}>Sin publicaciones</Text>
-                                    <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>
-                                        ¡Sé el primero en compartir el momento de tu mascota!
+            {/* ── COLLAPSIBLE FILTERS ── */}
+            {filtersOpen && (
+                <View style={[s.filterRow, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8, paddingHorizontal: 14, paddingVertical: 10 }}
+                    >
+                        {SPECIES_TAGS.map(tag => {
+                            const active = speciesFilter === tag.value;
+                            return (
+                                <TouchableOpacity
+                                    key={tag.value}
+                                    style={[
+                                        s.filterChip,
+                                        { backgroundColor: theme.background, borderColor: theme.border },
+                                        active && { backgroundColor: theme.primary, borderColor: theme.primary },
+                                    ]}
+                                    onPress={() => setSpeciesFilter(tag.value)}
+                                >
+                                    <Text style={[
+                                        s.filterChipText,
+                                        { color: theme.textSecondary },
+                                        active && { color: '#FFF' },
+                                    ]}>
+                                        {tag.label}
                                     </Text>
-                                </View>
-                            }
-                        />
-                    ) : (
-                        <FlatList
-                            key="grid"
-                            data={posts}
-                            keyExtractor={item => item.id}
-                            renderItem={renderGridCell}
-                            numColumns={3}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 100 }}
-                            ListEmptyComponent={
-                                <View style={s.emptyState}>
-                                    <Text style={{ fontSize: 56 }}>📸</Text>
-                                    <Text style={[s.emptyTitle, { color: theme.text }]}>Sin publicaciones</Text>
-                                </View>
-                            }
-                        />
-                    )}
-                </>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
             )}
 
-            {/* ── REELS ── */}
-            {feedType === 'reels' && (
+            {/* ── POSTS ── */}
+            {loading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                </View>
+            ) : (
                 <FlatList
-                    data={reels}
+                    data={posts}
                     keyExtractor={item => item.id}
-                    renderItem={renderReel}
+                    renderItem={renderFeedPost}
                     showsVerticalScrollIndicator={false}
-                    pagingEnabled
-                    contentContainerStyle={{ paddingBottom: 80 }}
+                    contentContainerStyle={{ paddingBottom: 100 }}
                     ListEmptyComponent={
                         <View style={s.emptyState}>
-                            <Text style={{ fontSize: 56 }}>🎬</Text>
-                            <Text style={[s.emptyTitle, { color: theme.text }]}>Sin Reels</Text>
+                            <Text style={{ fontSize: 56 }}>📸</Text>
+                            <Text style={[s.emptyTitle, { color: theme.text }]}>
+                                {feedType === 'forYou' ? 'Sin posts de amigos' : 'Sin publicaciones'}
+                            </Text>
                             <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>
-                                Sube el primer video de tu mascota.
+                                {feedType === 'forYou'
+                                    ? 'Añade amigos para ver sus posts aquí.'
+                                    : '¡Sé el primero en compartir el momento de tu mascota!'
+                                }
                             </Text>
                         </View>
                     }
@@ -633,7 +713,7 @@ export default function CommunityScreen() {
             )}
 
             {/* ════════════════════════════════════════
-                MODAL: POST OPTIONS (bottom sheet)
+                MODAL: POST OPTIONS
             ════════════════════════════════════════ */}
             <Modal
                 visible={!!optionsPost}
@@ -678,18 +758,7 @@ export default function CommunityScreen() {
 
                         <TouchableOpacity
                             style={[s.optionsRow, { borderBottomColor: theme.border }]}
-                            onPress={() => handleSharePost(optionsPost)}
-                        >
-                            <View style={[s.optionsIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                                <Ionicons name="share-social-outline" size={20} color="#22C55E" />
-                            </View>
-                            <Text style={[s.optionsLabel, { color: theme.text }]}>Compartir</Text>
-                            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[s.optionsRow, { borderBottomWidth: 0 }]}
-                            onPress={() => { setOptionsPost(null); Alert.alert('✅ Enlace copiado', 'El enlace ha sido copiado.'); }}
+                            onPress={() => handleCopyLink(optionsPost)}
                         >
                             <View style={[s.optionsIconWrap, { backgroundColor: theme.primaryBg }]}>
                                 <Ionicons name="link-outline" size={20} color={theme.primary} />
@@ -697,6 +766,20 @@ export default function CommunityScreen() {
                             <Text style={[s.optionsLabel, { color: theme.text }]}>Copiar enlace</Text>
                             <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
                         </TouchableOpacity>
+
+                        {/* Report (only for others' posts) */}
+                        {optionsPost?.authorUid !== auth.currentUser?.uid && (
+                            <TouchableOpacity
+                                style={[s.optionsRow, { borderBottomWidth: 0 }]}
+                                onPress={() => handleReportPost(optionsPost)}
+                            >
+                                <View style={[s.optionsIconWrap, { backgroundColor: '#FEF2F2' }]}>
+                                    <Ionicons name="flag-outline" size={20} color="#EF4444" />
+                                </View>
+                                <Text style={[s.optionsLabel, { color: '#EF4444' }]}>Reportar</Text>
+                                <Ionicons name="chevron-forward" size={16} color="#EF4444" />
+                            </TouchableOpacity>
+                        )}
 
                         <TouchableOpacity
                             style={[s.optionsCancelBtn, { backgroundColor: theme.background }]}
@@ -709,7 +792,7 @@ export default function CommunityScreen() {
             </Modal>
 
             {/* ════════════════════════════════════════
-                MODAL: EDIT POST
+                MODAL: EDIT POST (photo + description)
             ════════════════════════════════════════ */}
             <Modal
                 visible={!!showEditModal}
@@ -730,7 +813,23 @@ export default function CommunityScreen() {
                             }
                         </TouchableOpacity>
                     </View>
-                    <View style={{ padding: 20 }}>
+                    <ScrollView style={{ padding: 20 }}>
+                        {/* Edit image */}
+                        <TouchableOpacity
+                            style={[s.mediaPicker, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}
+                            onPress={pickEditImage}
+                        >
+                            {editImageUri ? (
+                                <Image source={{ uri: editImageUri }} style={s.mediaPickerImg} />
+                            ) : (
+                                <View style={{ alignItems: 'center', gap: 8 }}>
+                                    <Ionicons name="image-outline" size={48} color={theme.textSecondary} />
+                                    <Text style={{ color: theme.primary, fontWeight: '700' }}>Toca para cambiar foto</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Edit caption */}
                         <TextInput
                             style={[s.captionInput, { backgroundColor: theme.cardBackground, color: theme.text, borderColor: theme.border }]}
                             multiline
@@ -738,14 +837,13 @@ export default function CommunityScreen() {
                             onChangeText={setEditCaption}
                             placeholder="Descripción..."
                             placeholderTextColor={theme.textSecondary}
-                            autoFocus
                         />
-                    </View>
+                    </ScrollView>
                 </View>
             </Modal>
 
             {/* ════════════════════════════════════════
-                MODAL: LIKERS
+                MODAL: LIKERS (with Add Friend btn)
             ════════════════════════════════════════ */}
             <Modal
                 visible={!!likersPost}
@@ -776,18 +874,36 @@ export default function CommunityScreen() {
                                     <Text style={[s.emptyTitle, { color: theme.text }]}>Sin likes aún</Text>
                                 </View>
                             }
-                            renderItem={({ item }) => (
-                                <View style={[s.likerRow, { borderBottomColor: theme.border }]}>
-                                    <View style={[s.likerAvatar, { backgroundColor: theme.primaryBg }]}>
-                                        {item.photoURL
-                                            ? <Image source={{ uri: item.photoURL }} style={StyleSheet.absoluteFillObject} borderRadius={22} />
-                                            : <Text style={{ fontSize: 18 }}>🐾</Text>
-                                        }
+                            renderItem={({ item }) => {
+                                const isMe = item.uid === auth.currentUser?.uid;
+                                const isFriend = friendIds.includes(item.uid);
+                                return (
+                                    <View style={[s.likerRow, { borderBottomColor: theme.border }]}>
+                                        <View style={[s.likerAvatar, { backgroundColor: theme.primaryBg }]}>
+                                            {item.photoURL
+                                                ? <Image source={{ uri: item.photoURL }} style={StyleSheet.absoluteFillObject} borderRadius={22} />
+                                                : <Text style={{ fontSize: 18 }}>🐾</Text>
+                                            }
+                                        </View>
+                                        <Text style={[s.likerName, { color: theme.text }]}>{item.fullName || 'Usuario'}</Text>
+                                        {!isMe && !isFriend && (
+                                            <TouchableOpacity
+                                                style={[s.addFriendBtn, { backgroundColor: theme.primary }]}
+                                                onPress={() => sendFriendRequest(item.uid, item.fullName || 'Usuario')}
+                                            >
+                                                <Ionicons name="person-add" size={14} color="#FFF" />
+                                                <Text style={s.addFriendText}>Añadir</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        {!isMe && isFriend && (
+                                            <View style={[s.friendBadge, { backgroundColor: theme.primaryBg }]}>
+                                                <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>Amigo</Text>
+                                            </View>
+                                        )}
+                                        {isMe ? null : null}
                                     </View>
-                                    <Text style={[s.likerName, { color: theme.text }]}>{item.fullName || 'Usuario'}</Text>
-                                    <Ionicons name="heart" size={16} color="#EF4444" />
-                                </View>
-                            )}
+                                );
+                            }}
                         />
                     )}
                 </View>
@@ -815,54 +931,32 @@ export default function CommunityScreen() {
                     </View>
 
                     <ScrollView style={{ padding: 20 }}>
-                        {/* Media type toggle */}
-                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                            {[
-                                { isVid: false, icon: 'image-outline', label: 'Foto' },
-                                { isVid: true,  icon: 'videocam-outline', label: 'Video (Reel)' },
-                            ].map(({ isVid, icon, label }) => {
-                                const active = uploadForm.isVideo === isVid;
-                                return (
+                        {/* Multi-photo picker grid */}
+                        <Text style={[s.tagLabel, { color: theme.textSecondary }]}>
+                            FOTOS ({uploadForm.images.length}/5)
+                        </Text>
+                        <View style={s.photoGrid}>
+                            {uploadForm.images.map((uri, i) => (
+                                <View key={i} style={s.photoThumbWrap}>
+                                    <Image source={{ uri }} style={s.photoThumb} resizeMode="cover" />
                                     <TouchableOpacity
-                                        key={label}
-                                        style={[
-                                            s.mediaTypeBtn,
-                                            { borderColor: theme.primary, backgroundColor: theme.cardBackground },
-                                            active && { backgroundColor: theme.primary },
-                                        ]}
-                                        onPress={isVid ? pickVideo : pickImage}
+                                        style={s.photoRemoveBtn}
+                                        onPress={() => removeUploadImage(i)}
                                     >
-                                        <Ionicons name={icon} size={18} color={active ? '#FFF' : theme.primary} />
-                                        <Text style={[s.mediaTypeBtnText, { color: active ? '#FFF' : theme.primary }]}>{label}</Text>
+                                        <Ionicons name="close-circle" size={22} color="#EF4444" />
                                     </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        {/* Media preview */}
-                        <TouchableOpacity
-                            style={[s.mediaPicker, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}
-                            onPress={uploadForm.isVideo ? pickVideo : pickImage}
-                        >
-                            {uploadForm.imageUri ? (
-                                <Image source={{ uri: uploadForm.imageUri }} style={s.mediaPickerImg} />
-                            ) : uploadForm.videoUri ? (
-                                <View style={{ alignItems: 'center', gap: 8 }}>
-                                    <Ionicons name="videocam" size={48} color={theme.primary} />
-                                    <Text style={{ color: theme.primary, fontWeight: '700' }}>Video seleccionado ✓</Text>
                                 </View>
-                            ) : (
-                                <View style={{ alignItems: 'center', gap: 8 }}>
-                                    <Ionicons
-                                        name={uploadForm.isVideo ? 'videocam-outline' : 'image-outline'}
-                                        size={48} color={theme.textSecondary}
-                                    />
-                                    <Text style={{ color: theme.primary, fontWeight: '700' }}>
-                                        {uploadForm.isVideo ? 'Toca para añadir video' : 'Toca para añadir foto'}
-                                    </Text>
-                                </View>
+                            ))}
+                            {uploadForm.images.length < 5 && (
+                                <TouchableOpacity
+                                    style={[s.photoAddBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}
+                                    onPress={pickImage}
+                                >
+                                    <Ionicons name="add" size={32} color={theme.primary} />
+                                    <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '700', marginTop: 4 }}>Añadir</Text>
+                                </TouchableOpacity>
                             )}
-                        </TouchableOpacity>
+                        </View>
 
                         {/* Caption */}
                         <TextInput
@@ -870,7 +964,7 @@ export default function CommunityScreen() {
                             multiline
                             value={uploadForm.caption}
                             onChangeText={t => setUploadForm(f => ({ ...f, caption: t }))}
-                            placeholder={uploadForm.isVideo ? 'Describe tu reel...' : 'Escribe algo sobre esta foto...'}
+                            placeholder="Escribe algo sobre estas fotos..."
                             placeholderTextColor={theme.textSecondary}
                         />
 
@@ -905,17 +999,21 @@ export default function CommunityScreen() {
             </Modal>
 
             {/* ════════════════════════════════════════
-                MODAL: COMMENTS
+                MODAL: COMMENTS (with keyboard fix, likes, replies, delete)
             ════════════════════════════════════════ */}
             <Modal
                 visible={!!commentsPostId}
                 animationType="slide"
                 presentationStyle="pageSheet"
-                onRequestClose={() => setCommentsPostId(null)}
+                onRequestClose={() => { setCommentsPostId(null); setReplyingTo(null); }}
             >
-                <View style={{ flex: 1, backgroundColor: theme.background }}>
+                <KeyboardAvoidingView
+                    style={{ flex: 1, backgroundColor: theme.background }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+                >
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                        <TouchableOpacity onPress={() => setCommentsPostId(null)}>
+                        <TouchableOpacity onPress={() => { setCommentsPostId(null); setReplyingTo(null); }}>
                             <Ionicons name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
                         <Text style={[s.modalTitle, { color: theme.text }]}>Comentarios</Text>
@@ -935,64 +1033,104 @@ export default function CommunityScreen() {
                                 <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>¡Sé el primero en comentar!</Text>
                             </View>
                         }
-                        renderItem={({ item: comment }) => (
-                            <View style={s.commentRow}>
-                                <View style={[s.commentAvatar, { backgroundColor: theme.primaryBg }]}>
-                                    {comment.authorPhotoURL
-                                        ? <Image source={{ uri: comment.authorPhotoURL }} style={StyleSheet.absoluteFillObject} borderRadius={18} />
-                                        : <Text style={{ fontSize: 15 }}>🐾</Text>
-                                    }
-                                </View>
-                                <View style={[s.commentBubble, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                                    <Text style={[s.commentAuthor, { color: theme.text }]}>{comment.authorName}</Text>
-                                    <Text style={[s.commentText, { color: theme.text }]}>{comment.text}</Text>
-                                </View>
-                            </View>
-                        )}
+                        renderItem={({ item: comment }) => {
+                            const uid = auth.currentUser?.uid;
+                            const isMyComment = comment.authorUid === uid;
+                            const liked = comment.likedBy?.includes(uid);
+                            const likeCount = comment.likesCount || 0;
+
+                            return (
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    onLongPress={() => isMyComment && handleDeleteComment(comment)}
+                                    style={s.commentRow}
+                                >
+                                    <View style={[s.commentAvatar, { backgroundColor: theme.primaryBg }]}>
+                                        {comment.authorPhotoURL
+                                            ? <Image source={{ uri: comment.authorPhotoURL }} style={StyleSheet.absoluteFillObject} borderRadius={18} />
+                                            : <Text style={{ fontSize: 15 }}>🐾</Text>
+                                        }
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={[s.commentBubble, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                                            <Text style={[s.commentAuthor, { color: theme.text }]}>{comment.authorName}</Text>
+                                            {comment.replyTo && (
+                                                <Text style={[s.replyTag, { color: theme.primary }]}>
+                                                    ↳ @{comment.replyTo.authorName}
+                                                </Text>
+                                            )}
+                                            <Text style={[s.commentText, { color: theme.text }]}>{comment.text}</Text>
+                                        </View>
+                                        {/* Comment actions */}
+                                        <View style={s.commentActionsRow}>
+                                            <TouchableOpacity
+                                                style={s.commentActionBtn}
+                                                onPress={() => toggleCommentLike(comment)}
+                                            >
+                                                <Ionicons
+                                                    name={liked ? 'heart' : 'heart-outline'}
+                                                    size={14}
+                                                    color={liked ? '#EF4444' : theme.textSecondary}
+                                                />
+                                                {likeCount > 0 && (
+                                                    <Text style={[s.commentActionText, { color: theme.textSecondary }]}>
+                                                        {likeCount}
+                                                    </Text>
+                                                )}
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={s.commentActionBtn}
+                                                onPress={() => {
+                                                    setReplyingTo({ id: comment.id, authorName: comment.authorName });
+                                                    setCommentInput(`@${comment.authorName} `);
+                                                }}
+                                            >
+                                                <Ionicons name="arrow-undo-outline" size={14} color={theme.textSecondary} />
+                                                <Text style={[s.commentActionText, { color: theme.textSecondary }]}>Responder</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        }}
                     />
 
-                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                        <View style={[s.commentInputRow, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
-                            <TextInput
-                                style={[s.commentInput, { backgroundColor: theme.background, color: theme.text }]}
-                                value={commentInput}
-                                onChangeText={setCommentInput}
-                                placeholder="Escribe un comentario..."
-                                placeholderTextColor={theme.textSecondary}
-                                multiline
-                            />
-                            <TouchableOpacity
-                                style={[s.commentSendBtn, { backgroundColor: theme.primary, opacity: !commentInput.trim() ? 0.4 : 1 }]}
-                                onPress={sendComment}
-                                disabled={sendingComment || !commentInput.trim()}
-                            >
-                                {sendingComment
-                                    ? <ActivityIndicator size="small" color="#FFF" />
-                                    : <Ionicons name="send" size={17} color="#FFF" />
-                                }
+                    {/* Reply indicator */}
+                    {replyingTo && (
+                        <View style={[s.replyIndicator, { backgroundColor: theme.primaryBg, borderTopColor: theme.border }]}>
+                            <Text style={[s.replyIndicatorText, { color: theme.primary }]}>
+                                Respondiendo a @{replyingTo.authorName}
+                            </Text>
+                            <TouchableOpacity onPress={() => { setReplyingTo(null); setCommentInput(''); }}>
+                                <Ionicons name="close" size={18} color={theme.textSecondary} />
                             </TouchableOpacity>
                         </View>
-                    </KeyboardAvoidingView>
-                </View>
+                    )}
+
+                    {/* Comment input */}
+                    <View style={[s.commentInputRow, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+                        <TextInput
+                            style={[s.commentInput, { backgroundColor: theme.background, color: theme.text }]}
+                            value={commentInput}
+                            onChangeText={setCommentInput}
+                            placeholder="Escribe un comentario..."
+                            placeholderTextColor={theme.textSecondary}
+                            multiline
+                        />
+                        <TouchableOpacity
+                            style={[s.commentSendBtn, { backgroundColor: theme.primary, opacity: !commentInput.trim() ? 0.4 : 1 }]}
+                            onPress={sendComment}
+                            disabled={sendingComment || !commentInput.trim()}
+                        >
+                            {sendingComment
+                                ? <ActivityIndicator size="small" color="#FFF" />
+                                : <Ionicons name="send" size={17} color="#FFF" />
+                            }
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
-    );
-}
-
-// ─────────────────────────────────────────────────
-// Reel Video Player
-// ─────────────────────────────────────────────────
-function ReelVideoPlayer({ videoUrl }) {
-    const { width: W, height: H } = Dimensions.get('window');
-    return (
-        <Video
-            source={{ uri: videoUrl }}
-            style={{ width: W, height: H - 180 }}
-            resizeMode={ResizeMode.COVER}
-            isLooping
-            shouldPlay
-            useNativeControls={false}
-        />
     );
 }
 
@@ -1013,8 +1151,9 @@ const s = StyleSheet.create({
     headerTitle:    { fontSize: 24, fontWeight: '900' },
     publishBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
     publishBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14 },
+    filterToggleBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
 
-    // TikTok-style feed tabs
+    // Feed tabs
     feedTabsBar: {
         flexDirection: 'row',
         borderBottomWidth: 1,
@@ -1045,9 +1184,8 @@ const s = StyleSheet.create({
         borderRadius: 20, borderWidth: 1.5,
     },
     filterChipText: { fontSize: 13, fontWeight: '600' },
-    viewToggleBtn:  { padding: 9, marginRight: 10, borderRadius: 12 },
 
-    // Feed Card (Instagram style)
+    // Feed Card
     feedCard:       { borderBottomWidth: 1 },
     feedAuthorRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
     authorAvatar:   { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
@@ -1058,8 +1196,6 @@ const s = StyleSheet.create({
     // Action bar
     feedActions:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingTop: 10, gap: 2 },
     feedActionBtn:  { padding: 5 },
-    speciesChip:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-    speciesChipText: { fontSize: 12, fontWeight: '600' },
 
     // Likes
     likesRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingTop: 8 },
@@ -1073,20 +1209,6 @@ const s = StyleSheet.create({
     // View comments
     viewCommentsBtn: { paddingHorizontal: 14, paddingTop: 5 },
     viewCommentsText: { fontSize: 13 },
-
-    // Grid
-    gridCell:    { width: POST_IMG_SIZE, height: POST_IMG_SIZE, margin: 0.5, position: 'relative' },
-    gridImage:   { width: '100%', height: '100%' },
-    gridOverlay: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', gap: 3 },
-    gridLikes:   { color: '#FFF', fontSize: 11, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
-
-    // Reels
-    reelSideBar:   { position: 'absolute', right: 14, bottom: 100, alignItems: 'center', gap: 24 },
-    reelAction:    { alignItems: 'center' },
-    reelActionCount: { color: '#FFF', fontSize: 12, fontWeight: '700', marginTop: 4, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 },
-    reelBottom:    { position: 'absolute', bottom: 22, left: 16, right: 90 },
-    reelAuthor:    { color: '#FFF', fontWeight: '800', fontSize: 15, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
-    reelCaption:   { color: 'rgba(255,255,255,0.88)', fontSize: 13, lineHeight: 18, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 3 },
 
     // Options bottom sheet
     optionsOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -1102,6 +1224,9 @@ const s = StyleSheet.create({
     likerRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1 },
     likerAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginRight: 12 },
     likerName:   { flex: 1, fontSize: 15, fontWeight: '700' },
+    addFriendBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14 },
+    addFriendText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+    friendBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
 
     // Modal header (shared)
     modalHeader: {
@@ -1115,10 +1240,20 @@ const s = StyleSheet.create({
     // Upload
     mediaPicker:    { height: 220, borderRadius: 20, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 16 },
     mediaPickerImg: { width: '100%', height: '100%', resizeMode: 'cover' },
-    mediaTypeBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14, borderWidth: 2 },
-    mediaTypeBtnText: { fontSize: 14, fontWeight: '700' },
     captionInput:   { borderWidth: 1.5, borderRadius: 16, padding: 14, fontSize: 15, minHeight: 100, textAlignVertical: 'top', marginBottom: 16 },
     tagLabel:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+
+    // Multi-photo grid (upload form)
+    photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    photoThumbWrap: { position: 'relative', width: (width - 64) / 3, height: (width - 64) / 3, borderRadius: 12, overflow: 'visible' },
+    photoThumb: { width: '100%', height: '100%', borderRadius: 12 },
+    photoRemoveBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: '#FFF', borderRadius: 12 },
+    photoAddBtn: { width: (width - 64) / 3, height: (width - 64) / 3, borderRadius: 12, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+
+    // Carousel dots (feed)
+    dotRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+    dot:    { width: 6, height: 6, borderRadius: 3, opacity: 0.6 },
+
 
     // Empty
     emptyState: { alignItems: 'center', marginTop: 80, paddingHorizontal: 30 },
@@ -1128,10 +1263,16 @@ const s = StyleSheet.create({
     // Comments
     commentRow:       { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
     commentAvatar:    { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginRight: 10 },
-    commentBubble:    { flex: 1, borderRadius: 16, padding: 12, borderWidth: 1 },
+    commentBubble:    { borderRadius: 16, padding: 12, borderWidth: 1 },
     commentAuthor:    { fontSize: 13, fontWeight: '800', marginBottom: 3 },
     commentText:      { fontSize: 14, lineHeight: 20 },
+    replyTag:         { fontSize: 12, fontWeight: '600', marginBottom: 3 },
+    commentActionsRow: { flexDirection: 'row', gap: 16, paddingLeft: 12, paddingTop: 6 },
+    commentActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    commentActionText: { fontSize: 12, fontWeight: '600' },
     commentInputRow:  { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12, borderTopWidth: 1 },
     commentInput:     { flex: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
     commentSendBtn:   { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+    replyIndicator:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 1 },
+    replyIndicatorText: { fontSize: 13, fontWeight: '600' },
 });

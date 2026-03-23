@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Syne:wght@700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --forest: #1a7a4c;
+  --forest-deep: #145f3b;
+  --mint: #34d399;
+  --mint-light: #d1fae5;
+  --ink: #0f2419;
+  --slate: #4b6358;
+  --fog: #f0f7f4;
+  --cloud: #ffffff;
+  --mist: #e2ede8;
+  --danger: #e53935;
+  --gold: #f59e0b;
+  --ocean: #0891b2;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 32px;
+  --shadow-sm: 0 2px 12px rgba(26,122,76,0.08);
+  --shadow-md: 0 8px 40px rgba(26,122,76,0.14);
+  --shadow-lg: 0 20px 60px rgba(26,122,76,0.20);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--cloud);
+  color: var(--ink);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: 'Syne', sans-serif; }
+
+a { text-decoration: none; color: inherit; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--fog); }
+::-webkit-scrollbar-thumb { background: var(--mint); border-radius: 99px; }
+
+/* Utility */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--forest);
+  color: white;
+  padding: 14px 30px;
+  border-radius: 99px;
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 20px rgba(26,122,76,0.3);
+}
+.btn-primary:hover {
+  background: var(--forest-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(26,122,76,0.4);
+}
+
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent;
+  color: var(--forest);
+  padding: 13px 30px;
+  border-radius: 99px;
+  font-weight: 700;
+  font-size: 15px;
+  border: 2px solid var(--forest);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.btn-outline:hover {
+  background: var(--forest);
+  color: white;
+  transform: translateY(-2px);
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--mint-light);
+  color: var(--forest);
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.section-tag {
+  display: inline-block;
+  background: var(--mint-light);
+  color: var(--forest);
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}

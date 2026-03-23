@@ -1,17 +1,14 @@
 # 🐾 PawMate
 
-**Aplicación completa de gestión de mascotas con app móvil, web y panel de administración**
+**La plataforma integral de gestión de mascotas — App Móvil · Web · Admin · Backend**
+
+> Proyecto Final DAM · Desarrollado por **Mohamed Sabbar**
 
 ---
 
-## 📋 Descripción del Proyecto
+## 📋 Descripción
 
-PawMate es una plataforma integral para el cuidado y gestión de mascotas que incluye:
-
-- 📱 **Aplicación Móvil** (Android & iOS) - Para dueños de mascotas
-- 🌐 **Aplicación Web** - Versión web para navegadores
-- 👨‍💼 **Panel de Administración** - Gestión completa del sistema
-- 🔧 **Backend API** - Servidor y base de datos
+PawMate es un ecosistema digital completo para el cuidado y gestión de mascotas en España. Conecta a dueños de animales con cuidadores verificados, ofrece seguimiento GPS en tiempo real, historial médico completo y una comunidad activa de amantes de los animales.
 
 ---
 
@@ -19,160 +16,79 @@ PawMate es una plataforma integral para el cuidado y gestión de mascotas que in
 
 ```
 PawMate0/
-├── mobile/          # 📱 Aplicación móvil (React Native + Expo)
-│   ├── src/         # Código fuente
-│   └── assets/      # Imágenes, fuentes, etc.
-│
-├── web/             # 🌐 Aplicación web (React/Next.js)
-│   ├── src/         # Código fuente
-│   └── public/      # Archivos estáticos
-│
-├── admin/           # 👨‍💼 Panel de administración (React/Next.js)
-│   ├── src/         # Código fuente
-│   └── public/      # Archivos estáticos
-│
-└── server/          # 🔧 Backend API (Node.js + Express)
-    └── src/         # Código fuente
+├── mobile/          📱 App móvil (React Native + Expo)
+├── web/             🌐 Carpeta original (vacía / legacy)
+├── pawmate-web/     🚀 Landing Page (Vite + React) ← NUEVO
+├── admin/           👨‍💼 Panel de administración
+└── server/          🔧 Backend API (Node.js + Express)
 ```
 
 ---
 
-## 🚀 Tecnologías Utilizadas
+## 🚀 Tech Stack
 
-### Mobile App
-- React Native
-- Expo
-- React Navigation
-- Firebase (Auth, Firestore, Storage)
-
-### Web & Admin
-- React / Next.js
-- Firebase
-- Tailwind CSS / Material-UI
-
-### Backend
-- Node.js
-- Express
-- Firebase Admin SDK
-
----
-
-## 🌿 Estrategia de Branching
-
-Este proyecto sigue un flujo de trabajo profesional con Git:
-
-- **`main`** - Rama de producción (código estable)
-- **`develop`** - Rama de desarrollo (integración)
-- **`feature/*`** - Ramas para nuevas funcionalidades
-
-### Ejemplo de workflow:
-```bash
-# Crear nueva funcionalidad
-git checkout develop
-git checkout -b feature/nombre-funcionalidad
-
-# Desarrollar y hacer commits
-git add .
-git commit -m "feat: descripción de la funcionalidad"
-
-# Merge a develop cuando esté lista
-git checkout develop
-git merge feature/nombre-funcionalidad
-
-# Cuando develop esté estable, merge a main
-git checkout main
-git merge develop
-```
-
----
-
-## 📦 Instalación
-
-### Requisitos Previos
-- Node.js (v16 o superior)
-- npm o yarn
-- Expo CLI (para mobile)
-- Cuenta de Firebase
-
-### Configuración Inicial
-
-**1. Clonar el repositorio**
-```bash
-git clone <URL_DEL_REPO>
-cd PawMate0
-```
-
-**2. Instalar dependencias** (se hará en cada carpeta según se desarrolle)
-```bash
-# Mobile
-cd mobile
-npm install
-
-# Web
-cd ../web
-npm install
-
-# Admin
-cd ../admin
-npm install
-
-# Server
-cd ../server
-npm install
-```
-
-**3. Configurar variables de entorno**
-- Crear archivos `.env` en cada carpeta según sea necesario
-- Añadir credenciales de Firebase (NO subir a Git)
+| Plataforma | Tecnologías |
+|-----------|-------------|
+| **Mobile** | React Native, Expo, Firebase Auth, Firestore |
+| **Landing Web** | Vite, React, Framer Motion, Lucide React |
+| **Admin** | React / Next.js |
+| **Backend** | Node.js, Express, Firebase Admin SDK |
 
 ---
 
 ## 🎯 Funcionalidades Principales
 
-### Aplicación Móvil
-- ✅ Registro e inicio de sesión
-- ✅ Gestión de perfiles de mascotas
-- ✅ Seguimiento de salud y vacunas
-- ✅ Comunidad de usuarios
-- ✅ Tienda de productos
+### 📱 App Móvil
+- ✅ Autenticación (Email/Password, Google)
+- ✅ Perfiles completos de mascotas (fotos, médico, chip)
+- ✅ Seguimiento GPS de paseos con mapa y estadísticas
+- ✅ Paw-Port QR Biométrico de emergencia
+- ✅ Recordatorios de vacunas y citas veterinarias
+- ✅ Comunidad social con feed de fotos
+- ✅ Sistema de cuidadores verificados con reservas
+- ✅ Dark mode / Light mode
+- ✅ Notificaciones push
 
-### Panel de Administración
-- ✅ Dashboard con estadísticas
-- ✅ Gestión de usuarios
-- ✅ Gestión de mascotas
-- ✅ Moderación de contenido
-- ✅ Gestión de productos
+### 🌐 Landing Page (pawmate-web/)
+- ✅ Hero con animaciones Framer Motion
+- ✅ Sección de funcionalidades con cards animadas
+- ✅ GPS Tracking showcase
+- ✅ Comunidad showcase
+- ✅ Sección "Cómo Funciona"
+- ✅ Testimonials
+- ✅ CTA con descarga de app
+- ✅ Diseño responsive mobile-first
 
 ---
 
-## 👨‍💻 Desarrollo
+## ▶️ Ejecutar
 
-Este proyecto está siendo desarrollado como parte del proyecto final de **DAM** (Desarrollo de Aplicaciones Multiplataforma).
+### Landing Web
+```bash
+cd pawmate-web
+npm install
+npm run dev
+# → http://localhost:5173
+```
 
-**Desarrollador**: Mohamed Sabbar
+### App Móvil
+```bash
+cd mobile
+npm install
+npx expo start --clear --tunnel
+```
 
 ---
 
-## 📝 Estado del Proyecto
+## 👨‍💻 Desarrollador
 
-🚧 **En desarrollo activo** - Reconstrucción completa desde cero
-
-El proyecto se está desarrollando de forma gradual con commits diarios para asegurar:
-- Código limpio y bien documentado
-- Comprensión profunda de cada componente
-- Preparación para examen final
+**Mohamed Sabbar**
+- 📧 msabbar02@yahoo.com
+- 📱 +34 624 170 100
+- 🎓 DAM — Desarrollo de Aplicaciones Multiplataforma
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto es de uso educativo.
-
----
-
-## 📞 Contacto
-
-**Email**: msabbar02@yahoo.com  
-**Móvil**: +34 624 170 100
-
-> **Última actualización**: 25 de Febrero de 2026
+Proyecto educativo · Uso académico · © 2026 PawMate

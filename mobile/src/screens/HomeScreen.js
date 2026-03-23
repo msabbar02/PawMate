@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity,
     Switch, Animated, Image, Alert,
-    ActivityIndicator, Platform, Modal, ScrollView, TextInput,
+    ActivityIndicator, Platform, Modal, ScrollView, TextInput, Linking,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -306,11 +306,33 @@ export default function HomeScreen({ navigation }) {
             Alert.alert('SOS', 'El botón SOS se activa cuando hay un paseo en curso.');
             return;
         }
-        Alert.alert('🆘 ALERTA SOS', '¿Enviar coordenadas GPS a contacto de emergencia?', [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'ENVIAR', onPress: () => Alert.alert('Enviado', 'Coordenadas enviadas.'), style: 'destructive' },
-        ]);
+
+        const contacts = userData?.emergencyContacts;
+        if (!contacts || contacts.length === 0) {
+            Alert.alert(
+                '🆘 Sin contactos de emergencia',
+                'Configura al menos un contacto de emergencia en Ajustes antes de usar el botón SOS.',
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Ir a Ajustes', onPress: () => navigation.navigate('Settings') },
+                ]
+            );
+            return;
+        }
+
+        const buttons = contacts.map(c => ({
+            text: `📞 ${c.name} — ${c.phone}`,
+            onPress: () => Linking.openURL(`tel:${c.phone.replace(/\s/g, '')}`),
+        }));
+        buttons.push({ text: 'Cancelar', style: 'cancel' });
+
+        Alert.alert(
+            '🆘 ALERTA SOS',
+            '¿A quién quieres llamar?\nTus coordenadas GPS serán enviadas al contacto.',
+            buttons
+        );
     };
+
 
     const toggleSheet = () => {
         const newCollapsed = !isSheetCollapsed;
@@ -389,10 +411,12 @@ export default function HomeScreen({ navigation }) {
             )}
 
             {/* ── TOP BAR ──────────────────────────── */}
-            <View style={[styles.topBar, { backgroundColor: theme.cardBackground }]}>
-                <View style={styles.topBarRow}>
-                    {/* User photo - navigate to Settings */}
-                    <TouchableOpacity style={styles.userAvatarBox} onPress={() => navigation.navigate('Settings')}>
+            <View style={[styles.topBar, { backgroundColor: 'transparent' }]}>
+                <View style={[styles.topBarRow, {
+                    backgroundColor: isDarkMode ? theme.cardBackground : 'rgba(255,255,255,0.97)',
+                }]}>
+                    {/* User photo - navigate to Profile */}
+                    <TouchableOpacity style={styles.userAvatarBox} onPress={() => navigation.navigate('Profile')}>
                         {userPhoto
                             ? <Image source={{ uri: userPhoto }} style={styles.userAvatarImg} />
                             : <Ionicons name="person" size={18} color="#FFF" />
@@ -463,7 +487,7 @@ export default function HomeScreen({ navigation }) {
                     maxHeight: sheetContentAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 420] }),
                     opacity: sheetContentAnim,
                 }}>
-                    <Text style={styles.sheetTitle}>
+                    <Text style={[styles.sheetTitle, { color: theme.text }]}>
                         {isSocialMode ? '🌍 Dueños cercanos' : '¿Qué quieres hacer?'}
                     </Text>
 
@@ -514,10 +538,10 @@ export default function HomeScreen({ navigation }) {
                     )}
 
                     {/* Social Mode Toggle */}
-                    <View style={styles.socialRow}>
+                    <View style={[styles.socialRow, { borderTopColor: theme.border }]}>
                         <View>
-                            <Text style={styles.socialTitle}>Modo Comunidad</Text>
-                            <Text style={styles.socialSub}>Ver dueños de mascotas cerca</Text>
+                            <Text style={[styles.socialTitle, { color: theme.text }]}>Modo Comunidad</Text>
+                            <Text style={[styles.socialSub, { color: theme.textSecondary }]}>Ver dueños de mascotas cerca</Text>
                         </View>
                         <Switch
                             value={isSocialMode}
@@ -539,34 +563,34 @@ export default function HomeScreen({ navigation }) {
             {/* ── MODAL: DOG SELECTION ───────────────── */}
             <Modal visible={isDogModalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.dogSheet}>
+                    <View style={[styles.dogSheet, { backgroundColor: theme.cardBackground }]}>
                         <View style={styles.sheetHandle} />
-                        <Text style={styles.dogSheetTitle}>¿A quién vas a pasear?</Text>
+                        <Text style={[styles.dogSheetTitle, { color: theme.text }]}>¿A quién vas a pasear?</Text>
 
                         {isLoadingDogs ? (
                             <ActivityIndicator size="large" color={COLORS.primary} style={{ marginVertical: 30 }} />
                         ) : myDogs.length === 0 ? (
                             <View style={styles.emptyDog}>
                                 <Text style={{ fontSize: 44 }}>🐕</Text>
-                                <Text style={styles.emptyDogText}>
+                                <Text style={[styles.emptyDogText, { color: theme.textSecondary }]}>
                                     No tienes perros registrados. Añade uno en "Mis Mascotas".
                                 </Text>
                             </View>
                         ) : (
                             myDogs.map(dog => (
-                                <TouchableOpacity key={dog.id} style={styles.dogRow} onPress={() => proceedWithWalk(dog)}>
+                                <TouchableOpacity key={dog.id} style={[styles.dogRow, { backgroundColor: theme.cardBackground, borderColor: theme.border, borderWidth: 1 }]} onPress={() => proceedWithWalk(dog)}>
                                     {dog.image
                                         ? <Image source={{ uri: dog.image }} style={styles.dogRowImg} />
                                         : <View style={styles.dogRowPlaceholder}><Text style={{ fontSize: 22 }}>🐕</Text></View>
                                     }
-                                    <Text style={styles.dogRowName}>{dog.name}</Text>
-                                    <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
+                                    <Text style={[styles.dogRowName, { color: theme.text }]}>{dog.name}</Text>
+                                    <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
                                 </TouchableOpacity>
                             ))
                         )}
 
                         <TouchableOpacity style={styles.cancelDogBtn} onPress={() => setIsDogModalVisible(false)}>
-                            <Text style={styles.cancelDogText}>Cancelar</Text>
+                            <Text style={[styles.cancelDogText, { color: theme.textSecondary }]}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -575,7 +599,7 @@ export default function HomeScreen({ navigation }) {
             {/* ── MODAL: CAREGIVER PANEL ─────────────── */}
             <Modal visible={isCaregiverPanelVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.caregiverSheet}>
+                    <View style={[styles.caregiverSheet, { backgroundColor: theme.cardBackground }]}>
                         <View style={styles.sheetHandle} />
 
                         {selectedCaregiver && (
@@ -591,7 +615,7 @@ export default function HomeScreen({ navigation }) {
                                     </View>
 
                                     <View style={{ flex: 1, marginLeft: 14 }}>
-                                        <Text style={styles.cgName}>{selectedCaregiver.name}</Text>
+                                        <Text style={[styles.cgName, { color: theme.text }]}>{selectedCaregiver.name}</Text>
 
                                         {/* Online / offline */}
                                         <View style={styles.cgStatusRow}>
@@ -618,7 +642,7 @@ export default function HomeScreen({ navigation }) {
                                                     size={13} color={COLORS.warning}
                                                 />
                                             ))}
-                                            <Text style={styles.cgRatingText}>
+                                            <Text style={[styles.cgRatingText, { color: theme.textSecondary }]}>
                                                 {selectedCaregiver.rating} ({selectedCaregiver.reviews} reseñas)
                                             </Text>
                                         </View>
@@ -634,8 +658,8 @@ export default function HomeScreen({ navigation }) {
                                 {/* Services */}
                                 <View style={styles.cgServicesRow}>
                                     {selectedCaregiver.services?.map(s => (
-                                        <View key={s} style={styles.serviceTag}>
-                                            <Text style={styles.serviceTagText}>{SERVICE_LABELS[s] || s}</Text>
+                                        <View key={s} style={[styles.serviceTag, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                                            <Text style={[styles.serviceTagText, { color: theme.text }]}>{SERVICE_LABELS[s] || s}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -671,7 +695,7 @@ export default function HomeScreen({ navigation }) {
                                     style={styles.cgCloseBtn}
                                     onPress={() => setIsCaregiverPanelVisible(false)}
                                 >
-                                    <Text style={styles.cgCloseBtnText}>Cerrar</Text>
+                                    <Text style={[styles.cgCloseBtnText, { color: theme.textSecondary }]}>Cerrar</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -682,9 +706,9 @@ export default function HomeScreen({ navigation }) {
             {/* ── MODAL: BOOKING REQUEST ─────────────── */}
             <Modal visible={isBookingModalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.bookingSheet}>
+                    <View style={[styles.bookingSheet, { backgroundColor: theme.cardBackground }]}>
                         <View style={styles.sheetHandle} />
-                        <Text style={styles.bookingSheetTitle}>Nueva Reserva</Text>
+                        <Text style={[styles.bookingSheetTitle, { color: theme.text }]}>Nueva Reserva</Text>
 
                         {selectedCaregiver && (
                             <ScrollView showsVerticalScrollIndicator={false}>
@@ -848,17 +872,17 @@ export default function HomeScreen({ navigation }) {
                     <View style={[styles.filterSheet, { backgroundColor: theme.cardBackground }]}>
                         <View style={styles.sheetHandle} />
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text style={styles.filterTitle}>Filtros</Text>
+                            <Text style={[styles.filterTitle, { color: theme.text }]}>Filtros</Text>
                             <TouchableOpacity onPress={() => setFilterVisible(false)} style={{ padding: 6 }}>
-                                <Ionicons name="close-circle" size={28} color={COLORS.textLight} />
+                                <Ionicons name="close-circle" size={28} color={theme.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Online only */}
-                        <View style={styles.filterSwitchRow}>
+                        <View style={[styles.filterSwitchRow, { backgroundColor: theme.background }]}>
                             <View>
-                                <Text style={styles.filterLabel}>Solo disponibles (en línea)</Text>
-                                <Text style={styles.filterLabelSub}>Ocultar cuidadores offline</Text>
+                                <Text style={[styles.filterLabel, { color: theme.text }]}>Solo disponibles (en línea)</Text>
+                                <Text style={[styles.filterLabelSub, { color: theme.textSecondary }]}>Ocultar cuidadores offline</Text>
                             </View>
                             <Switch
                                 value={filterOnline}
@@ -869,7 +893,7 @@ export default function HomeScreen({ navigation }) {
                         </View>
 
                         {/* Min rating */}
-                        <Text style={styles.filterSectionLabel}>Valoración mínima</Text>
+                        <Text style={[styles.filterSectionLabel, { color: theme.textSecondary }]}>Valoración mínima</Text>
                         <View style={styles.filterChips}>
                             {[
                                 { v: 0,   l: 'Todas' },
@@ -879,16 +903,16 @@ export default function HomeScreen({ navigation }) {
                             ].map(({ v, l }) => (
                                 <TouchableOpacity
                                     key={String(v)}
-                                    style={[styles.filterChip, filterMinRating === v && styles.filterChipActive]}
+                                    style={[styles.filterChip, filterMinRating === v && styles.filterChipActive, !( filterMinRating === v) && { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
                                     onPress={() => setFilterMinRating(v)}
                                 >
-                                    <Text style={[styles.filterChipText, filterMinRating === v && { color: '#FFF' }]}>{l}</Text>
+                                    <Text style={[styles.filterChipText, filterMinRating === v && { color: '#FFF' }, !(filterMinRating === v) && { color: theme.text }]}>{l}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
                         {/* Service type */}
-                        <Text style={styles.filterSectionLabel}>Tipo de servicio</Text>
+                        <Text style={[styles.filterSectionLabel, { color: theme.textSecondary }]}>Tipo de servicio</Text>
                         <View style={styles.filterChips}>
                             {[
                                 { v: null,       l: 'Todos' },
@@ -898,10 +922,10 @@ export default function HomeScreen({ navigation }) {
                             ].map(({ v, l }) => (
                                 <TouchableOpacity
                                     key={String(v)}
-                                    style={[styles.filterChip, filterService === v && styles.filterChipActive]}
+                                    style={[styles.filterChip, filterService === v && styles.filterChipActive, !(filterService === v) && { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
                                     onPress={() => setFilterService(v)}
                                 >
-                                    <Text style={[styles.filterChipText, filterService === v && { color: '#FFF' }]}>{l}</Text>
+                                    <Text style={[styles.filterChipText, filterService === v && { color: '#FFF' }, !(filterService === v) && { color: theme.text }]}>{l}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
@@ -956,7 +980,6 @@ const styles = StyleSheet.create({
     },
     topBarRow: {
         flexDirection: 'row', alignItems: 'center', gap: 10,
-        backgroundColor: 'rgba(255,255,255,0.96)',
         borderRadius: 22, paddingVertical: 10, paddingHorizontal: 14,
         shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 14, elevation: 7,
     },
@@ -1081,16 +1104,15 @@ const styles = StyleSheet.create({
 
     // Dog Sheet
     dogSheet: {
-        backgroundColor: COLORS.surface,
         borderTopLeftRadius: 30, borderTopRightRadius: 30,
         padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     },
-    dogSheetTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text, textAlign: 'center', marginBottom: 20 },
+    dogSheetTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 20 },
     emptyDog: { alignItems: 'center', marginVertical: 20, gap: 10 },
     emptyDogText: { textAlign: 'center', color: COLORS.textLight, fontSize: 14, paddingHorizontal: 20, lineHeight: 20 },
     dogRow: {
         flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#FFF', padding: 14, borderRadius: 18, marginBottom: 10,
+        padding: 14, borderRadius: 18, marginBottom: 10,
         shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
     },
     dogRowImg: { width: 46, height: 46, borderRadius: 23 },
@@ -1098,13 +1120,12 @@ const styles = StyleSheet.create({
         width: 46, height: 46, borderRadius: 23,
         backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center',
     },
-    dogRowName: { flex: 1, marginLeft: 14, fontSize: 16, fontWeight: '800', color: COLORS.text },
+    dogRowName: { flex: 1, marginLeft: 14, fontSize: 16, fontWeight: '800' },
     cancelDogBtn: { marginTop: 8, paddingVertical: 14, alignItems: 'center' },
-    cancelDogText: { color: COLORS.textLight, fontSize: 16, fontWeight: '700' },
+    cancelDogText: { fontSize: 16, fontWeight: '700' },
 
     // Caregiver Sheet
     caregiverSheet: {
-        backgroundColor: '#FFF',
         borderTopLeftRadius: 30, borderTopRightRadius: 30,
         padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     },
@@ -1152,7 +1173,6 @@ const styles = StyleSheet.create({
 
     // Filter Sheet
     filterSheet: {
-        backgroundColor: '#FFF',
         borderTopLeftRadius: 30, borderTopRightRadius: 30,
         padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 28,
     },
@@ -1186,12 +1206,11 @@ const styles = StyleSheet.create({
 
     // Booking Sheet
     bookingSheet: {
-        backgroundColor: '#FFF',
         borderTopLeftRadius: 30, borderTopRightRadius: 30,
         padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
         maxHeight: '92%',
     },
-    bookingSheetTitle: { fontSize: 22, fontWeight: '900', color: COLORS.text, marginBottom: 16, marginTop: 8 },
+    bookingSheetTitle: { fontSize: 22, fontWeight: '900', marginBottom: 16, marginTop: 8 },
     bkCaregiverRow: {
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: COLORS.surface, borderRadius: 18,

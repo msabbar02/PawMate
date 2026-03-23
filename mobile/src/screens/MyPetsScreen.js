@@ -461,7 +461,7 @@ export default function PawMatePetsCenter() {
             showsVerticalScrollIndicator={false}
         >
             <View style={styles.listHeaderRow}>
-                <Text style={styles.screenTitle}>Mis Mascotas</Text>
+                <Text style={[styles.screenTitle, { color: theme.text }]}>Mis Mascotas</Text>
                 <TouchableOpacity
                     style={styles.addBtn}
                     onPress={() => { resetForm(); setIsFormVisible(true); }}
@@ -471,10 +471,10 @@ export default function PawMatePetsCenter() {
             </View>
 
             {pets.length === 0 ? (
-                <View style={styles.emptyCard}>
+                <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground }]}>
                     <Text style={{ fontSize: 64, textAlign: 'center' }}>🐾</Text>
-                    <Text style={styles.emptyTitle}>Sin Mascotas</Text>
-                    <Text style={styles.emptyDesc}>
+                    <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin Mascotas</Text>
+                    <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
                         Añade tu primera mascota para gestionar su perfil, paseos y salud.
                     </Text>
                     <TouchableOpacity
@@ -488,13 +488,13 @@ export default function PawMatePetsCenter() {
                 pets.map(pet => (
                     <TouchableOpacity
                         key={pet.id}
-                        style={styles.petCard}
+                        style={[styles.petCard, { backgroundColor: theme.cardBackground }]}
                         onPress={() => navigateTo('detail', pet)}
                         activeOpacity={0.82}
                     >
                         <View style={styles.petCardTop}>
                             {/* Avatar */}
-                            <View style={styles.petAvatarWrap}>
+                            <View style={[styles.petAvatarWrap, { backgroundColor: theme.primaryBg }]}>
                                 {pet.image
                                     ? <Image source={{ uri: pet.image }} style={styles.petAvatarImg} />
                                     : <Text style={{ fontSize: 34 }}>{getSpeciesEmoji(pet.species)}</Text>
@@ -503,8 +503,8 @@ export default function PawMatePetsCenter() {
 
                             {/* Info */}
                             <View style={{ flex: 1, marginLeft: 14 }}>
-                                <Text style={styles.petCardName}>{pet.name}</Text>
-                                <Text style={styles.petCardSub}>
+                                <Text style={[styles.petCardName, { color: theme.text }]}>{pet.name}</Text>
+                                <Text style={[styles.petCardSub, { color: theme.textSecondary }]}>
                                     {getSpeciesEmoji(pet.species)} {getSpeciesLabel(pet.species)}
                                     {pet.breed ? ` · ${pet.breed}` : ''}
                                 </Text>
@@ -516,13 +516,13 @@ export default function PawMatePetsCenter() {
                                     </View>
                                 )}
                             </View>
-                            <ChevronRight size={20} color={COLORS.textLight} />
+                            <ChevronRight size={20} color={theme.textSecondary} />
                         </View>
 
                         {/* Actions */}
-                        <View style={styles.petCardBottom}>
+                        <View style={[styles.petCardBottom, { borderTopColor: theme.border }]}>
                             <TouchableOpacity
-                                style={styles.editChip}
+                                style={[styles.editChip, { backgroundColor: theme.primaryBg }]}
                                 onPress={() => openEditModal(pet)}
                             >
                                 <PenSquare size={14} color={COLORS.primary} />
@@ -544,8 +544,8 @@ export default function PawMatePetsCenter() {
         return (
             <View>
                 {/* General Info */}
-                <View style={styles.infoCard}>
-                    <Text style={styles.infoCardTitle}>Información General</Text>
+                <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
+                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>Información General</Text>
                     <View style={styles.infoGrid}>
                         <InfoItem label="Especie" value={`${getSpeciesEmoji(selectedPet?.species)} ${getSpeciesLabel(selectedPet?.species)}`} />
                         <InfoItem label="Raza" value={selectedPet?.breed || '—'} />
@@ -561,8 +561,8 @@ export default function PawMatePetsCenter() {
                 </View>
 
                 {/* Medical Data */}
-                <View style={styles.infoCard}>
-                    <Text style={styles.infoCardTitle}>🏥 Datos Médicos</Text>
+                <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
+                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>🏥 Datos Médicos</Text>
                     <InfoItemFull
                         label="Nº Microchip"
                         value={selectedPet?.chipId || 'Sin microchip registrado'}
@@ -584,8 +584,8 @@ export default function PawMatePetsCenter() {
 
                 {/* Vet Contact */}
                 {(selectedPet?.vetName || selectedPet?.vetPhone) && (
-                    <View style={styles.infoCard}>
-                        <Text style={styles.infoCardTitle}>🩺 Veterinario</Text>
+                    <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
+                        <Text style={[styles.infoCardTitle, { color: theme.text }]}>🩺 Veterinario</Text>
                         {selectedPet?.vetName && (
                             <View style={styles.vetRow}>
                                 <User size={17} color={COLORS.secondary} />
@@ -676,7 +676,7 @@ export default function PawMatePetsCenter() {
 
                 {/* Global Stats */}
                 {walks.length > 0 && (
-                    <View style={styles.globalStatsRow}>
+                    <View style={[styles.globalStatsRow, { backgroundColor: theme.cardBackground }]}>
                         <GlobalStat value={totalStats.km} label="km totales" />
                         <View style={styles.statDivider} />
                         <GlobalStat value={totalStats.kcal} label="kcal" />
@@ -689,10 +689,10 @@ export default function PawMatePetsCenter() {
 
                 {/* Walks List */}
                 {walks.length === 0 ? (
-                    <View style={styles.emptyCard}>
+                    <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, marginTop: 0 }]}>
                         <Text style={{ fontSize: 52, textAlign: 'center' }}>🗺️</Text>
-                        <Text style={styles.emptyTitle}>Sin Paseos</Text>
-                        <Text style={styles.emptyDesc}>
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin Paseos</Text>
+                        <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
                             Los paseos con GPS aparecerán aquí con mapa, distancia y calorías.
                         </Text>
                     </View>
@@ -704,7 +704,7 @@ export default function PawMatePetsCenter() {
                         const walkDate = walk.endTime ? new Date(walk.endTime) : null;
 
                         return (
-                            <View key={walk.id} style={styles.walkCard}>
+                            <View key={walk.id} style={[styles.walkCard, { backgroundColor: theme.cardBackground }]}>
                                 {/* Map Thumbnail */}
                                 {hasRoute && region && (
                                     <View style={styles.walkMapBox}>
@@ -769,10 +769,10 @@ export default function PawMatePetsCenter() {
                 )}
 
                 {!isDog && (
-                    <View style={[styles.emptyCard, { marginTop: 0 }]}>
+                    <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, marginTop: 0 }]}>
                         <Text style={{ fontSize: 48, textAlign: 'center' }}>🐾</Text>
-                        <Text style={styles.emptyTitle}>Solo para perros</Text>
-                        <Text style={styles.emptyDesc}>
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>Solo para perros</Text>
+                        <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
                             El seguimiento GPS de paseos está disponible para perros.
                         </Text>
                     </View>
@@ -787,7 +787,7 @@ export default function PawMatePetsCenter() {
     const renderHealthTab = () => (
         <View>
             <View style={[styles.listHeaderRow, { paddingHorizontal: 2 }]}>
-                <Text style={styles.sectionTitle}>📅 Recordatorios</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>📅 Recordatorios</Text>
                 <TouchableOpacity
                     style={[styles.addBtn, { width: 34, height: 34, borderRadius: 17 }]}
                     onPress={() => openReminderForm()}
@@ -796,13 +796,13 @@ export default function PawMatePetsCenter() {
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.agendaCard}>
+            <View style={[styles.agendaCard, { backgroundColor: theme.cardBackground }]}>
                 {(!selectedPet?.reminders || selectedPet.reminders.length === 0) ? (
                     <View style={{ padding: 30, alignItems: 'center' }}>
                         <Text style={{ fontSize: 44 }}>🔔</Text>
-                        <Text style={styles.emptyDesc}>Sin recordatorios activos.</Text>
+                        <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Sin recordatorios activos.</Text>
                         <TouchableOpacity onPress={() => openReminderForm()} style={{ marginTop: 10 }}>
-                            <Text style={{ color: COLORS.primary, fontWeight: '700' }}>+ Añadir recordatorio</Text>
+                            <Text style={{ color: theme.primary, fontWeight: '700' }}>+ Añadir recordatorio</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
@@ -847,15 +847,15 @@ export default function PawMatePetsCenter() {
                 showsVerticalScrollIndicator={false}
             >
                 {/* ── HERO ───────────────────────────────── */}
-                <View style={styles.heroSection}>
+                <View style={[styles.heroSection, { backgroundColor: theme.cardBackground }]}>
                     {/* Back */}
-                    <TouchableOpacity style={styles.heroBackBtn} onPress={() => navigateTo('list')}>
-                        <Ionicons name="chevron-back" size={21} color={COLORS.text} />
+                    <TouchableOpacity style={[styles.heroBackBtn, { backgroundColor: theme.background }]} onPress={() => navigateTo('list')}>
+                        <Ionicons name="chevron-back" size={21} color={theme.text} />
                     </TouchableOpacity>
 
                     {/* Edit shortcut */}
-                    <TouchableOpacity style={styles.heroEditBtn} onPress={() => openEditModal(selectedPet)}>
-                        <PenSquare size={17} color={COLORS.text} />
+                    <TouchableOpacity style={[styles.heroEditBtn, { backgroundColor: theme.background }]} onPress={() => openEditModal(selectedPet)}>
+                        <PenSquare size={17} color={theme.text} />
                     </TouchableOpacity>
 
                     {/* Photo */}
@@ -869,7 +869,7 @@ export default function PawMatePetsCenter() {
                     </View>
 
                     {/* Name */}
-                    <Text style={styles.heroName}>{selectedPet.name}</Text>
+                    <Text style={[styles.heroName, { color: theme.text }]}>{selectedPet.name}</Text>
 
                     {/* Badges */}
                     <View style={styles.heroBadgesRow}>
@@ -882,7 +882,7 @@ export default function PawMatePetsCenter() {
                     </View>
 
                     {/* Stats Row */}
-                    <View style={styles.heroStatsRow}>
+                    <View style={[styles.heroStatsRow, { backgroundColor: theme.background }]}>
                         <HeroStat value={parseFloat(totalStats.km) > 0 ? totalStats.km : '—'} label="km" />
                         <View style={styles.heroStatDiv} />
                         <HeroStat value={totalStats.kcal > 0 ? totalStats.kcal : '—'} label="kcal" />
@@ -894,7 +894,7 @@ export default function PawMatePetsCenter() {
                 </View>
 
                 {/* ── TAB BAR ────────────────────────────── */}
-                <View style={styles.tabBar}>
+                <View style={[styles.tabBar, { backgroundColor: theme.cardBackground }]}>
                     {[
                         { key: 'profile', label: '🐾 Perfil' },
                         { key: 'walks', label: '🗺️ Paseos' },
@@ -930,8 +930,8 @@ export default function PawMatePetsCenter() {
     if (isLoadingSync) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }]}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={{ color: COLORS.textLight, marginTop: 12, fontWeight: '600' }}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={{ color: theme.textSecondary, marginTop: 12, fontWeight: '600' }}>
                     Cargando mascotas...
                 </Text>
             </View>
@@ -950,22 +950,22 @@ export default function PawMatePetsCenter() {
             {/* ── MODAL: CREAR / EDITAR MASCOTA ──────── */}
             <Modal visible={isFormVisible} animationType="slide" presentationStyle="formSheet">
                 <KeyboardAvoidingView
-                    style={{ flex: 1, backgroundColor: COLORS.background }}
+                    style={{ flex: 1, backgroundColor: theme.background }}
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 >
-                    <View style={styles.formHeader}>
-                        <Text style={styles.formTitle}>
+                    <View style={[styles.formHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                        <Text style={[styles.formTitle, { color: theme.text }]}>
                             {isEditing ? 'Editar Mascota' : 'Nueva Mascota'}
                         </Text>
                         <TouchableOpacity onPress={() => { setIsFormVisible(false); resetForm(); }}>
-                            <X size={24} color={COLORS.text} />
+                            <X size={24} color={theme.text} />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.formBody} showsVerticalScrollIndicator={false}>
+                    <ScrollView style={[styles.formBody, { backgroundColor: theme.background }]} showsVerticalScrollIndicator={false}>
 
                         {/* Foto */}
-                        <TouchableOpacity style={styles.photoPicker} onPress={pickImage}>
+                        <TouchableOpacity style={[styles.photoPicker, { backgroundColor: theme.cardBackground, borderColor: theme.border }]} onPress={pickImage}>
                             {formParams.image ? (
                                 <Image source={{ uri: formParams.image }} style={styles.photoPickerImg} />
                             ) : (
@@ -983,11 +983,11 @@ export default function PawMatePetsCenter() {
 
                         <FormLabel text="Nombre *" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.name}
                             onChangeText={t => setFormParams(p => ({ ...p, name: t }))}
                             placeholder="Ej. Max"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Especie" />
@@ -1011,11 +1011,11 @@ export default function PawMatePetsCenter() {
 
                         <FormLabel text="Raza" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.breed}
                             onChangeText={t => setFormParams(p => ({ ...p, breed: t }))}
                             placeholder="Ej. Golden Retriever"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Sexo" />
@@ -1040,30 +1040,30 @@ export default function PawMatePetsCenter() {
 
                         <FormLabel text="Peso (kg)" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             keyboardType="numeric"
                             value={formParams.weight}
                             onChangeText={t => setFormParams(p => ({ ...p, weight: t }))}
                             placeholder="Ej. 12.5"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Fecha de Nacimiento (YYYY-MM-DD)" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.birthdate}
                             onChangeText={t => setFormParams(p => ({ ...p, birthdate: t }))}
                             placeholder="Ej. 2022-05-14"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Color del pelaje" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.color}
                             onChangeText={t => setFormParams(p => ({ ...p, color: t }))}
                             placeholder="Ej. Dorado con blanco"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <View style={styles.switchRow}>
@@ -1085,50 +1085,50 @@ export default function PawMatePetsCenter() {
 
                         <FormLabel text="Nº Microchip" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.chipId}
                             onChangeText={t => setFormParams(p => ({ ...p, chipId: t }))}
                             placeholder="Ej. 941000024583921"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="⚠️ Alergias" />
                         <TextInput
-                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12 }]}
+                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             multiline
                             value={formParams.allergies}
                             onChangeText={t => setFormParams(p => ({ ...p, allergies: t }))}
                             placeholder="Ej. Polen, pollo, penicilina..."
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="💊 Medicamentos actuales" />
                         <TextInput
-                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12 }]}
+                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             multiline
                             value={formParams.medications}
                             onChangeText={t => setFormParams(p => ({ ...p, medications: t }))}
                             placeholder="Ej. Apoquel 16mg/día"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="📋 Condiciones médicas" />
                         <TextInput
-                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12 }]}
+                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             multiline
                             value={formParams.medicalConditions}
                             onChangeText={t => setFormParams(p => ({ ...p, medicalConditions: t }))}
                             placeholder="Ej. Displasia de cadera, diabetes..."
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="🛡️ Nº Seguro / Póliza" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.insurance}
                             onChangeText={t => setFormParams(p => ({ ...p, insurance: t }))}
                             placeholder="Ej. AXA-2024-001234"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         {/* ── VETERINARIO ── */}
@@ -1136,21 +1136,21 @@ export default function PawMatePetsCenter() {
 
                         <FormLabel text="Nombre del veterinario" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={formParams.vetName}
                             onChangeText={t => setFormParams(p => ({ ...p, vetName: t }))}
                             placeholder="Ej. Dr. García"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Teléfono de contacto" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             keyboardType="phone-pad"
                             value={formParams.vetPhone}
                             onChangeText={t => setFormParams(p => ({ ...p, vetPhone: t }))}
                             placeholder="Ej. +34 912 345 678"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <TouchableOpacity style={styles.submitBtn} onPress={handleSavePet}>
@@ -1213,35 +1213,35 @@ export default function PawMatePetsCenter() {
             {/* ── MODAL: RECORDATORIO ─────────────────── */}
             <Modal visible={isReminderModalVisible} animationType="slide" presentationStyle="pageSheet">
                 <KeyboardAvoidingView
-                    style={{ flex: 1, backgroundColor: COLORS.background }}
+                    style={{ flex: 1, backgroundColor: theme.background }}
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 >
-                    <View style={styles.formHeader}>
-                        <Text style={styles.formTitle}>
+                    <View style={[styles.formHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                        <Text style={[styles.formTitle, { color: theme.text }]}>
                             {editingReminder ? 'Editar Aviso' : 'Nuevo Aviso'}
                         </Text>
                         <TouchableOpacity onPress={() => setIsReminderModalVisible(false)}>
-                            <X size={24} color={COLORS.text} />
+                            <X size={24} color={theme.text} />
                         </TouchableOpacity>
                     </View>
-                    <ScrollView style={styles.formBody}>
+                    <ScrollView style={[styles.formBody, { backgroundColor: theme.background }]}>
                         <FormLabel text="Título" />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={reminderForm.title}
                             onChangeText={t => setReminderForm(r => ({ ...r, title: t }))}
                             placeholder="Ej. Vacuna Rabia"
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Descripción" />
                         <TextInput
-                            style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 12 }]}
+                            style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             multiline
                             value={reminderForm.description}
                             onChangeText={t => setReminderForm(r => ({ ...r, description: t }))}
                             placeholder="Notas adicionales..."
-                            placeholderTextColor={COLORS.textLight}
+                            placeholderTextColor={theme.textSecondary}
                         />
 
                         <FormLabel text="Fecha y hora del evento" />
@@ -1261,7 +1261,7 @@ export default function PawMatePetsCenter() {
                                     style={[styles.input, { flex: 1, justifyContent: 'center' }]}
                                     onPress={() => setShowDatePicker(true)}
                                 >
-                                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>
+                                <Text style={{ color: theme.text, fontWeight: '600' }}>
                                         {reminderForm.eventTime.toLocaleDateString()}
                                     </Text>
                                 </TouchableOpacity>
@@ -1269,7 +1269,7 @@ export default function PawMatePetsCenter() {
                                     style={[styles.input, { flex: 1, justifyContent: 'center' }]}
                                     onPress={() => setShowTimePicker(true)}
                                 >
-                                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>
+                                <Text style={{ color: theme.text, fontWeight: '600' }}>
                                         {reminderForm.eventTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </Text>
                                 </TouchableOpacity>

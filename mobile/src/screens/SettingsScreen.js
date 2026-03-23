@@ -16,38 +16,92 @@ import { uploadImageToStorage } from '../utils/storageHelpers';
 
 const APP_VERSION = '1.0.0';
 
+const POLICY_TEXT = `POLÍTICA DE PRIVACIDAD DE PAWMATE
+Última actualización: marzo 2026
+
+1. INTRODUCCIÓN
+PawMate ("nosotros", "nuestra aplicación") se compromete a proteger tu privacidad. Esta política describe cómo recopilamos, usamos y protegemos tu información personal.
+
+2. INFORMACIÓN QUE RECOPILAMOS
+• Datos de cuenta: nombre, correo electrónico, teléfono, foto de perfil.
+• Datos de mascotas: nombre, especie, raza, información médica que proporciones voluntariamente.
+• Datos de ubicación: coordenadas GPS durante paseos activos (solo cuando la app está en uso).
+• Datos de reservas: fechas, tipo de servicio, precios.
+• Contenido publicado: fotos y descripciones de posts en la comunidad.
+
+3. USO DE LA INFORMACIÓN
+Utilizamos tu información para:
+• Facilitar la conexión entre dueños de mascotas y cuidadores.
+• Procesar pagos de manera segura a través de Stripe.
+• Enviar notificaciones sobre tus reservas y actividad en la app.
+• Mejorar nuestros servicios y personalizar tu experiencia.
+
+4. COMPARTIR INFORMACIÓN
+No vendemos tu información personal a terceros. Compartimos datos solo con:
+• Cuidadores/dueños involucrados en una reserva.
+• Stripe para procesamiento de pagos.
+• Servicios de emergencia cuando activas el botón SOS.
+
+5. SEGURIDAD
+Implementamos medidas técnicas y organizativas para proteger tu datos, incluyendo cifrado en tránsito (HTTPS) y en reposo (Firebase Security Rules).
+
+6. TUS DERECHOS
+Tienes derecho a:
+• Acceder a tus datos personales.
+• Corregir información inexacta.
+• Solicitar la eliminación de tu cuenta y datos.
+• Exportar tus datos.
+
+Para ejercer estos derechos, contacta: soporte@pawmate.app
+
+7. RETENCIÓN DE DATOS
+Conservamos tus datos mientras tu cuenta esté activa. Tras eliminar tu cuenta, los datos se borran en un plazo de 30 días, excepto los requeridos por ley.
+
+8. CONTACTO
+PawMate · soporte@pawmate.app
+Para consultas sobre privacidad: privacidad@pawmate.app`;
+
 export default function SettingsScreen({ navigation }) {
     const { userData, user } = useContext(AuthContext);
     const { theme, toggleTheme, isDarkMode } = useContext(ThemeContext);
 
-    const [fullName, setFullName]         = useState(userData?.fullName || '');
-    const [phone, setPhone]               = useState(userData?.phone || '');
-    const [saving, setSaving]             = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
-    const [photoUri, setPhotoUri]         = useState(userData?.photoURL || null);
+    const [photoUri, setPhotoUri]             = useState(userData?.photoURL || null);
 
+    // Password modal
     const [showPasswordModal, setShowPasswordModal] = useState(false);
-    const [oldPass, setOldPass]   = useState('');
-    const [newPass, setNewPass]   = useState('');
-    const [changingPass, setChangingPass] = useState(false);
-    const [showOld, setShowOld]   = useState(false);
-    const [showNew, setShowNew]   = useState(false);
+    const [oldPass, setOldPass]     = useState('');
+    const [newPass, setNewPass]     = useState('');
+    const [changingPass, setChangingPass]           = useState(false);
+    const [showOld, setShowOld]     = useState(false);
+    const [showNew, setShowNew]     = useState(false);
 
+    // Emergency contacts
+    const [emergencyContacts, setEmergencyContacts]         = useState(userData?.emergencyContacts || []);
+    const [showContactModal, setShowContactModal]           = useState(false);
+    const [editingContact, setEditingContact]               = useState(null); // null = new
+    const [contactName, setContactName]                     = useState('');
+    const [contactPhone, setContactPhone]                   = useState('');
+    const [savingContact, setSavingContact]                 = useState(false);
+
+    // Policy modal
+    const [showPolicy, setShowPolicy] = useState(false);
+
+    // Stats
     const [petCount, setPetCount]   = useState(0);
     const [postCount, setPostCount] = useState(0);
 
     const ROLE_CONFIG = {
-        normal:    { label: 'Usuario',              emoji: '👤', color: '#6B7280' },
-        owner:     { label: 'Dueño Verificado',     emoji: '🐾', color: theme.primary },
-        caregiver: { label: 'Cuidador Verificado',  emoji: '🛡️', color: '#0891b2' },
+        normal:    { label: 'Usuario',             emoji: '👤', color: '#6B7280' },
+        owner:     { label: 'Dueño Verificado',    emoji: '🐾', color: theme.primary },
+        caregiver: { label: 'Cuidador Verificado', emoji: '🛡️', color: '#0891b2' },
     };
     const role = ROLE_CONFIG[userData?.role] || ROLE_CONFIG.normal;
 
     useEffect(() => {
         if (userData) {
-            setFullName(userData.fullName || '');
-            setPhone(userData.phone || '');
             setPhotoUri(userData.photoURL || null);
+            setEmergencyContacts(userData.emergencyContacts || []);
         }
     }, [userData]);
 
@@ -76,24 +130,10 @@ export default function SettingsScreen({ navigation }) {
             const url = await uploadImageToStorage(localUri, `avatars/${user.uid}.jpg`);
             await updateDoc(doc(db, 'users', user.uid), { photoURL: url });
         } catch {
-            Alert.alert('Error', 'No se pudo subir la foto. Inténtalo de nuevo.');
+            Alert.alert('Error', 'No se pudo subir la foto.');
         } finally {
             setUploadingPhoto(false);
         }
-    };
-
-    // ── Save profile ──
-    const handleSave = async () => {
-        if (!fullName.trim()) return Alert.alert('Error', 'El nombre no puede estar vacío.');
-        setSaving(true);
-        try {
-            await updateDoc(doc(db, 'users', user.uid), {
-                fullName: fullName.trim(),
-                phone:    phone.trim(),
-            });
-            Alert.alert('¡Guardado! ✅', 'Tu perfil ha sido actualizado.');
-        } catch { Alert.alert('Error', 'No se pudo guardar.'); }
-        finally { setSaving(false); }
     };
 
     // ── Change password ──
@@ -108,7 +148,7 @@ export default function SettingsScreen({ navigation }) {
             await updatePassword(auth.currentUser, newPass);
             setShowPasswordModal(false);
             setOldPass(''); setNewPass('');
-            Alert.alert('✅ Contraseña actualizada', 'Tu contraseña ha sido cambiada.');
+            Alert.alert('✅ Contraseña actualizada');
         } catch (e) {
             Alert.alert('Error', e.code === 'auth/wrong-password'
                 ? 'La contraseña actual es incorrecta.'
@@ -116,7 +156,62 @@ export default function SettingsScreen({ navigation }) {
         } finally { setChangingPass(false); }
     };
 
-    // ── Sign out ──
+    // ── Emergency contacts ──
+    const openAddContact = () => {
+        setEditingContact(null);
+        setContactName('');
+        setContactPhone('');
+        setShowContactModal(true);
+    };
+
+    const openEditContact = (contact, index) => {
+        setEditingContact(index);
+        setContactName(contact.name);
+        setContactPhone(contact.phone);
+        setShowContactModal(true);
+    };
+
+    const handleSaveContact = async () => {
+        if (!contactName.trim() || !contactPhone.trim()) {
+            return Alert.alert('Error', 'Rellena el nombre y el teléfono.');
+        }
+        setSavingContact(true);
+        const newContacts = [...emergencyContacts];
+        const entry = { name: contactName.trim(), phone: contactPhone.trim() };
+        if (editingContact !== null) {
+            newContacts[editingContact] = entry;
+        } else {
+            if (newContacts.length >= 3) {
+                setSavingContact(false);
+                return Alert.alert('Límite alcanzado', 'Puedes tener como máximo 3 contactos de emergencia.');
+            }
+            newContacts.push(entry);
+        }
+        try {
+            await updateDoc(doc(db, 'users', user.uid), { emergencyContacts: newContacts });
+            setEmergencyContacts(newContacts);
+            setShowContactModal(false);
+        } catch { Alert.alert('Error', 'No se pudo guardar el contacto.'); }
+        finally { setSavingContact(false); }
+    };
+
+    const handleDeleteContact = async (index) => {
+        Alert.alert('Eliminar contacto', '¿Eliminar este contacto de emergencia?', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Eliminar', style: 'destructive',
+                onPress: async () => {
+                    const newContacts = emergencyContacts.filter((_, i) => i !== index);
+                    try {
+                        await updateDoc(doc(db, 'users', user.uid), { emergencyContacts: newContacts });
+                        setEmergencyContacts(newContacts);
+                    } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+                },
+            },
+        ]);
+    };
+
+    // ── Sign out / Delete account ──
     const handleSignOut = () => {
         Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
             { text: 'Cancelar', style: 'cancel' },
@@ -124,9 +219,8 @@ export default function SettingsScreen({ navigation }) {
         ]);
     };
 
-    // ── Delete account ──
     const handleDeleteAccount = () => {
-        Alert.alert('⚠️ Eliminar cuenta', 'Esta acción es IRREVERSIBLE. Se borrarán todos tus datos.', [
+        Alert.alert('⚠️ Eliminar cuenta', 'Esta acción es IRREVERSIBLE.', [
             { text: 'Cancelar', style: 'cancel' },
             {
                 text: 'Eliminar', style: 'destructive',
@@ -146,25 +240,19 @@ export default function SettingsScreen({ navigation }) {
     // HELPERS
     // ─────────────────────────────────────────────────
     const SectionTitle = ({ children, danger }) => (
-        <Text style={[s.sectionTitle, {
-            color: danger ? '#EF4444' : theme.textSecondary,
-        }]}>
+        <Text style={[s.sectionTitle, { color: danger ? '#EF4444' : theme.textSecondary }]}>
             {children}
         </Text>
     );
 
     const SettingRow = ({ icon, iconBg, label, sublabel, right, onPress, danger, last }) => (
         <TouchableOpacity
-            style={[
-                s.settingRow,
-                { backgroundColor: theme.cardBackground },
-                last && s.settingRowLast,
-            ]}
+            style={[s.settingRow, { backgroundColor: theme.cardBackground }, last && s.settingRowLast]}
             onPress={onPress}
             disabled={!onPress}
             activeOpacity={onPress ? 0.65 : 1}
         >
-            <View style={[s.settingIconWrap, { backgroundColor: iconBg || (isDarkMode ? '#1a3626' : '#e8f5ee') }]}>
+            <View style={[s.settingIconWrap, { backgroundColor: iconBg || theme.primaryBg }]}>
                 <Ionicons name={icon} size={18} color={danger ? '#EF4444' : theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
@@ -181,9 +269,7 @@ export default function SettingsScreen({ navigation }) {
     );
 
     const SettingGroup = ({ children }) => (
-        <View style={[s.settingGroup, { borderColor: theme.border }]}>
-            {children}
-        </View>
+        <View style={[s.settingGroup, { borderColor: theme.border }]}>{children}</View>
     );
 
     // ─────────────────────────────────────────────────
@@ -193,26 +279,15 @@ export default function SettingsScreen({ navigation }) {
         <View style={[s.container, { backgroundColor: theme.background }]}>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-            {/* ── HEADER ── */}
+            {/* HEADER */}
             <View style={[s.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <Text style={[s.headerTitle, { color: theme.text }]}>Ajustes</Text>
-                <TouchableOpacity
-                    style={[s.saveBtn, { backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }]}
-                    onPress={handleSave}
-                    disabled={saving}
-                >
-                    {saving
-                        ? <ActivityIndicator size="small" color="#FFF" />
-                        : <Text style={s.saveBtnText}>Guardar</Text>
-                    }
-                </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
                 {/* ── PROFILE HERO CARD ── */}
                 <View style={[s.profileHero, { backgroundColor: theme.cardBackground }]}>
-                    {/* Avatar */}
                     <TouchableOpacity style={s.avatarWrap} onPress={handleChangePhoto} disabled={uploadingPhoto}>
                         <View style={[s.avatarRing, { borderColor: theme.primary + '40' }]}>
                             {photoUri
@@ -230,19 +305,13 @@ export default function SettingsScreen({ navigation }) {
                         </View>
                     </TouchableOpacity>
 
-                    {/* Name + Role */}
-                    <Text style={[s.heroName, { color: theme.text }]}>
-                        {userData?.fullName || 'Tu nombre'}
-                    </Text>
-                    <Text style={[s.heroEmail, { color: theme.textSecondary }]}>
-                        {user?.email || ''}
-                    </Text>
+                    <Text style={[s.heroName, { color: theme.text }]}>{userData?.fullName || 'Tu nombre'}</Text>
+                    <Text style={[s.heroEmail, { color: theme.textSecondary }]}>{user?.email || ''}</Text>
                     <View style={[s.rolePill, { backgroundColor: role.color + '15' }]}>
                         <Text style={{ fontSize: 12 }}>{role.emoji}</Text>
                         <Text style={[s.rolePillText, { color: role.color }]}>{role.label}</Text>
                     </View>
 
-                    {/* Stats strip */}
                     <View style={[s.statsStrip, { borderTopColor: theme.border }]}>
                         <View style={s.statItem}>
                             <Text style={[s.statNum, { color: theme.text }]}>{petCount}</Text>
@@ -261,55 +330,45 @@ export default function SettingsScreen({ navigation }) {
                     </View>
                 </View>
 
-                {/* ── DATOS PERSONALES ── */}
+                {/* ── DATOS PERSONALES (read-only) ── */}
                 <SectionTitle>DATOS PERSONALES</SectionTitle>
-                <View style={[s.formCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                    <View style={s.inputGroup}>
-                        <View style={[s.inputIconWrap, { backgroundColor: theme.primaryBg }]}>
-                            <Ionicons name="person-outline" size={17} color={theme.primary} />
+                <View style={[s.infoCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                    <View style={s.infoRow}>
+                        <View style={[s.infoIconWrap, { backgroundColor: theme.primaryBg }]}>
+                            <Ionicons name="person-outline" size={16} color={theme.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.inputLabel, { color: theme.textSecondary }]}>Nombre completo</Text>
-                            <TextInput
-                                style={[s.textInput, { color: theme.text }]}
-                                value={fullName}
-                                onChangeText={setFullName}
-                                placeholder="Tu nombre"
-                                placeholderTextColor={theme.textSecondary}
-                            />
+                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>Nombre completo</Text>
+                            <Text style={[s.infoValue, { color: theme.text }]}>{userData?.fullName || '—'}</Text>
                         </View>
                     </View>
-
-                    <View style={[s.inputDivider, { backgroundColor: theme.border }]} />
-
-                    <View style={s.inputGroup}>
-                        <View style={[s.inputIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                            <Ionicons name="call-outline" size={17} color="#3B82F6" />
+                    <View style={[s.infoDiv, { backgroundColor: theme.border }]} />
+                    <View style={s.infoRow}>
+                        <View style={[s.infoIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                            <Ionicons name="call-outline" size={16} color="#3B82F6" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.inputLabel, { color: theme.textSecondary }]}>Teléfono</Text>
-                            <TextInput
-                                style={[s.textInput, { color: theme.text }]}
-                                value={phone}
-                                onChangeText={setPhone}
-                                placeholder="+34 600 000 000"
-                                placeholderTextColor={theme.textSecondary}
-                                keyboardType="phone-pad"
-                            />
+                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>Teléfono</Text>
+                            <Text style={[s.infoValue, { color: theme.text }]}>{userData?.phone || '—'}</Text>
                         </View>
                     </View>
-
-                    <View style={[s.inputDivider, { backgroundColor: theme.border }]} />
-
-                    <View style={s.inputGroup}>
-                        <View style={[s.inputIconWrap, { backgroundColor: '#F5F3FF' }]}>
-                            <Ionicons name="mail-outline" size={17} color="#7C3AED" />
+                    <View style={[s.infoDiv, { backgroundColor: theme.border }]} />
+                    <View style={s.infoRow}>
+                        <View style={[s.infoIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                            <Ionicons name="mail-outline" size={16} color="#7C3AED" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.inputLabel, { color: theme.textSecondary }]}>Email</Text>
-                            <Text style={[s.textInput, { color: theme.textSecondary }]}>{user?.email || '—'}</Text>
+                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>Email</Text>
+                            <Text style={[s.infoValue, { color: theme.text }]}>{user?.email || '—'}</Text>
                         </View>
-                        <Ionicons name="lock-closed-outline" size={14} color={theme.textSecondary} />
+                        <Ionicons name="lock-closed-outline" size={13} color={theme.textSecondary} />
+                    </View>
+                    <View style={[s.infoDiv, { backgroundColor: theme.border }]} />
+                    <View style={[s.infoNote, { backgroundColor: theme.primaryBg }]}>
+                        <Ionicons name="information-circle-outline" size={14} color={theme.primary} />
+                        <Text style={[s.infoNoteText, { color: theme.primary }]}>
+                            Para modificar tus datos, ve a la pantalla de Perfil
+                        </Text>
                     </View>
                 </View>
 
@@ -318,7 +377,7 @@ export default function SettingsScreen({ navigation }) {
                 <SettingGroup>
                     <SettingRow
                         icon={isDarkMode ? 'moon' : 'sunny-outline'}
-                        iconBg={isDarkMode ? '#1e293b' : '#FEF9C3'}
+                        iconBg={isDarkMode ? theme.primaryBg : '#FEF9C3'}
                         label={isDarkMode ? 'Modo oscuro' : 'Modo claro'}
                         sublabel="Cambia el aspecto de la app"
                         last
@@ -333,19 +392,82 @@ export default function SettingsScreen({ navigation }) {
                     />
                 </SettingGroup>
 
+                {/* ── CONTACTOS DE EMERGENCIA ── */}
+                <SectionTitle>CONTACTOS DE EMERGENCIA</SectionTitle>
+                <View style={[s.settingGroup, { borderColor: theme.border }]}>
+                    {emergencyContacts.length === 0 && (
+                        <View style={[s.settingRow, { backgroundColor: theme.cardBackground }]}>
+                            <Ionicons name="alert-circle-outline" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
+                            <Text style={[s.settingSublabel, { color: theme.textSecondary, flex: 1 }]}>
+                                Sin contactos de emergencia. El botón SOS necesita al menos uno.
+                            </Text>
+                        </View>
+                    )}
+                    {emergencyContacts.map((contact, i) => (
+                        <View key={i} style={[s.settingRow, { backgroundColor: theme.cardBackground }, i === emergencyContacts.length - 1 && emergencyContacts.length > 0 && s.settingRowLast]}>
+                            <View style={[s.settingIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                                <Ionicons name="call" size={18} color="#EF4444" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[s.settingLabel, { color: theme.text }]}>{contact.name}</Text>
+                                <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>{contact.phone}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => openEditContact(contact, i)} style={{ marginRight: 12 }}>
+                                <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteContact(i)}>
+                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                    {emergencyContacts.length < 3 && (
+                        <TouchableOpacity
+                            style={[s.settingRow, s.settingRowLast, { backgroundColor: theme.cardBackground }]}
+                            onPress={openAddContact}
+                        >
+                            <View style={[s.settingIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                                <Ionicons name="add" size={18} color="#EF4444" />
+                            </View>
+                            <Text style={[s.settingLabel, { color: theme.primary }]}>Añadir contacto</Text>
+                            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* ── MÉTODOS DE PAGO ── */}
+                <SectionTitle>MÉTODOS DE PAGO</SectionTitle>
+                <SettingGroup>
+                    <View style={[s.settingRow, { backgroundColor: theme.cardBackground }]}>
+                        <View style={[s.settingIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                            <Ionicons name="card-outline" size={18} color="#3B82F6" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>Sin métodos guardados</Text>
+                            <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>Las tarjetas se gestionan al pagar</Text>
+                        </View>
+                    </View>
+                    <SettingRow
+                        icon="shield-checkmark-outline"
+                        iconBg="#ECFDF5"
+                        label="Pagos seguros con Stripe"
+                        sublabel="Tus datos bancarios nunca se almacenan en PawMate"
+                        last
+                    />
+                </SettingGroup>
+
                 {/* ── CUENTA ── */}
                 <SectionTitle>CUENTA</SectionTitle>
                 <SettingGroup>
                     <SettingRow
                         icon="key-outline"
-                        iconBg={isDarkMode ? '#1e293b' : '#F0F9FF'}
+                        iconBg={isDarkMode ? theme.primaryBg : '#F0F9FF'}
                         label="Cambiar contraseña"
                         onPress={() => setShowPasswordModal(true)}
                     />
                     {userData?.role === 'normal' && userData?.verificationStatus !== 'pending' && (
                         <SettingRow
                             icon="shield-checkmark-outline"
-                            iconBg={isDarkMode ? '#1a3626' : '#ECFDF5'}
+                            iconBg={theme.primaryBg}
                             label="Verificar mi cuenta"
                             sublabel="Conviértete en Dueño o Cuidador"
                             onPress={() => navigation.navigate('Verify')}
@@ -354,14 +476,14 @@ export default function SettingsScreen({ navigation }) {
                     {userData?.verificationStatus === 'pending' && (
                         <SettingRow
                             icon="time-outline"
-                            iconBg={isDarkMode ? '#2d2000' : '#FEF3C7'}
+                            iconBg={isDarkMode ? theme.primaryBg : '#FEF3C7'}
                             label="Verificación en revisión"
                             sublabel="Te avisaremos en 24-48h"
                         />
                     )}
                     <SettingRow
                         icon="notifications-outline"
-                        iconBg={isDarkMode ? '#1e293b' : '#FFF7ED'}
+                        iconBg={isDarkMode ? theme.primaryBg : '#FFF7ED'}
                         label="Notificaciones"
                         last
                         onPress={() => navigation.navigate('Notifications')}
@@ -379,7 +501,7 @@ export default function SettingsScreen({ navigation }) {
                     <SettingRow
                         icon="document-text-outline"
                         label="Política de privacidad"
-                        onPress={() => Linking.openURL('https://pawmate.app/privacy')}
+                        onPress={() => setShowPolicy(true)}
                     />
                     <SettingRow
                         icon="chatbubble-ellipses-outline"
@@ -416,14 +538,8 @@ export default function SettingsScreen({ navigation }) {
             {/* ════════════════════════════════════════
                 MODAL: CHANGE PASSWORD
             ════════════════════════════════════════ */}
-            <Modal
-                visible={showPasswordModal}
-                animationType="slide"
-                presentationStyle="pageSheet"
-                onRequestClose={() => setShowPasswordModal(false)}
-            >
+            <Modal visible={showPasswordModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPasswordModal(false)}>
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
-                    {/* Header */}
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
                             <Ionicons name="close" size={24} color={theme.text} />
@@ -431,9 +547,7 @@ export default function SettingsScreen({ navigation }) {
                         <Text style={[s.modalTitle, { color: theme.text }]}>Cambiar contraseña</Text>
                         <View style={{ width: 28 }} />
                     </View>
-
                     <ScrollView contentContainerStyle={{ padding: 24 }}>
-                        {/* Info banner */}
                         <View style={[s.infoBanner, { backgroundColor: theme.primaryBg }]}>
                             <Ionicons name="shield-checkmark-outline" size={18} color={theme.primary} />
                             <Text style={[s.infoBannerText, { color: theme.primary }]}>
@@ -471,18 +585,14 @@ export default function SettingsScreen({ navigation }) {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Strength indicator */}
                         {newPass.length > 0 && (
                             <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
                                 {[1, 2, 3, 4].map(i => (
-                                    <View
-                                        key={i}
-                                        style={[s.strengthBar, {
-                                            backgroundColor: newPass.length >= i * 2
-                                                ? (newPass.length >= 8 ? '#22C55E' : '#F59E0B')
-                                                : theme.border,
-                                        }]}
-                                    />
+                                    <View key={i} style={[s.strengthBar, {
+                                        backgroundColor: newPass.length >= i * 2
+                                            ? (newPass.length >= 8 ? '#22C55E' : '#F59E0B')
+                                            : theme.border,
+                                    }]} />
                                 ))}
                                 <Text style={[s.strengthLabel, { color: theme.textSecondary }]}>
                                     {newPass.length < 4 ? 'Débil' : newPass.length < 8 ? 'Media' : 'Fuerte'}
@@ -503,6 +613,80 @@ export default function SettingsScreen({ navigation }) {
                     </ScrollView>
                 </View>
             </Modal>
+
+            {/* ════════════════════════════════════════
+                MODAL: EMERGENCY CONTACT
+            ════════════════════════════════════════ */}
+            <Modal visible={showContactModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowContactModal(false)}>
+                <View style={{ flex: 1, backgroundColor: theme.background }}>
+                    <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                        <TouchableOpacity onPress={() => setShowContactModal(false)}>
+                            <Ionicons name="close" size={24} color={theme.text} />
+                        </TouchableOpacity>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>
+                            {editingContact !== null ? 'Editar contacto' : 'Nuevo contacto de emergencia'}
+                        </Text>
+                        <View style={{ width: 28 }} />
+                    </View>
+                    <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
+                        <View style={[s.infoBanner, { backgroundColor: '#FEE2E2' }]}>
+                            <Ionicons name="alert-circle-outline" size={18} color="#EF4444" />
+                            <Text style={[s.infoBannerText, { color: '#EF4444' }]}>
+                                Este contacto recibirá una llamada cuando actives el botón SOS durante un paseo.
+                            </Text>
+                        </View>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>NOMBRE</Text>
+                        <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                            <TextInput
+                                style={[s.passwordInput, { color: theme.text }]}
+                                value={contactName}
+                                onChangeText={setContactName}
+                                placeholder="Ej. Mamá"
+                                placeholderTextColor={theme.textSecondary}
+                            />
+                        </View>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>TELÉFONO</Text>
+                        <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                            <TextInput
+                                style={[s.passwordInput, { color: theme.text }]}
+                                value={contactPhone}
+                                onChangeText={setContactPhone}
+                                placeholder="+34 600 000 000"
+                                placeholderTextColor={theme.textSecondary}
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+                        <TouchableOpacity
+                            style={[s.primaryBtn, { backgroundColor: '#EF4444', marginTop: 16, opacity: savingContact ? 0.7 : 1 }]}
+                            onPress={handleSaveContact}
+                            disabled={savingContact}
+                        >
+                            {savingContact
+                                ? <ActivityIndicator color="#FFF" />
+                                : <Text style={s.primaryBtnText}>Guardar contacto</Text>
+                            }
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </Modal>
+
+            {/* ════════════════════════════════════════
+                MODAL: POLÍTICA DE PRIVACIDAD
+            ════════════════════════════════════════ */}
+            <Modal visible={showPolicy} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPolicy(false)}>
+                <View style={{ flex: 1, backgroundColor: theme.background }}>
+                    <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                        <TouchableOpacity onPress={() => setShowPolicy(false)}>
+                            <Ionicons name="close" size={24} color={theme.text} />
+                        </TouchableOpacity>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>Política de Privacidad</Text>
+                        <View style={{ width: 28 }} />
+                    </View>
+                    <ScrollView contentContainerStyle={{ padding: 20 }}>
+                        <Text style={[s.policyText, { color: theme.text }]}>{POLICY_TEXT}</Text>
+                    </ScrollView>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -513,113 +697,68 @@ export default function SettingsScreen({ navigation }) {
 const s = StyleSheet.create({
     container: { flex: 1 },
 
-    // Header
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingTop: Platform.OS === 'ios' ? 60 : 36,
         paddingBottom: 16,
         borderBottomWidth: 1,
     },
     headerTitle: { fontSize: 28, fontWeight: '900' },
-    saveBtn:     { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 },
-    saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14 },
 
-    // Profile hero card
+    // Profile hero
     profileHero: {
-        alignItems: 'center',
-        paddingTop: 28, paddingBottom: 0,
-        marginHorizontal: 16, marginTop: 20,
-        borderRadius: 24,
+        alignItems: 'center', paddingTop: 28, paddingBottom: 0,
+        marginHorizontal: 16, marginTop: 20, borderRadius: 24,
         shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
         overflow: 'hidden',
     },
-    avatarWrap: { position: 'relative', marginBottom: 14 },
-    avatarRing: { width: 108, height: 108, borderRadius: 54, borderWidth: 3, overflow: 'hidden', padding: 2 },
-    avatar:     { width: '100%', height: '100%', borderRadius: 50 },
+    avatarWrap:     { position: 'relative', marginBottom: 14 },
+    avatarRing:     { width: 108, height: 108, borderRadius: 54, borderWidth: 3, overflow: 'hidden', padding: 2 },
+    avatar:         { width: '100%', height: '100%', borderRadius: 50 },
     avatarFallback: { justifyContent: 'center', alignItems: 'center' },
-    cameraBtn:  {
-        position: 'absolute', bottom: 2, right: 2,
-        width: 30, height: 30, borderRadius: 15,
-        justifyContent: 'center', alignItems: 'center',
-        borderWidth: 2.5,
-    },
-    heroName:  { fontSize: 20, fontWeight: '900', marginBottom: 2 },
-    heroEmail: { fontSize: 13, marginBottom: 10 },
-    rolePill:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, marginBottom: 22 },
-    rolePillText: { fontSize: 13, fontWeight: '700' },
+    cameraBtn:      { position: 'absolute', bottom: 2, right: 2, width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', borderWidth: 2.5 },
+    heroName:       { fontSize: 20, fontWeight: '900', marginBottom: 2 },
+    heroEmail:      { fontSize: 13, marginBottom: 10 },
+    rolePill:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, marginBottom: 22 },
+    rolePillText:   { fontSize: 13, fontWeight: '700' },
+    statsStrip:     { flexDirection: 'row', width: '100%', justifyContent: 'space-evenly', alignItems: 'center', paddingVertical: 18, borderTopWidth: 1 },
+    statItem:       { alignItems: 'center', flex: 1 },
+    statNum:        { fontSize: 22, fontWeight: '900' },
+    statLabel:      { fontSize: 11, fontWeight: '600', marginTop: 2 },
+    statDivider:    { width: 1, height: 28 },
 
-    statsStrip: {
-        flexDirection: 'row', width: '100%',
-        justifyContent: 'space-evenly', alignItems: 'center',
-        paddingVertical: 18, borderTopWidth: 1,
-    },
-    statItem:    { alignItems: 'center', flex: 1 },
-    statNum:     { fontSize: 22, fontWeight: '900' },
-    statLabel:   { fontSize: 11, fontWeight: '600', marginTop: 2 },
-    statDivider: { width: 1, height: 28 },
-
-    // Section title
-    sectionTitle: {
-        fontSize: 11, fontWeight: '800', letterSpacing: 1,
-        marginHorizontal: 20, marginTop: 28, marginBottom: 8,
-    },
-
-    // Form card (inline inputs)
-    formCard: {
-        marginHorizontal: 16, borderRadius: 20,
-        borderWidth: 1, overflow: 'hidden',
-    },
-    inputGroup: {
-        flexDirection: 'row', alignItems: 'center',
-        paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-    },
-    inputIconWrap: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-    inputLabel:    { fontSize: 11, fontWeight: '600', marginBottom: 2 },
-    textInput:     { fontSize: 15, paddingVertical: 0 },
-    inputDivider:  { height: 1, marginLeft: 62 },
-
-    // Setting groups
-    settingGroup: {
-        marginHorizontal: 16, borderRadius: 20,
-        borderWidth: 1, overflow: 'hidden',
-    },
-    settingRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-        paddingHorizontal: 16, paddingVertical: 15,
-        borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)',
-    },
+    // Section title & groups
+    sectionTitle:   { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginHorizontal: 20, marginTop: 28, marginBottom: 8 },
+    settingGroup:   { marginHorizontal: 16, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+    settingRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' },
     settingRowLast: { borderBottomWidth: 0 },
-    settingIconWrap: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-    settingLabel:    { fontSize: 15, fontWeight: '600' },
-    settingSublabel: { fontSize: 12, marginTop: 1 },
+    settingIconWrap:{ width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    settingLabel:   { fontSize: 15, fontWeight: '600' },
+    settingSublabel:{ fontSize: 12, marginTop: 1 },
 
-    // Password modal
-    modalHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        padding: 18, paddingTop: Platform.OS === 'ios' ? 56 : 18,
-        borderBottomWidth: 1,
-    },
-    modalTitle: { fontSize: 17, fontWeight: '800' },
+    // Info card (read-only personal data)
+    infoCard: { marginHorizontal: 16, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+    infoRow:  { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+    infoIconWrap: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    infoLabel:    { fontSize: 11, fontWeight: '600', marginBottom: 2 },
+    infoValue:    { fontSize: 15, fontWeight: '600' },
+    infoDiv:      { height: 1, marginLeft: 62 },
+    infoNote:     { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, margin: 10, borderRadius: 12 },
+    infoNoteText: { fontSize: 12, fontWeight: '600', flex: 1 },
 
-    infoBanner: {
-        flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-        padding: 14, borderRadius: 16, marginBottom: 24,
-    },
+    // Modals
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, paddingTop: Platform.OS === 'ios' ? 56 : 18, borderBottomWidth: 1 },
+    modalTitle:  { fontSize: 17, fontWeight: '800' },
+    infoBanner:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 16, marginBottom: 24 },
     infoBannerText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '500' },
+    fieldLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    passwordInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14 },
+    passwordInput:    { flex: 1, fontSize: 15, paddingVertical: 0 },
+    strengthBar:      { flex: 1, height: 4, borderRadius: 2 },
+    strengthLabel:    { fontSize: 12, fontWeight: '600', alignSelf: 'center', marginLeft: 4 },
+    primaryBtn:       { paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
+    primaryBtnText:   { color: '#FFF', fontWeight: '800', fontSize: 16 },
 
-    fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-
-    passwordInputRow: {
-        flexDirection: 'row', alignItems: 'center',
-        borderWidth: 1.5, borderRadius: 16,
-        paddingHorizontal: 16, paddingVertical: 14,
-    },
-    passwordInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
-
-    strengthBar:   { flex: 1, height: 4, borderRadius: 2 },
-    strengthLabel: { fontSize: 12, fontWeight: '600', alignSelf: 'center', marginLeft: 4 },
-
-    primaryBtn:     { paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-    primaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
+    // Policy
+    policyText: { fontSize: 14, lineHeight: 22 },
 });

@@ -1,0 +1,123 @@
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, var(--surface-color) 0%, var(--bg-color) 100%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.login-icon {
+    color: var(--primary-color);
+    margin-bottom: 16px;
+}
+
+.login-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: white;
+}
+
+.login-header p {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.login-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--danger-color);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 20px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 14px;
+    color: var(--text-muted);
+}
+
+.input-group input {
+    width: 100%;
+    padding: 14px 44px 14px 44px;
+    background-color: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 15px;
+    transition: all 0.2s ease;
+}
+
+.toggle-password-btn {
+    position: absolute;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 0.2s ease;
+}
+
+.toggle-password-btn:hover {
+    color: var(--text-main);
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background-color: rgba(15, 23, 42, 0.8);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.input-group input::placeholder {
+    color: var(--text-muted);
+}
+
+.login-button {
+    margin-top: 8px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.login-button:hover {
+    background-color: var(--primary-hover);
+}

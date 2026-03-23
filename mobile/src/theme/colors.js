@@ -42,21 +42,22 @@ export const lightTheme = {
 };
 
 export const darkTheme = {
-    background: '#0d1f16',
-    cardBackground: '#152a1e',
-    text: '#f0f7f4',
-    textSecondary: '#7eaa92',
-    primary: '#34d399',
-    primaryLight: '#1a7a4c',
-    primaryBg: '#1a3626',
-    border: '#243d2e',
-    error: '#f87171',
-    success: '#34d399',
-    tabBar: '#152a1e',
-    tabBarInactive: '#4b6358',
-    tabBarActive: '#34d399',
-    isDark: true,
+    background:      '#0f1f14',
+    cardBackground:  '#1c3427',
+    text:            '#e8f5ee',
+    textSecondary:   '#7eaa92',
+    primary:         '#34d399',
+    primaryLight:    '#1a7a4c',
+    primaryBg:       '#243d2e',
+    border:          '#2e5040',
+    error:           '#f87171',
+    success:         '#34d399',
+    tabBar:          '#1c3427',
+    tabBarInactive:  '#4b7a60',
+    tabBarActive:    '#34d399',
+    isDark:          true,
 };
+
 
 export const COLORS = {
     primary: '#1a7a4c',

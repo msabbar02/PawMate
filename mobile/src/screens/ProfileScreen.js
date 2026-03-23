@@ -1,244 +1,603 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, TextInput, Platform,
+    Switch, KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS } from '../constants/colors';
+import * as Location from 'expo-location';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { AuthContext } from '../context/AuthContext';
+import { ThemeContext } from '../context/ThemeContext';
 import { auth, db } from '../config/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { uploadImageToStorage } from '../utils/storageHelpers';
+import { uploadImageToStorage, saveAvatarToFirestore } from '../utils/storageHelpers';
+import { COLORS } from '../constants/colors';
 
-const ROLE_LABEL = {
-    normal: { label: 'Usuario', icon: '👤', color: COLORS.textLight },
-    owner: { label: 'Dueño Verificado ✓', icon: '🐾', color: COLORS.primary },
-    caregiver: { label: 'Cuidador Verificado 🛡️', icon: '🛡️', color: COLORS.secondary },
+// ─── helpers ─────────────────────────────────────────────────
+const formatDate = (d) => {
+    if (!d) return '';
+    if (typeof d === 'string') return d;
+    const date = d?.toDate ? d.toDate() : new Date(d);
+    return date.toLocaleDateString('es-ES');
 };
 
+const sectionLabel = (text, theme) => (
+    <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{text}</Text>
+);
+
+// ─── Field Row ────────────────────────────────────────────────
+const Field = ({ label, value, onChangeText, placeholder, keyboardType, editable = true, theme, multiline }) => (
+    <View style={[styles.fieldRow, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{label}</Text>
+        {editable ? (
+            <TextInput
+                style={[styles.fieldInput, { color: theme.text }]}
+                value={value}
+                onChangeText={onChangeText}
+                placeholder={placeholder || label}
+                placeholderTextColor={theme.textSecondary}
+                keyboardType={keyboardType || 'default'}
+                multiline={multiline}
+            />
+        ) : (
+            <Text style={[styles.fieldValue, { color: theme.textSecondary }]}>{value || '—'}</Text>
+        )}
+    </View>
+);
+
+// ─── Main Component ───────────────────────────────────────────
 export default function ProfileScreen({ navigation }) {
     const { userData, user } = useContext(AuthContext);
+    const { theme, isDarkMode } = useContext(ThemeContext);
 
-    const [fullName, setFullName] = useState(userData?.fullName || '');
-    const [saving, setSaving] = useState(false);
+    // ── Editable fields state (initialized from userData)
+    // NOTE: Firestore uses 'avatar' for photo, 'address' sub-object for location
+    const [firstName,    setFirstName]    = useState(userData?.firstName    || userData?.fullName?.split(' ')[0] || '');
+    const [lastName,     setLastName]     = useState(userData?.lastName     || userData?.fullName?.split(' ').slice(1).join(' ') || '');
+    const [phone,        setPhone]        = useState(userData?.phone        || '');
+    const [city,         setCity]         = useState(userData?.address?.city     || userData?.city     || '');
+    const [postalCode,   setPostalCode]   = useState(userData?.address?.postalCode || userData?.postalCode || '');
+    const [province,     setProvince]     = useState(userData?.address?.province  || userData?.province  || '');
+    const [country,      setCountry]      = useState(userData?.address?.country   || userData?.country   || 'España');
+    // Photo: 'avatar' field, accept both base64 data URLs and https URLs
+    const rawAvatar = userData?.avatar || userData?.photoURL || null;
+    const [photoUri, setPhotoUri] = useState(
+        rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null
+    );
+
+    // Birth date
+    const [birthDate,    setBirthDate]    = useState(
+        userData?.birthDate ? new Date(userData.birthDate?.seconds ? userData.birthDate.seconds * 1000 : userData.birthDate) : new Date(1990, 0, 1)
+    );
+    const [showDatePicker, setShowDatePicker] = useState(false);
+
+    // Preferences
+    const [saveWalks,    setSaveWalks]    = useState(userData?.saveWalks    ?? true);
+    const [saveLocation, setSaveLocation] = useState(userData?.saveLocation ?? true);
+
+    // Stats (read-only)
+    const totalWalks    = userData?.totalWalks    ?? 0;
+    const totalDistance = userData?.totalDistance ?? 0;
+    const totalMinutes  = userData?.totalMinutes  ?? 0;
+    const distanceLabel = totalDistance >= 1 ? `${totalDistance.toFixed(1)} km` : `${Math.round(totalDistance * 1000)} m`;
+    const timeLabel     = totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes} min`;
+
+    // UI state
+    const [saving,         setSaving]         = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
-    const [photoUri, setPhotoUri] = useState(userData?.photoURL || null);
+    const [fetchingCity,   setFetchingCity]   = useState(false);
 
-    const role = ROLE_LABEL[userData?.role] || ROLE_LABEL.normal;
+    // ── Sync from userData when it updates ────────────────
+    useEffect(() => {
+        if (userData) {
+            setFirstName(   userData.firstName    || userData.fullName?.split(' ')[0] || '');
+            setLastName(    userData.lastName     || userData.fullName?.split(' ').slice(1).join(' ') || '');
+            setPhone(       userData.phone        || '');
+            setCity(        userData.address?.city     || userData.city     || '');
+            setPostalCode(  userData.address?.postalCode || userData.postalCode || '');
+            setProvince(    userData.address?.province  || userData.province  || '');
+            setCountry(     userData.address?.country   || userData.country   || 'España');
+            setSaveWalks(   userData.saveWalks    ?? true);
+            setSaveLocation(userData.saveLocation ?? true);
+            // Only use avatar if it's a real Storage URL or base64
+            const av = userData.avatar || userData.photoURL || null;
+            if (av && (av.startsWith('https://') || av.startsWith('data:'))) setPhotoUri(av);
+            if (userData.birthDate) {
+                const ts = userData.birthDate?.seconds;
+                setBirthDate(ts ? new Date(ts * 1000) : new Date(userData.birthDate));
+            }
+        }
+    }, [userData]);
 
-    // ── Change Photo ──────────────────────────────────
+    // ── Get city from GPS ──────────────────────────────────
+    const fetchCityFromLocation = useCallback(async () => {
+        setFetchingCity(true);
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permiso de ubicación',
+                    'Para detectar tu ciudad necesitamos acceso a tu ubicación. Sin él tampoco podrás hacer reservas.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const [geo] = await Location.reverseGeocodeAsync({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+            });
+            if (geo) {
+                setCity(        geo.city         || geo.subregion || '');
+                setPostalCode(  geo.postalCode   || '');
+                setProvince(    geo.region       || '');
+                setCountry(     geo.country      || 'España');
+            }
+        } catch (e) {
+            Alert.alert('Error', 'No se pudo obtener la ubicación.');
+        } finally {
+            setFetchingCity(false);
+        }
+    }, []);
+
+    // ── Change Photo ───────────────────────────────────────
     const handleChangePhoto = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permiso necesario', 'Necesitamos acceso a tu galería para cambiar la foto.');
+            return;
+        }
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
-            allowsEditing: true, aspect: [1, 1], quality: 0.8,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.25,     // low quality to keep base64 small
         });
         if (result.canceled) return;
 
         const localUri = result.assets[0].uri;
-        setPhotoUri(localUri);
+        setPhotoUri(localUri); // optimistic UI
         setUploadingPhoto(true);
         try {
-            const path = `avatars/${user.uid}.jpg`;
-            const url = await uploadImageToStorage(localUri, path);
-            await updateDoc(doc(db, 'users', user.uid), { photoURL: url });
+            // Save as base64 directly to Firestore (no Firebase Storage needed)
+            const base64Url = await saveAvatarToFirestore(localUri, user.uid);
+            setPhotoUri(base64Url);
         } catch (e) {
-            Alert.alert('Error', 'No se pudo subir la foto.');
+            // Revert to previous photo on failure
+            const prev = rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null;
+            setPhotoUri(prev);
+            Alert.alert('Error al subir foto', e?.message || 'Error desconocido');
         } finally {
             setUploadingPhoto(false);
         }
     };
 
-    // ── Save Profile ──────────────────────────────────
+    // ── Save All Profile Data ──────────────────────────────
     const handleSave = async () => {
-        if (!fullName.trim()) return Alert.alert('Error', 'El nombre no puede estar vacío.');
+        if (!firstName.trim()) return Alert.alert('Error', 'El nombre no puede estar vacío.');
         setSaving(true);
         try {
             await updateDoc(doc(db, 'users', user.uid), {
-                fullName: fullName.trim(),
+                firstName:    firstName.trim(),
+                lastName:     lastName.trim(),
+                fullName:     `${firstName.trim()} ${lastName.trim()}`.trim(),
+                phone:        phone.trim(),
+                // Store location in 'address' sub-object to match existing Firestore schema
+                address: {
+                    city:       city.trim(),
+                    postalCode: postalCode.trim(),
+                    province:   province.trim(),
+                    country:    country.trim(),
+                },
+                // Also flat fields for compatibility
+                city:         city.trim(),
+                birthDate:    birthDate.toISOString(),
+                saveWalks,
+                saveLocation,
             });
-            Alert.alert('¡Guardado! ✅', 'Tu perfil ha sido actualizado.');
+            Alert.alert('✅ Guardado', 'Tu perfil ha sido actualizado.');
         } catch (e) {
-            Alert.alert('Error', 'No se pudo guardar el perfil.');
+            Alert.alert('Error', 'No se pudo guardar. Inténtalo de nuevo.');
         } finally {
             setSaving(false);
         }
     };
 
-    // ── Sign Out ──────────────────────────────────────
+    // ── Sign Out ───────────────────────────────────────────
     const handleSignOut = () => {
-        Alert.alert(
-            'Cerrar sesión',
-            '¿Seguro que quieres salir?',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Salir', style: 'destructive',
-                    onPress: () => signOut(auth).catch(() => {}),
-                },
-            ]
-        );
+        Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Salir', style: 'destructive', onPress: () => signOut(auth).catch(() => {}) },
+        ]);
     };
 
-    return (
-        <View style={styles.container}>
-            <StatusBar style="dark" />
+    const role     = userData?.role || 'normal';
+    const isNormal = role === 'normal';
+    const isPending = userData?.verificationStatus === 'pending';
 
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+    return (
+        <KeyboardAvoidingView
+            style={[styles.root, { backgroundColor: theme.background }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+
+            {/* ── HEADER ── */}
+            <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Mi Perfil</Text>
-                <TouchableOpacity onPress={handleSave} disabled={saving}>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Mi Perfil</Text>
+                <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerBtn}>
                     {saving
-                        ? <ActivityIndicator color={COLORS.primary} />
-                        : <Text style={styles.saveText}>Guardar</Text>
+                        ? <ActivityIndicator size="small" color={COLORS.primary} />
+                        : <Text style={[styles.saveText, { color: COLORS.primary }]}>Guardar</Text>
                     }
                 </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-                {/* Avatar */}
-                <View style={styles.avatarSection}>
-                    <TouchableOpacity style={styles.avatarWrapper} onPress={handleChangePhoto} disabled={uploadingPhoto}>
-                        {photoUri
-                            ? <Image source={{ uri: photoUri }} style={styles.avatar} />
-                            : (
-                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                    <Text style={{ fontSize: 48 }}>🐾</Text>
-                                </View>
-                            )
-                        }
-                        <View style={styles.avatarEditBadge}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
+
+                {/* ── PHOTO + NAME SUMMARY ── */}
+                <View style={[styles.heroSection, { backgroundColor: theme.cardBackground }]}>
+                    <TouchableOpacity
+                        style={styles.avatarWrapper}
+                        onPress={handleChangePhoto}
+                        disabled={uploadingPhoto}
+                        activeOpacity={0.85}
+                    >
+                        {photoUri ? (
+                            <Image source={{ uri: photoUri }} style={styles.avatar} />
+                        ) : (
+                            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: COLORS.primaryBg }]}>
+                                <Text style={{ fontSize: 48 }}>🐾</Text>
+                            </View>
+                        )}
+                        <View style={[styles.cameraBadge, { backgroundColor: COLORS.primary, borderColor: theme.cardBackground }]}>
                             {uploadingPhoto
                                 ? <ActivityIndicator size="small" color="#FFF" />
-                                : <Ionicons name="camera" size={16} color="#FFF" />
+                                : <Ionicons name="camera" size={15} color="#FFF" />
                             }
                         </View>
                     </TouchableOpacity>
 
+                    <Text style={[styles.heroName, { color: theme.text }]}>
+                        {[userData?.firstName, userData?.lastName].filter(Boolean).join(' ') || userData?.fullName || user?.email?.split('@')[0] || 'Usuario'}
+                    </Text>
+                    <Text style={[styles.heroEmail, { color: theme.textSecondary }]}>{user?.email}</Text>
+
                     {/* Role badge */}
-                    <View style={[styles.roleBadge, { backgroundColor: role.color + '18' }]}>
-                        <Text style={[styles.roleBadgeText, { color: role.color }]}>{role.label}</Text>
+                    {role === 'caregiver' ? (
+                        <View style={[styles.roleBadge, { backgroundColor: COLORS.secondaryLight }]}>
+                            <Text style={[styles.roleBadgeText, { color: COLORS.secondary }]}>🛡️ Cuidador Verificado</Text>
+                        </View>
+                    ) : role === 'owner' ? (
+                        <View style={[styles.roleBadge, { backgroundColor: COLORS.primaryBg }]}>
+                            <Text style={[styles.roleBadgeText, { color: COLORS.primary }]}>🐾 Dueño Verificado ✓</Text>
+                        </View>
+                    ) : isPending ? (
+                        <View style={[styles.roleBadge, { backgroundColor: COLORS.warningLight }]}>
+                            <Text style={[styles.roleBadgeText, { color: COLORS.warning }]}>⏳ Verificación en revisión</Text>
+                        </View>
+                    ) : (
+                        <View style={[styles.roleBadge, { backgroundColor: theme.background }]}>
+                            <Text style={[styles.roleBadgeText, { color: theme.textSecondary }]}>👤 Usuario</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* ── STATS ROW ── */}
+                <View style={styles.statsRow}>
+                    {[
+                        { icon: 'walk-outline',     value: totalWalks,      label: 'Paseos' },
+                        { icon: 'navigate-outline', value: distanceLabel,   label: 'Distancia' },
+                        { icon: 'time-outline',     value: timeLabel,       label: 'Tiempo' },
+                    ].map((s, i) => (
+                        <View key={i} style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
+                            <Ionicons name={s.icon} size={20} color={COLORS.primary} />
+                            <Text style={[styles.statValue, { color: theme.text }]}>{s.value}</Text>
+                            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{s.label}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                {/* ── PERSONAL DATA ── */}
+                <View style={styles.section}>
+                    {sectionLabel('DATOS PERSONALES', theme)}
+
+                    <Field label="Nombre"    value={firstName}  onChangeText={setFirstName}  theme={theme} />
+                    <Field label="Apellidos" value={lastName}   onChangeText={setLastName}   theme={theme} />
+                    <Field label="Email"     value={user?.email || ''} theme={theme} editable={false} />
+                    <Field label="Teléfono"  value={phone}      onChangeText={setPhone}      theme={theme} keyboardType="phone-pad" />
+
+                    {/* Date of birth */}
+                    <TouchableOpacity
+                        style={[styles.fieldRow, { backgroundColor: theme.cardBackground }]}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Fecha nacimiento</Text>
+                        <Text style={[styles.fieldValue, { color: theme.text }]}>{formatDate(birthDate)}</Text>
+                        <Ionicons name="calendar-outline" size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
+                    </TouchableOpacity>
+
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={birthDate}
+                            mode="date"
+                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                            maximumDate={new Date()}
+                            minimumDate={new Date(1920, 0, 1)}
+                            onChange={(event, selected) => {
+                                setShowDatePicker(Platform.OS === 'ios');
+                                if (selected) setBirthDate(selected);
+                            }}
+                        />
+                    )}
+                </View>
+
+                {/* ── LOCATION ── */}
+                <View style={styles.section}>
+                    {sectionLabel('UBICACIÓN', theme)}
+
+                    {/* City with GPS button */}
+                    <View style={[styles.fieldRow, { backgroundColor: theme.cardBackground }]}>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Ciudad</Text>
+                        <TextInput
+                            style={[styles.fieldInput, { color: theme.text, flex: 1 }]}
+                            value={city}
+                            onChangeText={setCity}
+                            placeholder="Tu ciudad"
+                            placeholderTextColor={theme.textSecondary}
+                        />
+                        <TouchableOpacity onPress={fetchCityFromLocation} disabled={fetchingCity} style={styles.gpsBtn}>
+                            {fetchingCity
+                                ? <ActivityIndicator size="small" color={COLORS.primary} />
+                                : <Ionicons name="locate" size={18} color={COLORS.primary} />
+                            }
+                        </TouchableOpacity>
+                    </View>
+
+                    <Field label="Código postal" value={postalCode} onChangeText={setPostalCode} theme={theme} keyboardType="numeric" />
+                    <Field label="Provincia"     value={province}   onChangeText={setProvince}   theme={theme} />
+                    <Field label="País"          value={country}    onChangeText={setCountry}    theme={theme} />
+
+                    <View style={[styles.locationNote, { backgroundColor: COLORS.primaryBg }]}>
+                        <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
+                        <Text style={[styles.locationNoteText, { color: COLORS.primary }]}>
+                            La ubicación GPS se usa para mostrarte cuidadores cercanos. Sin permiso de ubicación no podrás hacer reservas.
+                        </Text>
                     </View>
                 </View>
 
-                {/* Form */}
-                <View style={styles.form}>
-                    <Text style={styles.fieldLabel}>NOMBRE COMPLETO</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={fullName}
-                        onChangeText={setFullName}
-                        placeholder="Tu nombre"
-                        placeholderTextColor={COLORS.textLight}
-                    />
+                {/* ── PRIVACY & TRACKING ── */}
+                <View style={styles.section}>
+                    {sectionLabel('PRIVACIDAD', theme)}
 
-                    <Text style={styles.fieldLabel}>EMAIL</Text>
-                    <View style={styles.inputReadonly}>
-                        <Text style={styles.inputReadonlyText}>{user?.email || '—'}</Text>
-                        <Ionicons name="lock-closed-outline" size={14} color={COLORS.textLight} />
+                    <View style={[styles.toggleRow, { backgroundColor: theme.cardBackground }]}>
+                        <View style={{ flex: 1, marginRight: 12 }}>
+                            <Text style={[styles.toggleTitle, { color: theme.text }]}>Guardar historial de paseos</Text>
+                            <Text style={[styles.toggleSub, { color: theme.textSecondary }]}>Tus paseos se guardan para estadísticas</Text>
+                        </View>
+                        <Switch
+                            value={saveWalks}
+                            onValueChange={setSaveWalks}
+                            trackColor={{ true: COLORS.primary, false: COLORS.border }}
+                            thumbColor="#FFF"
+                        />
                     </View>
 
-                    {/* Verification status */}
-                    {userData?.verificationStatus === 'pending' && (
-                        <View style={styles.verifyBanner}>
-                            <Ionicons name="time-outline" size={16} color={COLORS.warning} />
-                            <Text style={styles.verifyBannerText}>Verificación en revisión (24-48h)</Text>
+                    <View style={[styles.toggleRow, { backgroundColor: theme.cardBackground }]}>
+                        <View style={{ flex: 1, marginRight: 12 }}>
+                            <Text style={[styles.toggleTitle, { color: theme.text }]}>Compartir ubicación en vivo</Text>
+                            <Text style={[styles.toggleSub, { color: theme.textSecondary }]}>Visible solo durante un paseo activo</Text>
                         </View>
-                    )}
+                        <Switch
+                            value={saveLocation}
+                            onValueChange={setSaveLocation}
+                            trackColor={{ true: COLORS.primary, false: COLORS.border }}
+                            thumbColor="#FFF"
+                        />
+                    </View>
+                </View>
 
-                    {userData?.role === 'normal' && userData?.verificationStatus !== 'pending' && (
+                {/* ── ROLE CHANGE (normal users only) ── */}
+                {isNormal && !isPending && (
+                    <View style={styles.section}>
+                        {sectionLabel('VERIFICAR CUENTA', theme)}
+                        <Text style={[styles.verifyDesc, { color: theme.textSecondary }]}>
+                            Verifica tu identidad con DNI/NIE/Pasaporte para desbloquear funciones de dueño o cuidador.
+                        </Text>
+
                         <TouchableOpacity
-                            style={styles.verifyBtn}
+                            style={[styles.roleBtn, { backgroundColor: COLORS.primaryBg, borderColor: COLORS.primary }]}
                             onPress={() => navigation.navigate('Verify')}
                         >
-                            <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.primary} />
-                            <Text style={styles.verifyBtnText}>Verificar mi cuenta</Text>
-                            <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                            <View style={[styles.roleBtnIcon, { backgroundColor: COLORS.primary }]}>
+                                <Text style={{ fontSize: 22 }}>🐾</Text>
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 14 }}>
+                                <Text style={[styles.roleBtnTitle, { color: COLORS.primary }]}>Hacerse Dueño Verificado</Text>
+                                <Text style={[styles.roleBtnSub, { color: COLORS.primary }]}>Accede a reservas y cuidadores</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
                         </TouchableOpacity>
-                    )}
-                </View>
 
-                {/* Account actions */}
-                <View style={styles.actions}>
-                    <TouchableOpacity style={styles.actionRow} onPress={handleSignOut}>
-                        <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
-                            <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-                        </View>
-                        <Text style={[styles.actionLabel, { color: COLORS.danger }]}>Cerrar sesión</Text>
-                        <Ionicons name="chevron-forward" size={16} color={COLORS.danger} />
+                        <TouchableOpacity
+                            style={[styles.roleBtn, { backgroundColor: COLORS.secondaryLight, borderColor: COLORS.secondary }]}
+                            onPress={() => navigation.navigate('Verify')}
+                        >
+                            <View style={[styles.roleBtnIcon, { backgroundColor: COLORS.secondary }]}>
+                                <Text style={{ fontSize: 22 }}>🛡️</Text>
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 14 }}>
+                                <Text style={[styles.roleBtnTitle, { color: COLORS.secondary }]}>Hacerse Cuidador Verificado</Text>
+                                <Text style={[styles.roleBtnSub, { color: COLORS.secondary }]}>Ofrece servicios y gana dinero</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* ── SAVE BUTTON ── */}
+                <View style={styles.section}>
+                    <TouchableOpacity
+                        style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+                        onPress={handleSave}
+                        disabled={saving}
+                    >
+                        {saving
+                            ? <ActivityIndicator color="#FFF" />
+                            : <>
+                                <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" />
+                                <Text style={styles.saveBtnText}>Guardar cambios</Text>
+                              </>
+                        }
                     </TouchableOpacity>
                 </View>
+
+                {/* ── LOGOUT ── */}
+                <View style={[styles.section, { paddingBottom: 8 }]}>
+                    <TouchableOpacity
+                        style={[styles.logoutBtn, { borderColor: COLORS.danger }]}
+                        onPress={handleSignOut}
+                    >
+                        <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
+                        <Text style={[styles.logoutBtnText, { color: COLORS.danger }]}>Cerrar sesión</Text>
+                    </TouchableOpacity>
+                </View>
+
             </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    root: { flex: 1 },
+
+    // Header
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 36, paddingBottom: 16,
-        backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: COLORS.border,
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 60 : 36,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
     },
-    backBtn: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-    saveText: { color: COLORS.primary, fontWeight: '800', fontSize: 16 },
+    headerBtn: { minWidth: 60, padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '800' },
+    saveText: { fontWeight: '800', fontSize: 15, textAlign: 'right' },
 
-    // Avatar
-    avatarSection: { alignItems: 'center', paddingVertical: 32, backgroundColor: '#FFF' },
-    avatarWrapper: { position: 'relative', marginBottom: 16 },
-    avatar: { width: 110, height: 110, borderRadius: 55 },
-    avatarPlaceholder: { backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' },
-    avatarEditBadge: {
-        position: 'absolute', bottom: 4, right: 4,
-        width: 30, height: 30, borderRadius: 15,
-        backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center',
-        borderWidth: 2, borderColor: '#FFF',
+    // Hero
+    heroSection: {
+        alignItems: 'center',
+        paddingTop: 28, paddingBottom: 22, paddingHorizontal: 20,
     },
-    roleBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+    avatarWrapper: { position: 'relative', marginBottom: 14 },
+    avatar: { width: 100, height: 100, borderRadius: 50 },
+    avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+    cameraBadge: {
+        position: 'absolute', bottom: 2, right: 2,
+        width: 32, height: 32, borderRadius: 16,
+        justifyContent: 'center', alignItems: 'center',
+        borderWidth: 2.5,
+    },
+    heroName: { fontSize: 20, fontWeight: '800', marginBottom: 3, textAlign: 'center' },
+    heroEmail: { fontSize: 13, marginBottom: 10, textAlign: 'center' },
+    roleBadge: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    },
     roleBadgeText: { fontSize: 13, fontWeight: '700' },
 
-    // Form
-    form: { padding: 20 },
-    fieldLabel: {
-        fontSize: 11, fontWeight: '700', color: COLORS.textLight,
-        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 18,
+    // Stats
+    statsRow: {
+        flexDirection: 'row',
+        paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4,
+        gap: 10,
     },
-    input: {
-        backgroundColor: '#FFF', borderWidth: 1.5, borderColor: COLORS.border,
-        borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13,
-        fontSize: 15, color: COLORS.text,
+    statCard: {
+        flex: 1, borderRadius: 18, padding: 14,
+        alignItems: 'center', gap: 5,
+        shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
     },
-    inputReadonly: {
-        backgroundColor: COLORS.surface, borderRadius: 14,
-        paddingHorizontal: 16, paddingVertical: 13,
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    },
-    inputReadonlyText: { fontSize: 15, color: COLORS.textLight },
-    verifyBanner: {
-        flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20,
-        backgroundColor: COLORS.warningLight, padding: 14, borderRadius: 14,
-    },
-    verifyBannerText: { flex: 1, fontSize: 14, color: COLORS.warning, fontWeight: '600' },
-    verifyBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20,
-        backgroundColor: COLORS.primaryBg, padding: 16, borderRadius: 16,
-        borderWidth: 1.5, borderColor: COLORS.primary + '30',
-    },
-    verifyBtnText: { flex: 1, fontSize: 15, fontWeight: '700', color: COLORS.primary },
+    statValue: { fontSize: 14, fontWeight: '900', textAlign: 'center' },
+    statLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-    // Actions
-    actions: { paddingHorizontal: 20, paddingTop: 10 },
-    actionRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 14,
-        backgroundColor: '#FFF', padding: 16, borderRadius: 16, marginBottom: 10,
+    // Sections
+    section: { paddingHorizontal: 16, paddingTop: 20 },
+    sectionLabel: {
+        fontSize: 11, fontWeight: '700', textTransform: 'uppercase',
+        letterSpacing: 0.6, marginBottom: 10, paddingLeft: 4,
+    },
+
+    // Fields
+    fieldRow: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 16, paddingVertical: 14,
+        borderRadius: 16, marginBottom: 8,
+        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    },
+    fieldLabel: { fontSize: 13, fontWeight: '600', width: 130 },
+    fieldInput: { flex: 1, fontSize: 14, fontWeight: '500', paddingVertical: 0 },
+    fieldValue: { flex: 1, fontSize: 14 },
+
+    // GPS button inside city field
+    gpsBtn: {
+        width: 34, height: 34, borderRadius: 17,
+        backgroundColor: COLORS.primaryBg,
+        justifyContent: 'center', alignItems: 'center',
+        marginLeft: 8,
+    },
+
+    // Location note
+    locationNote: {
+        flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+        borderRadius: 14, padding: 12, marginTop: 4,
+    },
+    locationNoteText: { flex: 1, fontSize: 12, lineHeight: 18 },
+
+    // Toggles
+    toggleRow: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 16, paddingVertical: 14,
+        borderRadius: 16, marginBottom: 8,
+        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    },
+    toggleTitle: { fontSize: 14, fontWeight: '700' },
+    toggleSub: { fontSize: 12, marginTop: 2 },
+
+    // Role buttons
+    verifyDesc: { fontSize: 13, lineHeight: 20, marginBottom: 14 },
+    roleBtn: {
+        flexDirection: 'row', alignItems: 'center',
+        borderRadius: 18, padding: 16, marginBottom: 10,
+        borderWidth: 1.5,
         shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
     },
-    actionIcon: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    actionLabel: { flex: 1, fontSize: 15, fontWeight: '700' },
+    roleBtnIcon: {
+        width: 46, height: 46, borderRadius: 14,
+        justifyContent: 'center', alignItems: 'center',
+    },
+    roleBtnTitle: { fontSize: 15, fontWeight: '800' },
+    roleBtnSub: { fontSize: 12, marginTop: 2 },
+
+    // Save button
+    saveBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+        backgroundColor: COLORS.primary, borderRadius: 18,
+        paddingVertical: 16,
+        shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+    },
+    saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
+
+    // Logout
+    logoutBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+        borderRadius: 18, paddingVertical: 14,
+        borderWidth: 1.5,
+    },
+    logoutBtnText: { fontWeight: '700', fontSize: 15 },
 });
