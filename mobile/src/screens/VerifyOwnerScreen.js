@@ -8,8 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
-import { auth, db } from '../config/firebase';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 
 const SPECIES_OPTIONS = [
     { value: 'dog',    label: '🐕 Perro' },
@@ -26,7 +25,7 @@ const SERVICE_OPTIONS = [
 ];
 
 export default function VerifyOwnerScreen({ navigation }) {
-    const { userData } = useContext(AuthContext);
+    const { user, userData } = useContext(AuthContext);
     const [step, setStep] = useState(1); // 1: choose role, 2: upload docs, 3: success
     const [targetRole, setTargetRole] = useState('owner'); // 'owner' | 'caregiver'
     const [submitting, setSubmitting] = useState(false);
@@ -80,9 +79,9 @@ export default function VerifyOwnerScreen({ navigation }) {
         try {
             const updateData = {
                 verificationStatus: 'pending',
-                verificationRequestedAt: serverTimestamp(),
+                verificationRequestedAt: new Date().toISOString(),
                 pendingRole: targetRole,
-                // In production: upload images to Firebase Storage and store URLs
+                // In production: upload images to Supabase Storage and store URLs
                 idFrontUrl: idFront,
                 idBackUrl: idBack,
                 selfieUrl: selfie,
@@ -99,7 +98,9 @@ export default function VerifyOwnerScreen({ navigation }) {
                 });
             }
 
-            await updateDoc(doc(db, 'users', auth.currentUser.uid), updateData);
+            if (user?.id) {
+                await supabase.from('users').update(updateData).eq('id', user.id);
+            }
             setStep(3);
         } catch (e) {
             Alert.alert('Error', 'No se pudo enviar la solicitud. Inténtalo de nuevo.');

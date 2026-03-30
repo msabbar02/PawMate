@@ -1,16 +1,16 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import Constants from 'expo-constants';
 
 /**
  * Requests notification permissions and registers the device's
- * Expo Push Token in Firestore under users/{uid}.expoPushToken.
+ * Expo Push Token in Supabase under users/{userId}.expoPushToken.
  * Silently skips if running in Expo Go (push not supported).
  */
 export async function registerForPushNotifications() {
-    if (!auth.currentUser) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
     // Skip in Expo Go — push notifications require a dev build since SDK 53
     const isExpoGo = Constants.appOwnership === 'expo';
@@ -43,10 +43,10 @@ export async function registerForPushNotifications() {
         const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
         const token = tokenData.data;
 
-        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        await supabase.from('users').update({
             expoPushToken: token,
             notificationsEnabled: true,
-        });
+        }).eq('id', user.id);
 
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {

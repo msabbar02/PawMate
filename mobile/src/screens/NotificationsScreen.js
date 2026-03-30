@@ -7,18 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
-import { auth, db } from '../config/firebase';
-import {
-    collection, query, orderBy, onSnapshot,
-    doc, updateDoc, serverTimestamp, getDocs, where,
-} from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
 import { acceptFriendRequest, rejectFriendRequest } from '../utils/friendHelpers';
 
 // Relative time helper
 function relativeTime(ts) {
-    if (!ts?.toMillis) return '';
-    const diff = Date.now() - ts.toMillis();
+    if (!ts) return '';
+    const time = ts.toMillis ? ts.toMillis() : new Date(ts).getTime();
+    const diff = Date.now() - time;
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'Ahora mismo';
     if (m < 60) return `Hace ${m} min`;
@@ -30,26 +27,38 @@ function relativeTime(ts) {
 }
 
 export default function NotificationsScreen({ navigation }) {
-    const { userData } = useContext(AuthContext);
+    const { userData, user } = useContext(AuthContext);
     const { theme, isDarkMode } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [activeNotif, setActiveNotif] = useState(null);
 
-    // ── FIRESTORE LISTENER ────────────────────────
+    // ── SUPABASE LISTENER ────────────────────────
     useEffect(() => {
-        if (!auth.currentUser) { setLoading(false); return; }
-        const q = query(
-            collection(db, 'notifications', auth.currentUser.uid, 'items'),
-            orderBy('createdAt', 'desc')
-        );
-        const unsub = onSnapshot(q, snap => {
-            setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (!user?.id) { setLoading(false); return; }
+        
+        const fetchNotifications = async () => {
+            const { data } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('userId', user.id)
+                .order('createdAt', { ascending: false });
+            if (data) setNotifications(data);
             setLoading(false);
-        }, () => setLoading(false));
-        return () => unsub();
-    }, []);
+        };
+        
+        fetchNotifications();
+
+        const channel = supabase
+            .channel('notifications_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `userId=eq.${user.id}` }, () => {
+                fetchNotifications();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [user?.id]);
 
     const unreadCount = notifications.filter(n => !n.read).length;
     const allSelected = selectedIds.size > 0 && selectedIds.size === notifications.length;
@@ -69,30 +78,25 @@ export default function NotificationsScreen({ navigation }) {
     };
 
     const markSelectedAsRead = async () => {
-        const uid = auth.currentUser?.uid;
-        if (!uid) return;
-        await Promise.all(
-            [...selectedIds].map(id =>
-                updateDoc(doc(db, 'notifications', uid, 'items', id), { read: true })
-            )
-        );
+        const uid = user?.id;
+        if (!uid || selectedIds.size === 0) return;
+        await supabase.from('notifications').update({ read: true }).in('id', [...selectedIds]);
         setSelectedIds(new Set());
     };
 
     const markAllAsRead = async () => {
-        const uid = auth.currentUser?.uid;
+        const uid = user?.id;
         if (!uid) return;
-        await Promise.all(
-            notifications.filter(n => !n.read).map(n =>
-                updateDoc(doc(db, 'notifications', uid, 'items', n.id), { read: true })
-            )
-        );
+        const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+        if (unreadIds.length > 0) {
+            await supabase.from('notifications').update({ read: true }).in('id', unreadIds);
+        }
     };
 
     const openNotif = async (notif) => {
         setActiveNotif(notif);
-        if (!notif.read && auth.currentUser) {
-            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+        if (!notif.read && user?.id) {
+            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
         }
     };
 
@@ -104,22 +108,24 @@ export default function NotificationsScreen({ navigation }) {
             // Capacity check
             const serviceType = bookingData?.serviceType || 'walking';
             const MAX = serviceType === 'walking' ? 5 : 3;
-            const capQ = query(
-                collection(db, 'reservations'),
-                where('caregiverUid', '==', auth.currentUser.uid),
-                where('status', '==', 'aceptada'),
-                where('serviceType', '==', serviceType)
-            );
-            const capSnap = await getDocs(capQ);
-            if (capSnap.size >= MAX) {
+            
+            const { count } = await supabase
+                .from('reservations')
+                .select('*', { count: 'exact', head: true })
+                .eq('caregiverUid', user?.id)
+                .eq('status', 'aceptada')
+                .eq('serviceType', serviceType);
+
+            if (count >= MAX) {
                 Alert.alert('Sin capacidad', `Ya tienes ${MAX} reservas activas de este tipo.`);
                 return;
             }
 
-            await updateDoc(doc(db, 'reservations', bookingId), {
+            await supabase.from('reservations').update({
                 status: 'aceptada',
-                confirmedAt: serverTimestamp(),
-            });
+                confirmedAt: new Date().toISOString(),
+            }).eq('id', bookingId);
+            
             await createNotification(bookingData?.ownerUid, {
                 type: 'booking_confirmed',
                 bookingId,
@@ -129,7 +135,7 @@ export default function NotificationsScreen({ navigation }) {
                 iconBg: COLORS.successLight,
                 iconColor: COLORS.success,
             });
-            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             Alert.alert('¡Reserva aceptada! 🎉', 'El dueño recibirá una notificación.');
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch {
@@ -142,7 +148,8 @@ export default function NotificationsScreen({ navigation }) {
         const { bookingId, bookingData } = notif;
         if (!bookingId) return;
         try {
-            await updateDoc(doc(db, 'reservations', bookingId), { status: 'cancelada' });
+            await supabase.from('reservations').update({ status: 'cancelada' }).eq('id', bookingId);
+            
             await createNotification(bookingData?.ownerUid, {
                 type: 'booking_rejected',
                 bookingId,
@@ -152,7 +159,7 @@ export default function NotificationsScreen({ navigation }) {
                 iconBg: COLORS.dangerLight,
                 iconColor: COLORS.danger,
             });
-            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch {
             Alert.alert('Error', 'No se pudo rechazar la reserva.');
@@ -171,7 +178,7 @@ export default function NotificationsScreen({ navigation }) {
                 notif.fromPhotoURL,
                 userData
             );
-            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             Alert.alert('¡Amigo añadido! 🎉', 'Ahora podréis ver los posts del otro.');
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch (e) {
@@ -182,7 +189,7 @@ export default function NotificationsScreen({ navigation }) {
     const handleRejectFriend = async (notif) => {
         try {
             await rejectFriendRequest(notif.requestId || notif.id);
-            await updateDoc(doc(db, 'notifications', auth.currentUser.uid, 'items', notif.id), { read: true });
+            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch {
             Alert.alert('Error', 'No se pudo rechazar la solicitud.');

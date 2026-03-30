@@ -15,12 +15,37 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { auth, db } from '../config/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 
 const { width } = Dimensions.get('window');
+
+const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error }) => (
+    <View style={styles.inputWrapper}>
+        <View style={[styles.inputContainer, error && styles.inputError]}>
+            <Ionicons name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
+            <TextInput
+                style={styles.input}
+                placeholder={placeholder}
+                placeholderTextColor={COLORS.textLight}
+                value={value}
+                onChangeText={onChangeText}
+                secureTextEntry={secureTextEntry}
+                autoCapitalize={isPassword ? 'none' : (fieldName === 'email' ? 'none' : 'words')}
+                keyboardType={fieldName === 'email' ? 'email-address' : 'default'}
+            />
+            {isPassword && (
+                <TouchableOpacity
+                    style={styles.eyeBtn}
+                    onPress={onTogglePassword}
+                >
+                    <Ionicons name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+            )}
+        </View>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+);
 
 export default function SignupScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
@@ -86,29 +111,28 @@ export default function SignupScreen({ navigation }) {
         setErrors({});
 
         try {
-            // 1. Crear el usuario en Firebase Auth
-            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-            const user = userCredential.user;
-
-            // 2. Actualizar el perfil (nombre)
-            await updateProfile(user, {
-                displayName: formData.fullName
-            });
-
-            // 3. Crear documento de usuario en Firestore (db)
-            await setDoc(doc(db, 'users', user.uid), {
-                fullName: formData.fullName,
+            // 1. Crear el usuario en Supabase Auth
+            const { error } = await supabase.auth.signUp({
                 email: formData.email,
-                createdAt: new Date().toISOString(),
-                role: 'normal'
+                password: formData.password,
+                options: {
+                    data: {
+                        fullName: formData.fullName,
+                        firstName: formData.fullName.split(' ')[0],
+                        lastName: formData.fullName.split(' ').slice(1).join(' ') || ''
+                    }
+                }
             });
+            if (error) throw error;
+
+            // El trigger en la base de datos de Supabase se encarga de crear el doc en public.users
             // El onAuthStateChanged general se encargará de la redirección
         } catch (error) {
-            console.error("Firebase Signup Error:", error.code);
+            console.error("Supabase Signup Error:", error.message);
             let errorMsg = 'Ocurrió un error. Intenta de nuevo.';
-            if (error.code === 'auth/email-already-in-use') {
+            if (error.message.includes('User already registered')) {
                 errorMsg = 'Este correo electrónico ya está registrado.';
-            } else if (error.code === 'auth/network-request-failed') {
+            } else if (error.message.includes('FetchError') || error.message.includes('Network request failed')) {
                 errorMsg = 'Error de red. Revisa tu conexión a internet.';
             }
             setErrors({ form: errorMsg });
@@ -116,36 +140,6 @@ export default function SignupScreen({ navigation }) {
             setLoading(false);
         }
     };
-
-    const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword }) => (
-        <View style={styles.inputWrapper}>
-            <View style={[styles.inputContainer, errors[fieldName] && styles.inputError]}>
-                <Ionicons name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
-                <TextInput
-                    style={styles.input}
-                    placeholder={placeholder}
-                    placeholderTextColor={COLORS.textLight}
-                    value={value}
-                    onChangeText={(text) => {
-                        setFormData({ ...formData, [fieldName]: text });
-                        if (errors[fieldName]) setErrors({ ...errors, [fieldName]: null });
-                    }}
-                    secureTextEntry={secureTextEntry}
-                    autoCapitalize={isPassword ? 'none' : (fieldName === 'email' ? 'none' : 'words')}
-                    keyboardType={fieldName === 'email' ? 'email-address' : 'default'}
-                />
-                {isPassword && (
-                    <TouchableOpacity
-                        style={styles.eyeBtn}
-                        onPress={() => fieldName === 'password' ? setShowPassword(!showPassword) : setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                        <Ionicons name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
-                    </TouchableOpacity>
-                )}
-            </View>
-            {errors[fieldName] && <Text style={styles.errorText}>{errors[fieldName]}</Text>}
-        </View>
-    );
 
     return (
         <KeyboardAvoidingView
@@ -176,6 +170,11 @@ export default function SignupScreen({ navigation }) {
                                 placeholder="Nombre Completo"
                                 value={formData.fullName}
                                 fieldName="fullName"
+                                error={errors.fullName}
+                                onChangeText={(text) => {
+                                    setFormData({ ...formData, fullName: text });
+                                    if (errors.fullName) setErrors({ ...errors, fullName: null });
+                                }}
                             />
 
                             <InputField
@@ -183,6 +182,11 @@ export default function SignupScreen({ navigation }) {
                                 placeholder="Correo Electrónico"
                                 value={formData.email}
                                 fieldName="email"
+                                error={errors.email}
+                                onChangeText={(text) => {
+                                    setFormData({ ...formData, email: text });
+                                    if (errors.email) setErrors({ ...errors, email: null });
+                                }}
                             />
 
                             <InputField
@@ -192,6 +196,12 @@ export default function SignupScreen({ navigation }) {
                                 fieldName="password"
                                 secureTextEntry={!showPassword}
                                 isPassword
+                                error={errors.password}
+                                onChangeText={(text) => {
+                                    setFormData({ ...formData, password: text });
+                                    if (errors.password) setErrors({ ...errors, password: null });
+                                }}
+                                onTogglePassword={() => setShowPassword(!showPassword)}
                             />
 
                             <InputField
@@ -201,6 +211,12 @@ export default function SignupScreen({ navigation }) {
                                 fieldName="confirmPassword"
                                 secureTextEntry={!showConfirmPassword}
                                 isPassword
+                                error={errors.confirmPassword}
+                                onChangeText={(text) => {
+                                    setFormData({ ...formData, confirmPassword: text });
+                                    if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: null });
+                                }}
+                                onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
                             />
 
                             <View style={styles.termsWrapper}>

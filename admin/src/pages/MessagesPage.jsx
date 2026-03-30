@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, query, orderBy, limit, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Search, MessageSquare, X, User } from 'lucide-react';
 import './UsersPage.css'; // Inheriting shared list styles
 
@@ -21,37 +20,26 @@ export default function MessagesPage() {
     const fetchThreads = async () => {
         setLoading(true);
         try {
-            // We have a 'messages' root collection where each doc ID is a reservationId
-            const messagesSnap = await getDocs(collection(db, 'messages'));
+            // In Supabase we fetch active reservations to get thread IDs
+            const { data: reservations } = await supabase.from('reservations').select('*').order('createdAt', { ascending: false });
+            if (!reservations) return;
             
-            const threadsData = await Promise.all(messagesSnap.docs.map(async (docSnap) => {
-                const threadId = docSnap.id;
-                let reservationData = null;
-                
-                // Try to get reservation details for context
-                try {
-                    const resDoc = await getDoc(doc(db, 'reservations', threadId));
-                    if (resDoc.exists()) {
-                        reservationData = resDoc.data();
-                    }
-                } catch (e) {}
-
-                // Try to get latest message
+            const threadsData = await Promise.all(reservations.map(async (res) => {
                 let lastMessage = 'Sin mensajes visibles';
                 try {
-                    const threadSnap = await getDocs(query(collection(db, 'messages', threadId, 'thread'), orderBy('timestamp', 'desc'), limit(1)));
-                    if (!threadSnap.empty) {
-                        lastMessage = threadSnap.docs[0].data().text || 'Mensaje multimedia/sistema';
+                    const { data: threadSnap } = await supabase.from('messages').select('text').eq('conversationId', res.id).order('createdAt', { ascending: false }).limit(1);
+                    if (threadSnap && threadSnap.length > 0) {
+                        lastMessage = threadSnap[0].text || 'Mensaje multimedia/sistema';
                     }
                 } catch (e) {}
 
                 return {
-                    id: threadId,
+                    id: res.id,
                     lastMessage,
-                    ownerName: reservationData?.ownerName || 'Usuario 1',
-                    caregiverName: reservationData?.caregiverName || 'Usuario 2',
-                    status: reservationData?.status || 'Desconocido',
-                    serviceType: reservationData?.serviceType || 'Desconocido'
+                    ownerName: res.ownerName || 'Usuario 1',
+                    caregiverName: res.caregiverName || 'Usuario 2',
+                    status: res.status || 'Desconocido',
+                    serviceType: res.serviceType || 'Desconocido'
                 };
             }));
             
@@ -67,9 +55,8 @@ export default function MessagesPage() {
         setSelectedThread(thread);
         setLoadingMessages(true);
         try {
-            const threadSnap = await getDocs(query(collection(db, 'messages', thread.id, 'thread'), orderBy('timestamp', 'asc')));
-            const msgs = threadSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setMessages(msgs);
+            const { data: msgs } = await supabase.from('messages').select('*').eq('conversationId', thread.id).order('createdAt', { ascending: true });
+            if (msgs) setMessages(msgs);
         } catch (error) {
             console.error("Error fetching messages:", error);
             alert("No se pudieron cargar los mensajes.");
@@ -196,7 +183,7 @@ export default function MessagesPage() {
                                                 {!isSystem && <div style={{ fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600, marginBottom: '4px' }}>{msg.senderName || 'Usuario'}</div>}
                                                 <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>{msg.text}</div>
                                                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'right' }}>
-                                                    {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString('es-ES') : ''}
+                                                    {msg.createdAt ? new Date(msg.createdAt).toLocaleString('es-ES') : ''}
                                                 </div>
                                             </div>
                                         );

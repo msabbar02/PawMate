@@ -8,13 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { auth, db } from '../config/firebase';
-import {
-    collection, query, onSnapshot, addDoc, doc,
-    updateDoc, arrayUnion, arrayRemove, serverTimestamp,
-    orderBy, limit, where, increment, deleteDoc, getDoc,
-    getDocs, setDoc,
-} from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToStorage } from '../utils/storageHelpers';
 import { createNotification } from '../utils/notificationHelpers';
@@ -36,7 +30,7 @@ const FEED_TABS = [
 ];
 
 export default function CommunityScreen() {
-    const { userData } = useContext(AuthContext);
+    const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
 
     // Feed
@@ -80,15 +74,19 @@ export default function CommunityScreen() {
     // FETCH FRIEND IDS
     // ─────────────────────────────────────────────────
     useEffect(() => {
-        if (!auth.currentUser) return;
-        const unsub = onSnapshot(
-            collection(db, 'users', auth.currentUser.uid, 'friends'),
-            snap => {
-                setFriendIds(snap.docs.map(d => d.id));
-            }
-        );
-        return () => unsub();
-    }, []);
+        if (!user?.id) return;
+        const fetchFriends = async () => {
+            const { data } = await supabase.from('friends').select('friendId').eq('userId', user.id);
+            if (data) Object.values(data).forEach((d) => setFriendIds((prev) => [...prev, d.friendId]));
+        };
+        fetchFriends();
+        
+        const channel = supabase.channel('friends_comm')
+             .on('postgres_changes', { event: '*', schema: 'public', table: 'friends', filter: `userId=eq.${user.id}` }, fetchFriends)
+             .subscribe();
+             
+        return () => { supabase.removeChannel(channel); };
+    }, [user?.id]);
 
     // ─────────────────────────────────────────────────
     // FETCH POSTS
@@ -96,73 +94,61 @@ export default function CommunityScreen() {
     useEffect(() => {
         setLoading(true);
 
-        if (feedType === 'forYou') {
-            // Show friends' posts + own posts
-            const uidsToShow = [...friendIds];
-            if (auth.currentUser) uidsToShow.push(auth.currentUser.uid);
-
-            if (uidsToShow.length === 0) {
-                setPosts([]);
-                setLoading(false);
-                return;
-            }
-
-            // Firestore 'in' supports max 30 values
-            const batchUids = uidsToShow.slice(0, 30);
-            let constraints = [
-                where('authorUid', 'in', batchUids),
-                orderBy('createdAt', 'desc'),
-                limit(30),
-            ];
-
-            const q = query(collection(db, 'posts'), ...constraints);
-            const unsub = onSnapshot(q,
-                snap => { setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
-                ()   => setLoading(false)
-            );
-            return () => unsub();
-        } else {
-            // Global
-            let constraints = [orderBy('createdAt', 'desc'), limit(30)];
-
-            if (speciesFilter !== 'all') {
-                constraints = [
-                    where('speciesTags', 'array-contains', speciesFilter),
-                    ...constraints,
-                ];
-            }
-
-            const q = query(collection(db, 'posts'), ...constraints);
-            const unsub = onSnapshot(q,
-                snap => { setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
-                ()   => setLoading(false)
-            );
-            return () => unsub();
-        }
-    }, [feedType, speciesFilter, friendIds]);
+        const fetchPosts = async () => {
+             let query = supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(30);
+             
+             if (feedType === 'forYou') {
+                 const uidsToShow = [...friendIds];
+                 if (user?.id) uidsToShow.push(user.id);
+                 
+                 if (uidsToShow.length === 0) {
+                     setPosts([]); setLoading(false); return;
+                 }
+                 
+                 query = query.in('authorUid', uidsToShow.slice(0, 30));
+             } else {
+                 if (speciesFilter !== 'all') {
+                     query = query.contains('speciesTags', [speciesFilter]);
+                 }
+             }
+             
+             const { data, error } = await query;
+             if (data) setPosts(data);
+             setLoading(false);
+        };
+        fetchPosts();
+        
+        const channel = supabase.channel('posts_comm')
+             .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
+             .subscribe();
+             
+        return () => { supabase.removeChannel(channel); };
+    }, [feedType, speciesFilter, friendIds, user?.id]);
 
     // ─────────────────────────────────────────────────
     // LIKE / UNLIKE (also updates user preferences)
     // ─────────────────────────────────────────────────
     const toggleLike = async (post) => {
-        if (!auth.currentUser) return;
-        const uid   = auth.currentUser.uid;
+        if (!user?.id) return;
+        const uid   = user.id;
         const liked = post.likedBy?.includes(uid);
         try {
-            await updateDoc(doc(db, 'posts', post.id), {
-                likedBy:         liked ? arrayRemove(uid) : arrayUnion(uid),
-                likesCount:      (post.likesCount || 0) + (liked ? -1 : 1),
+            const newLikedBy = liked ? post.likedBy.filter(id => id !== uid) : [...(post.likedBy || []), uid];
+            
+            await supabase.from('posts').update({
+                likedBy: newLikedBy,
+                likesCount: (post.likesCount || 0) + (liked ? -1 : 1),
                 engagementScore: Math.max(0, (post.engagementScore || 0) + (liked ? -2 : 2)),
-            });
+            }).eq('id', post.id);
+
             // Update user species preference for recommendations
             const species = post.speciesTags?.[0];
             if (species) {
-                const prefRef = doc(db, 'users', uid, 'preferences', species);
-                const prefSnap = await getDoc(prefRef);
-                if (prefSnap.exists()) {
-                    await updateDoc(prefRef, { count: increment(liked ? -1 : 1) });
+                const { data: prefData } = await supabase.from('userPreferences').select('*').eq('userId', uid).eq('species', species).single();
+                if (prefData) {
+                    await supabase.from('userPreferences').update({ count: prefData.count + (liked ? -1 : 1) }).eq('id', prefData.id);
                 } else if (!liked) {
-                    await setDoc(prefRef, { species, count: 1 });
+                    await supabase.from('userPreferences').insert({ userId: uid, species, count: 1 });
                 }
             }
         } catch { /* ignore */ }
@@ -177,12 +163,8 @@ export default function CommunityScreen() {
         setLoadingLikers(true);
         try {
             const uids  = post.likedBy.slice(0, 20);
-            const users = await Promise.all(
-                uids.map(uid =>
-                    getDoc(doc(db, 'users', uid)).then(d => d.exists() ? { uid, ...d.data() } : null)
-                )
-            );
-            setLikersList(users.filter(Boolean));
+            const { data } = await supabase.from('users').select('*').in('id', uids);
+            setLikersList(data || []);
         } catch { /* ignore */ }
         setLoadingLikers(false);
     };
@@ -191,41 +173,39 @@ export default function CommunityScreen() {
     // FRIEND REQUESTS (from likers modal)
     // ─────────────────────────────────────────────────
     const sendFriendRequest = async (toUid, toName) => {
-        if (!auth.currentUser || toUid === auth.currentUser.uid) return;
+        if (!user?.id || toUid === user.id) return;
         try {
             // Check if already friends
-            const friendDoc = await getDoc(doc(db, 'users', auth.currentUser.uid, 'friends', toUid));
-            if (friendDoc.exists()) {
+            const { data: friendDoc } = await supabase.from('friends').select('*').eq('userId', user.id).eq('friendId', toUid).maybeSingle();
+            if (friendDoc) {
                 Alert.alert('Ya sois amigos', `${toName} ya está en tu lista de amigos.`);
                 return;
             }
             // Check if already sent
-            const existing = await getDocs(query(
-                collection(db, 'friendRequests'),
-                where('fromUid', '==', auth.currentUser.uid),
-                where('toUid', '==', toUid),
-                where('status', '==', 'pending')
-            ));
-            if (!existing.empty) {
+            const { data: existing } = await supabase.from('friendRequests')
+                .select('*')
+                .eq('fromUid', user.id)
+                .eq('toUid', toUid)
+                .eq('status', 'pending');
+            if (existing && existing.length > 0) {
                 Alert.alert('Ya enviada', 'Ya tienes una solicitud pendiente.');
                 return;
             }
 
-            await addDoc(collection(db, 'friendRequests'), {
-                fromUid: auth.currentUser.uid,
+            await supabase.from('friendRequests').insert({
+                fromUid: user.id,
                 fromName: userData?.fullName || 'Usuario',
                 fromPhotoURL: userData?.photoURL || null,
                 toUid,
                 toName,
                 status: 'pending',
-                createdAt: serverTimestamp(),
             });
 
             await createNotification(toUid, {
                 type: 'friend_request',
                 title: 'Solicitud de amistad 🤝',
                 body: `${userData?.fullName || 'Un usuario'} quiere ser tu amigo.`,
-                fromUid: auth.currentUser.uid,
+                fromUid: user.id,
                 icon: 'person-add-outline',
                 iconBg: '#EFF6FF',
                 iconColor: '#3B82F6',
@@ -248,7 +228,7 @@ export default function CommunityScreen() {
                 text: 'Eliminar', style: 'destructive',
                 onPress: async () => {
                     setOptionsPost(null);
-                    try { await deleteDoc(doc(db, 'posts', post.id)); }
+                    try { await supabase.from('posts').delete().eq('id', post.id); }
                     catch { Alert.alert('Error', 'No se pudo eliminar el post.'); }
                 },
             },
@@ -272,20 +252,20 @@ export default function CommunityScreen() {
     };
 
     const handleSaveEdit = async () => {
-        if (!editCaption.trim() || !showEditModal) return;
+        if (!editCaption.trim() || !showEditModal || !user?.id) return;
         setEditingPost(true);
         try {
             const updates = { caption: editCaption.trim() };
 
             // If user picked a new image (local URI)
-            if (editImageUri && !editImageUri.startsWith('https://')) {
-                const uid = auth.currentUser.uid;
+            if (editImageUri && !editImageUri.startsWith('http')) {
+                const uid = user.id;
                 const timestamp = Date.now();
                 const newUrl = await uploadImageToStorage(editImageUri, `posts/${uid}/${timestamp}.jpg`);
                 updates.imageUrl = newUrl;
             }
 
-            await updateDoc(doc(db, 'posts', showEditModal.id), updates);
+            await supabase.from('posts').update(updates).eq('id', showEditModal.id);
             setShowEditModal(null);
         } catch { Alert.alert('Error', 'No se pudo editar el post.'); }
         finally { setEditingPost(false); }
@@ -302,27 +282,22 @@ export default function CommunityScreen() {
 
     const handleReportPost = async (post) => {
         setOptionsPost(null);
-        if (!auth.currentUser) return;
+        if (!user?.id) return;
         try {
-            await addDoc(collection(db, 'reports'), {
+            await supabase.from('reports').insert({
                 postId: post.id,
-                reporterUid: auth.currentUser.uid,
+                reporterUid: user.id,
                 reporterName: userData?.fullName || 'Usuario',
                 authorUid: post.authorUid,
                 authorName: post.authorName,
                 reason: 'Contenido inapropiado',
                 status: 'pending',
-                createdAt: serverTimestamp(),
             });
             // Notify admin (first admin found or system)
             try {
-                const adminSnap = await getDocs(query(
-                    collection(db, 'users'),
-                    where('role', '==', 'admin'),
-                    limit(1)
-                ));
-                if (!adminSnap.empty) {
-                    const adminUid = adminSnap.docs[0].id;
+                const { data: adminSnap } = await supabase.from('users').select('id').eq('role', 'admin').limit(1);
+                if (adminSnap && adminSnap.length > 0) {
+                    const adminUid = adminSnap[0].id;
                     await createNotification(adminUid, {
                         type: 'post_report',
                         title: '⚠️ Post reportado',
@@ -364,11 +339,12 @@ export default function CommunityScreen() {
     // UPLOAD POST
     // ─────────────────────────────────────────────────
     const handleUploadPost = async () => {
+        if (!user?.id) return;
         if (uploadForm.images.length === 0) return Alert.alert('Error', 'Selecciona al menos una imagen');
         if (!uploadForm.caption.trim()) return Alert.alert('Error', 'Escribe una descripción');
         setUploading(true);
         try {
-            const uid       = auth.currentUser.uid;
+            const uid       = user.id;
             const timestamp = Date.now();
 
             // Upload all images in parallel
@@ -378,11 +354,11 @@ export default function CommunityScreen() {
                 )
             );
 
-            await addDoc(collection(db, 'posts'), {
+            await supabase.from('posts').insert({
                 authorUid:      uid,
-                authorName:     userData?.fullName || 'Usuario',
+                authorName:     userData?.fullName || (userData?.firstName ? `${userData.firstName} ${userData?.lastName || ''}`.trim() : null) || 'Usuario',
                 authorRole:     userData?.role || 'normal',
-                authorPhotoURL: userData?.photoURL || null,
+                authorPhotoURL: userData?.photoURL || userData?.avatar || null,
                 imageUrl:       imageUrls[0],   // keep for backward compat
                 imageUrls,                       // new multi-photo array
                 caption:        uploadForm.caption,
@@ -391,7 +367,6 @@ export default function CommunityScreen() {
                 commentsCount:  0,
                 likedBy:        [],
                 engagementScore: 0,
-                createdAt:      serverTimestamp(),
             });
 
             // Notify friends about new post
@@ -424,65 +399,75 @@ export default function CommunityScreen() {
     // ─────────────────────────────────────────────────
     useEffect(() => {
         if (!commentsPostId) { setCommentsData([]); return; }
-        const q = query(
-            collection(db, 'posts', commentsPostId, 'comments'),
-            orderBy('createdAt', 'asc')
-        );
-        const unsub = onSnapshot(q, snap => {
-            setCommentsData(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-        return () => unsub();
+        
+        const fetchComments = async () => {
+             const { data } = await supabase.from('comments').select('*').eq('postId', commentsPostId).order('createdAt', { ascending: true });
+             if (data) setCommentsData(data);
+        };
+        fetchComments();
+        
+        const channel = supabase.channel('comments_comm')
+             .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `postId=eq.${commentsPostId}` }, fetchComments)
+             .subscribe();
+             
+        return () => { supabase.removeChannel(channel); };
     }, [commentsPostId]);
 
     const sendComment = async () => {
-        if (!commentInput.trim() || !commentsPostId || !auth.currentUser) return;
+        if (!commentInput.trim() || !commentsPostId || !user?.id) return;
         const text = commentInput.trim();
         setCommentInput('');
         setReplyingTo(null);
         setSendingComment(true);
         try {
-            await addDoc(collection(db, 'posts', commentsPostId, 'comments'), {
-                authorUid:      auth.currentUser.uid,
-                authorName:     userData?.fullName || 'Usuario',
-                authorPhotoURL: userData?.photoURL || null,
+            await supabase.from('comments').insert({
+                postId:         commentsPostId,
+                authorUid:      user.id,
+                authorName:     userData?.fullName || (userData?.firstName ? `${userData.firstName} ${userData?.lastName || ''}`.trim() : null) || 'Usuario',
+                authorPhotoURL: userData?.photoURL || userData?.avatar || null,
                 text,
                 replyTo:        replyingTo ? { id: replyingTo.id, authorName: replyingTo.authorName } : null,
                 likedBy:        [],
                 likesCount:     0,
-                createdAt:      serverTimestamp(),
             });
-            await updateDoc(doc(db, 'posts', commentsPostId), {
-                commentsCount:   increment(1),
-                engagementScore: increment(1),
-            });
+            
+            const { data: pData } = await supabase.from('posts').select('commentsCount, engagementScore').eq('id', commentsPostId).single();
+            if (pData) {
+                await supabase.from('posts').update({
+                    commentsCount:   (pData.commentsCount || 0) + 1,
+                    engagementScore: (pData.engagementScore || 0) + 1,
+                }).eq('id', commentsPostId);
+            }
             setTimeout(() => commentsListRef.current?.scrollToEnd({ animated: true }), 100);
         } catch { /* ignore */ } finally { setSendingComment(false); }
     };
 
     const toggleCommentLike = async (comment) => {
-        if (!auth.currentUser || !commentsPostId) return;
-        const uid = auth.currentUser.uid;
+        if (!user?.id || !commentsPostId) return;
+        const uid = user.id;
         const liked = comment.likedBy?.includes(uid);
         try {
-            await updateDoc(doc(db, 'posts', commentsPostId, 'comments', comment.id), {
-                likedBy:    liked ? arrayRemove(uid) : arrayUnion(uid),
+            const newLikedBy = liked ? comment.likedBy.filter(i => i !== uid) : [...(comment.likedBy || []), uid];
+            await supabase.from('comments').update({
+                likedBy:    newLikedBy,
                 likesCount: Math.max(0, (comment.likesCount || 0) + (liked ? -1 : 1)),
-            });
+            }).eq('id', comment.id);
         } catch { /* ignore */ }
     };
 
     const handleDeleteComment = (comment) => {
-        if (comment.authorUid !== auth.currentUser?.uid) return;
+        if (comment.authorUid !== user?.id) return;
         Alert.alert('Eliminar comentario', '¿Seguro que quieres eliminar este comentario?', [
             { text: 'Cancelar', style: 'cancel' },
             {
                 text: 'Eliminar', style: 'destructive',
                 onPress: async () => {
                     try {
-                        await deleteDoc(doc(db, 'posts', commentsPostId, 'comments', comment.id));
-                        await updateDoc(doc(db, 'posts', commentsPostId), {
-                            commentsCount: increment(-1),
-                        });
+                        await supabase.from('comments').delete().eq('id', comment.id);
+                        const { data: pData } = await supabase.from('posts').select('commentsCount').eq('id', commentsPostId).single();
+                        if (pData) {
+                            await supabase.from('posts').update({ commentsCount: Math.max(0, (pData.commentsCount || 0) - 1) }).eq('id', commentsPostId);
+                        }
                     } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
                 },
             },
@@ -493,13 +478,13 @@ export default function CommunityScreen() {
     // RENDER: Feed Post Card
     // ─────────────────────────────────────────────────
     const renderFeedPost = useCallback(({ item: post }) => {
-        const uid         = auth.currentUser?.uid;
+        const uid         = user?.id;
         const liked       = post.likedBy?.includes(uid);
         const isMyPost    = post.authorUid === uid;
         const likesCount  = post.likesCount  || 0;
         const commCount   = post.commentsCount || 0;
-        const dateStr     = post.createdAt?.toDate
-            ? post.createdAt.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+        const dateStr     = post.createdAt
+            ? new Date(post.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
             : '';
 
         return (
@@ -730,7 +715,7 @@ export default function CommunityScreen() {
                         <View style={[s.optionsHandle, { backgroundColor: theme.border }]} />
 
                         {/* Only owner sees edit/delete */}
-                        {optionsPost?.authorUid === auth.currentUser?.uid && (
+                        {optionsPost?.authorUid === user?.id && (
                             <>
                                 <TouchableOpacity
                                     style={[s.optionsRow, { borderBottomColor: theme.border }]}
@@ -768,7 +753,7 @@ export default function CommunityScreen() {
                         </TouchableOpacity>
 
                         {/* Report (only for others' posts) */}
-                        {optionsPost?.authorUid !== auth.currentUser?.uid && (
+                        {optionsPost?.authorUid !== user?.id && (
                             <TouchableOpacity
                                 style={[s.optionsRow, { borderBottomWidth: 0 }]}
                                 onPress={() => handleReportPost(optionsPost)}
@@ -875,8 +860,8 @@ export default function CommunityScreen() {
                                 </View>
                             }
                             renderItem={({ item }) => {
-                                const isMe = item.uid === auth.currentUser?.uid;
-                                const isFriend = friendIds.includes(item.uid);
+                                const isMe = item.id === user?.id;
+                                const isFriend = friendIds.includes(item.id);
                                 return (
                                     <View style={[s.likerRow, { borderBottomColor: theme.border }]}>
                                         <View style={[s.likerAvatar, { backgroundColor: theme.primaryBg }]}>
@@ -889,7 +874,7 @@ export default function CommunityScreen() {
                                         {!isMe && !isFriend && (
                                             <TouchableOpacity
                                                 style={[s.addFriendBtn, { backgroundColor: theme.primary }]}
-                                                onPress={() => sendFriendRequest(item.uid, item.fullName || 'Usuario')}
+                                                onPress={() => sendFriendRequest(item.id, item.fullName || 'Usuario')}
                                             >
                                                 <Ionicons name="person-add" size={14} color="#FFF" />
                                                 <Text style={s.addFriendText}>Añadir</Text>
@@ -1034,7 +1019,7 @@ export default function CommunityScreen() {
                             </View>
                         }
                         renderItem={({ item: comment }) => {
-                            const uid = auth.currentUser?.uid;
+                            const uid = user?.id;
                             const isMyComment = comment.authorUid === uid;
                             const liked = comment.likedBy?.includes(uid);
                             const likeCount = comment.likesCount || 0;

@@ -1,12 +1,10 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '../config/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import { registerForPushNotifications } from '../utils/pushNotifications';
 
 export const AuthContext = createContext({
-    user: null, // The Firebase user object
-    userData: null, // Additional user data from Firestore
+    user: null, // The Supabase user object
+    userData: null, // Additional user data from Postgres
     isLoading: true, // Loading state
 });
 
@@ -16,46 +14,73 @@ export const AuthProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        let unsubscribeSnapshot = null;
+        let subscriptionChannel = null;
 
-        // Subscribe to auth state changes
-        const unsubscribeAuth = onAuthStateChanged(auth, async (authenticatedUser) => {
-            if (authenticatedUser) {
-                setUser(authenticatedUser);
-
-                // Fetch additional user data from Firestore in real-time
-                const docRef = doc(db, 'users', authenticatedUser.uid);
-                unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = { id: docSnap.id, ...docSnap.data() };
+        const handleAuthChange = async (session) => {
+            if (session?.user) {
+                setUser(session.user);
+                
+                // Fetch initial user data
+                const fetchUserData = async () => {
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+                        
+                    if (data && !error) {
                         setUserData(data);
-                        // Register push token once on first load
                         registerForPushNotifications().catch(() => {});
                     } else {
-                        console.log("No such user document!");
+                        console.log("No such user document or error:", error);
                         setUserData(null);
                     }
                     setIsLoading(false);
-                }, (error) => {
-                    console.error("Error fetching user data:", error);
-                    setIsLoading(false);
-                });
+                };
+                
+                await fetchUserData();
+
+                // Subscribe to real-time changes on this user's row
+                subscriptionChannel = supabase
+                    .channel('public:users')
+                    .on('postgres_changes', { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'users',
+                        filter: `id=eq.${session.user.id}`
+                    }, (payload) => {
+                        if (payload.new) {
+                            setUserData(payload.new);
+                        }
+                    })
+                    .subscribe();
 
             } else {
                 setUser(null);
                 setUserData(null);
                 setIsLoading(false);
-                if (unsubscribeSnapshot) {
-                    unsubscribeSnapshot();
-                    unsubscribeSnapshot = null;
+                if (subscriptionChannel) {
+                    supabase.removeChannel(subscriptionChannel);
+                    subscriptionChannel = null;
                 }
             }
+        };
+
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            handleAuthChange(session);
         });
 
-        // Unsubscribe on unmount
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
+            handleAuthChange(session);
+        });
+
         return () => {
-            unsubscribeAuth();
-            if (unsubscribeSnapshot) unsubscribeSnapshot();
+            subscription.unsubscribe();
+            if (subscriptionChannel) {
+                supabase.removeChannel(subscriptionChannel);
+            }
         };
     }, []);
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getCountFromServer, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Users, Dog, CalendarDays, Globe, AlertTriangle } from 'lucide-react';
 import './DashboardPage.css';
 
@@ -19,27 +18,31 @@ export default function DashboardPage() {
         const fetchDashboardData = async () => {
             try {
                 // Fetch counts - wait for all concurrently
-                const [usersSnap, petsSnap, resSnap, postsSnap, repSnap] = await Promise.all([
-                    getCountFromServer(collection(db, 'users')),
-                    getCountFromServer(collection(db, 'pets')),
-                    getCountFromServer(collection(db, 'reservations')),
-                    getCountFromServer(collection(db, 'posts')),
-                    getCountFromServer(collection(db, 'reports')),
+                const [
+                    { count: usersCount }, 
+                    { count: petsCount }, 
+                    { count: resCount }, 
+                    { count: postsCount }, 
+                    { count: repCount },
+                    { data: recent }
+                ] = await Promise.all([
+                    supabase.from('users').select('*', { count: 'exact', head: true }),
+                    supabase.from('pets').select('*', { count: 'exact', head: true }),
+                    supabase.from('reservations').select('*', { count: 'exact', head: true }),
+                    supabase.from('posts').select('*', { count: 'exact', head: true }),
+                    supabase.from('reports').select('*', { count: 'exact', head: true }),
+                    supabase.from('reservations').select('*').order('createdAt', { ascending: false }).limit(5)
                 ]);
 
                 setStats({
-                    users: usersSnap.data().count,
-                    pets: petsSnap.data().count,
-                    reservations: resSnap.data().count,
-                    posts: postsSnap.data().count,
-                    reports: repSnap.data().count
+                    users: usersCount || 0,
+                    pets: petsCount || 0,
+                    reservations: resCount || 0,
+                    posts: postsCount || 0,
+                    reports: repCount || 0
                 });
 
-                // Fetch recent reservations
-                const q = query(collection(db, 'reservations'), orderBy('createdAt', 'desc'), limit(5));
-                const snap = await getDocs(q);
-                const recent = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setRecentActivity(recent);
+                setRecentActivity(recent || []);
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {
@@ -93,7 +96,6 @@ export default function DashboardPage() {
                     ) : (
                         <div className="activity-list">
                             {recentActivity.map(activity => {
-                                const dateStr = activity.createdAt?.toDate ? activity.createdAt.toDate().toLocaleDateString('es-ES') : 'Fecha desconocida';
                                 return (
                                     <div className="activity-item" key={activity.id}>
                                         <div className="activity-avatar">
@@ -103,7 +105,7 @@ export default function DashboardPage() {
                                             <p className="activity-text">
                                                 <strong>{activity.ownerName || 'Usuario'}</strong> ha reservado {activity.serviceType === 'walking' ? 'un paseo' : 'estancia'} con <strong>{activity.caregiverName || 'cuidador'}</strong>
                                             </p>
-                                            <span className="activity-meta">Estado: <span className={`status-badge ${activity.status || 'pendiente'}`}>{activity.status || 'pendiente'}</span> · {dateStr}</span>
+                                            <span className="activity-meta">Estado: <span className={`status-badge ${activity.status || 'pendiente'}`}>{activity.status || 'pendiente'}</span> · {new Date(activity.createdAt).toLocaleDateString('es-ES')}</span>
                                         </div>
                                     </div>
                                 );

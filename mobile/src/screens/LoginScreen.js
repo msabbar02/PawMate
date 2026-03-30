@@ -14,11 +14,37 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { auth } from '../config/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 
 const { width } = Dimensions.get('window');
+
+const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error }) => (
+    <View style={styles.inputWrapper}>
+        <View style={[styles.inputContainer, error && styles.inputError]}>
+            <Ionicons name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
+            <TextInput
+                style={styles.input}
+                placeholder={placeholder}
+                placeholderTextColor={COLORS.textLight}
+                value={value}
+                onChangeText={onChangeText}
+                secureTextEntry={secureTextEntry}
+                autoCapitalize={isPassword ? 'none' : 'none'}
+                keyboardType={fieldName === 'email' ? 'email-address' : 'default'}
+            />
+            {isPassword && (
+                <TouchableOpacity
+                    style={styles.eyeBtn}
+                    onPress={onTogglePassword}
+                >
+                    <Ionicons name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+            )}
+        </View>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+);
 
 export default function LoginScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
@@ -62,14 +88,18 @@ export default function LoginScreen({ navigation }) {
         setErrors({});
 
         try {
-            await signInWithEmailAndPassword(auth, formData.email, formData.password);
+            const { error } = await supabase.auth.signInWithPassword({
+                email: formData.email,
+                password: formData.password
+            });
+            if (error) throw error;
             // El onAuthStateChanged general se encargará de la redirección
         } catch (error) {
-            console.error("Firebase Login Error:", error.code);
+            console.error("Supabase Login Error:", error.message);
             let errorMsg = 'Ocurrió un error. Intenta de nuevo.';
-            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            if (error.message.includes('Invalid login credentials')) {
                 errorMsg = 'Correo o contraseña incorrectos.';
-            } else if (error.code === 'auth/network-request-failed') {
+            } else if (error.message.includes('FetchError') || error.message.includes('Network request failed')) {
                 errorMsg = 'Error de red. Revisa tu conexión a internet.';
             }
             setErrors({ form: errorMsg });
@@ -77,36 +107,6 @@ export default function LoginScreen({ navigation }) {
             setLoading(false);
         }
     };
-
-    const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword }) => (
-        <View style={styles.inputWrapper}>
-            <View style={[styles.inputContainer, errors[fieldName] && styles.inputError]}>
-                <Ionicons name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
-                <TextInput
-                    style={styles.input}
-                    placeholder={placeholder}
-                    placeholderTextColor={COLORS.textLight}
-                    value={value}
-                    onChangeText={(text) => {
-                        setFormData({ ...formData, [fieldName]: text });
-                        if (errors[fieldName]) setErrors({ ...errors, [fieldName]: null });
-                    }}
-                    secureTextEntry={secureTextEntry}
-                    autoCapitalize={isPassword ? 'none' : 'none'}
-                    keyboardType={fieldName === 'email' ? 'email-address' : 'default'}
-                />
-                {isPassword && (
-                    <TouchableOpacity
-                        style={styles.eyeBtn}
-                        onPress={() => setShowPassword(!showPassword)}
-                    >
-                        <Ionicons name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
-                    </TouchableOpacity>
-                )}
-            </View>
-            {errors[fieldName] && <Text style={styles.errorText}>{errors[fieldName]}</Text>}
-        </View>
-    );
 
     return (
         <KeyboardAvoidingView
@@ -136,6 +136,11 @@ export default function LoginScreen({ navigation }) {
                                 placeholder="Correo Electrónico"
                                 value={formData.email}
                                 fieldName="email"
+                                error={errors.email}
+                                onChangeText={(text) => {
+                                    setFormData({ ...formData, email: text });
+                                    if (errors.email) setErrors({ ...errors, email: null });
+                                }}
                             />
 
                             <InputField
@@ -145,6 +150,12 @@ export default function LoginScreen({ navigation }) {
                                 fieldName="password"
                                 secureTextEntry={!showPassword}
                                 isPassword
+                                error={errors.password}
+                                onChangeText={(text) => {
+                                    setFormData({ ...formData, password: text });
+                                    if (errors.password) setErrors({ ...errors, password: null });
+                                }}
+                                onTogglePassword={() => setShowPassword(!showPassword)}
                             />
 
                             <TouchableOpacity style={styles.forgotPassword}>

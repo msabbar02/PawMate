@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Search, Edit2, Trash2, X, Cat, Dog, Bird, FileText, Eye, AlertCircle } from 'lucide-react';
 import './UsersPage.css'; // Inheriting shared table styles
 
@@ -24,26 +23,26 @@ export default function PetsPage() {
     const fetchPets = async () => {
         setLoading(true);
         try {
-            const querySnapshot = await getDocs(collection(db, 'pets'));
+            const { data: petsList } = await supabase.from('pets').select('*');
             
             // Fetch owner names for all pets concurrently
-            const petsData = await Promise.all(querySnapshot.docs.map(async (docSnap) => {
-                const pet = { id: docSnap.id, ...docSnap.data() };
-                let owner = 'Desconocido';
-                if (pet.ownerId) {
-                    try {
-                        const userDoc = await getDoc(doc(db, 'users', pet.ownerId));
-                        if (userDoc.exists()) {
-                            owner = userDoc.data().fullName || userDoc.data().email || 'Usuario';
+            if (petsList) {
+                const petsData = await Promise.all(petsList.map(async (pet) => {
+                    let owner = 'Desconocido';
+                    if (pet.ownerId) {
+                        try {
+                            const { data: userDoc } = await supabase.from('users').select('*').eq('id', pet.ownerId).single();
+                            if (userDoc) {
+                                owner = userDoc.fullName || userDoc.email || 'Usuario';
+                            }
+                        } catch (e) {
+                            console.warn("Could not fetch owner", e);
                         }
-                    } catch (e) {
-                        console.warn("Could not fetch owner", e);
                     }
-                }
-                return { ...pet, ownerName: owner };
-            }));
-            
-            setPets(petsData);
+                    return { ...pet, ownerName: owner };
+                }));
+                setPets(petsData);
+            }
         } catch (error) {
             console.error("Error fetching pets:", error);
         } finally {
@@ -54,7 +53,7 @@ export default function PetsPage() {
     const handleDeletePet = async (petId) => {
         if (window.confirm('¿Seguro que deseas eliminar esta mascota?')) {
             try {
-                await deleteDoc(doc(db, 'pets', petId));
+                await supabase.from('pets').delete().eq('id', petId);
                 setPets(pets.filter(p => p.id !== petId));
             } catch (error) {
                 alert("Error al eliminar la mascota");
@@ -87,7 +86,7 @@ export default function PetsPage() {
 
     const handleSaveEdit = async () => {
         try {
-            await updateDoc(doc(db, 'pets', selectedPet.id), editForm);
+            await supabase.from('pets').update(editForm).eq('id', selectedPet.id);
             setPets(pets.map(p => p.id === selectedPet.id ? { ...p, ...editForm } : p));
             setIsEditModalOpen(false);
         } catch (error) {

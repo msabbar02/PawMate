@@ -11,9 +11,7 @@ import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { auth, db } from '../config/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { supabase } from '../config/supabase';
 import { uploadImageToStorage, saveAvatarToFirestore } from '../utils/storageHelpers';
 import { COLORS } from '../constants/colors';
 
@@ -163,8 +161,8 @@ export default function ProfileScreen({ navigation }) {
         setPhotoUri(localUri); // optimistic UI
         setUploadingPhoto(true);
         try {
-            // Save as base64 directly to Firestore (no Firebase Storage needed)
-            const base64Url = await saveAvatarToFirestore(localUri, user.uid);
+            // Save as base64 directly to Supabase storage by using saveAvatarToFirestore (now maps to Supabase)
+            const base64Url = await saveAvatarToFirestore(localUri, user.id);
             setPhotoUri(base64Url);
         } catch (e) {
             // Revert to previous photo on failure
@@ -181,24 +179,23 @@ export default function ProfileScreen({ navigation }) {
         if (!firstName.trim()) return Alert.alert('Error', 'El nombre no puede estar vacío.');
         setSaving(true);
         try {
-            await updateDoc(doc(db, 'users', user.uid), {
+            await supabase.from('users').update({
                 firstName:    firstName.trim(),
                 lastName:     lastName.trim(),
                 fullName:     `${firstName.trim()} ${lastName.trim()}`.trim(),
                 phone:        phone.trim(),
-                // Store location in 'address' sub-object to match existing Firestore schema
+                // Store location in 'address' sub-object to match existing schema
                 address: {
                     city:       city.trim(),
                     postalCode: postalCode.trim(),
                     province:   province.trim(),
                     country:    country.trim(),
                 },
-                // Also flat fields for compatibility
                 city:         city.trim(),
                 birthDate:    birthDate.toISOString(),
                 saveWalks,
                 saveLocation,
-            });
+            }).eq('id', user.id);
             Alert.alert('✅ Guardado', 'Tu perfil ha sido actualizado.');
         } catch (e) {
             Alert.alert('Error', 'No se pudo guardar. Inténtalo de nuevo.');
@@ -211,7 +208,7 @@ export default function ProfileScreen({ navigation }) {
     const handleSignOut = () => {
         Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
             { text: 'Cancelar', style: 'cancel' },
-            { text: 'Salir', style: 'destructive', onPress: () => signOut(auth).catch(() => {}) },
+            { text: 'Salir', style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
         ]);
     };
 

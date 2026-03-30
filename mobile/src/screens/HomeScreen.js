@@ -11,8 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { auth, db } from '../config/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
 
 const MY_PET = { species: 'Perro' };
@@ -99,14 +98,24 @@ export default function HomeScreen({ navigation }) {
 
     // ── Unread Notifications Listener ──────────────
     useEffect(() => {
-        if (!user?.uid) return;
-        const q = query(
-            collection(db, 'notifications', user.uid, 'items'),
-            where('read', '==', false)
-        );
-        const unsub = onSnapshot(q, snap => setUnreadNotifCount(snap.size));
-        return () => unsub();
-    }, [user?.uid]);
+        if (!user?.id) return;
+        
+        const fetchUnread = async () => {
+            const { count } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('userId', user.id)
+                .eq('read', false);
+            setUnreadNotifCount(count || 0);
+        };
+        fetchUnread();
+        
+        const channel = supabase.channel('home_unread_notifs')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `userId=eq.${user.id}` }, fetchUnread)
+            .subscribe();
+            
+        return () => { supabase.removeChannel(channel); };
+    }, [user?.id]);
 
     // ── SOS Pulse ──────────────────────────────────
     useEffect(() => {
@@ -144,18 +153,17 @@ export default function HomeScreen({ navigation }) {
         } catch { /* ignore */ }
     };
 
-    // ── Real Caregivers from Firestore ─────────────
+    // ── Real Caregivers from Supabase ─────────────
     const fetchCaregivers = async (myLat, myLon) => {
         try {
-            const q = query(
-                collection(db, 'users'),
-                where('role', '==', 'caregiver')
-            );
-            const snap = await getDocs(q);
-            const cgList = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter(cg => cg.latitude != null && cg.longitude != null); // only caregivers with GPS
-            setCaregivers(cgList);
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('role', 'caregiver')
+                .not('latitude', 'is', null)
+                .not('longitude', 'is', null);
+            if (error) throw error;
+            setCaregivers(data || []);
         } catch (e) {
             console.warn('fetchCaregivers error:', e.message);
         }
@@ -181,14 +189,9 @@ export default function HomeScreen({ navigation }) {
         setIsDogModalVisible(true);
         setIsLoadingDogs(true);
         try {
-            if (!auth.currentUser) throw new Error('No auth');
-            const q = query(
-                collection(db, 'pets'),
-                where('ownerId', '==', auth.currentUser.uid),
-                where('species', '==', 'dog')
-            );
-            const snapshot = await getDocs(q);
-            setMyDogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+            if (!user?.id) throw new Error('No auth');
+            const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).eq('species', 'dog');
+            setMyDogs(data || []);
         } catch { /* ignore */ } finally {
             setIsLoadingDogs(false);
         }
@@ -211,10 +214,9 @@ export default function HomeScreen({ navigation }) {
         setIsBookingModalVisible(true);
         setIsLoadingPets(true);
         try {
-            if (!auth.currentUser) throw new Error('no auth');
-            const q = query(collection(db, 'pets'), where('ownerId', '==', auth.currentUser.uid));
-            const snap = await getDocs(q);
-            setUserPets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            if (!user?.id) throw new Error('no auth');
+            const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id);
+            setUserPets(data || []);
         } catch { setUserPets([]); }
         finally { setIsLoadingPets(false); }
     };
@@ -236,9 +238,9 @@ export default function HomeScreen({ navigation }) {
             const SERVICE_LABELS_ES = { walking: 'Paseo', hotel: 'Hotel', daycare: 'Guardería' };
             const serviceLabel = SERVICE_LABELS_ES[bookingForm.serviceType] || bookingForm.serviceType;
 
-            const resRef = await addDoc(collection(db, 'reservations'), {
-                ownerUid: auth.currentUser.uid,
-                ownerName: userData?.fullName || auth.currentUser.email,
+            const { data: resData, error: insertError } = await supabase.from('reservations').insert({
+                ownerUid: user?.id,
+                ownerName: userData?.fullName || user?.email,
                 ownerPhotoURL: userData?.photoURL || user?.photoURL || null,
                 caregiverUid: selectedCaregiver.id,
                 caregiverName: selectedCaregiver.name,
@@ -254,24 +256,21 @@ export default function HomeScreen({ navigation }) {
                 notes: bookingForm.notes,
                 status: 'pendiente',
                 qrCode: null,
-                createdAt: serverTimestamp(),
-                confirmedAt: null,
-                activatedAt: null,
-                completedAt: null,
-            });
+            }).select('id').single();
+            if (insertError) throw insertError;
 
             await createNotification(selectedCaregiver.id, {
                 type: 'booking_request',
                 title: 'Nueva solicitud de reserva 📅',
                 body: `${userData?.fullName || 'Un dueño'} quiere reservar ${serviceLabel} para ${petNames.join(', ')} el ${bookingForm.startDate}.`,
-                bookingId: resRef.id,
+                bookingId: resData.id,
                 bookingData: {
                     serviceType: bookingForm.serviceType,
                     petNames,
                     startDate: bookingForm.startDate,
                     totalPrice,
-                    ownerUid: auth.currentUser.uid,
-                    ownerName: userData?.fullName || auth.currentUser.email,
+                    ownerUid: user?.id,
+                    ownerName: userData?.fullName || user?.email,
                     caregiverName: selectedCaregiver.name,
                 },
                 icon: 'calendar-outline',

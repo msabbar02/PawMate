@@ -9,9 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { auth, db } from '../config/firebase';
-import { doc, updateDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
-import { signOut, deleteUser, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { supabase } from '../config/supabase';
 import { uploadImageToStorage } from '../utils/storageHelpers';
 
 const APP_VERSION = '1.0.0';
@@ -106,16 +104,16 @@ export default function SettingsScreen({ navigation }) {
     }, [userData]);
 
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!user?.id) return;
         (async () => {
             try {
-                const petsSnap  = await getDocs(query(collection(db, 'pets'),  where('ownerId',   '==', user.uid)));
-                const postsSnap = await getDocs(query(collection(db, 'posts'), where('authorUid', '==', user.uid)));
-                setPetCount(petsSnap.size);
-                setPostCount(postsSnap.size);
+                const { count: petsCount } = await supabase.from('pets').select('*', { count: 'exact', head: true }).eq('ownerId', user.id);
+                const { count: postsCount } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('authorUid', user.id);
+                setPetCount(petsCount || 0);
+                setPostCount(postsCount || 0);
             } catch { /* ignore */ }
         })();
-    }, [user?.uid]);
+    }, [user?.id]);
 
     // ── Photo ──
     const handleChangePhoto = async () => {
@@ -127,8 +125,8 @@ export default function SettingsScreen({ navigation }) {
         setPhotoUri(localUri);
         setUploadingPhoto(true);
         try {
-            const url = await uploadImageToStorage(localUri, `avatars/${user.uid}.jpg`);
-            await updateDoc(doc(db, 'users', user.uid), { photoURL: url });
+            const url = await uploadImageToStorage(localUri, `avatars/${user.id}.jpg`);
+            await supabase.from('users').update({ photoURL: url, avatar: url }).eq('id', user.id);
         } catch {
             Alert.alert('Error', 'No se pudo subir la foto.');
         } finally {
@@ -143,14 +141,15 @@ export default function SettingsScreen({ navigation }) {
         }
         setChangingPass(true);
         try {
-            const credential = EmailAuthProvider.credential(user.email, oldPass);
-            await reauthenticateWithCredential(auth.currentUser, credential);
-            await updatePassword(auth.currentUser, newPass);
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: oldPass });
+            if (signInError) throw new Error('wrong-password');
+            const { error: updateError } = await supabase.auth.updateUser({ password: newPass });
+            if (updateError) throw updateError;
             setShowPasswordModal(false);
             setOldPass(''); setNewPass('');
             Alert.alert('✅ Contraseña actualizada');
         } catch (e) {
-            Alert.alert('Error', e.code === 'auth/wrong-password'
+            Alert.alert('Error', e.message === 'wrong-password'
                 ? 'La contraseña actual es incorrecta.'
                 : 'No se pudo cambiar la contraseña.');
         } finally { setChangingPass(false); }
@@ -188,7 +187,7 @@ export default function SettingsScreen({ navigation }) {
             newContacts.push(entry);
         }
         try {
-            await updateDoc(doc(db, 'users', user.uid), { emergencyContacts: newContacts });
+            await supabase.from('users').update({ emergencyContacts: newContacts }).eq('id', user.id);
             setEmergencyContacts(newContacts);
             setShowContactModal(false);
         } catch { Alert.alert('Error', 'No se pudo guardar el contacto.'); }
@@ -203,7 +202,7 @@ export default function SettingsScreen({ navigation }) {
                 onPress: async () => {
                     const newContacts = emergencyContacts.filter((_, i) => i !== index);
                     try {
-                        await updateDoc(doc(db, 'users', user.uid), { emergencyContacts: newContacts });
+                        await supabase.from('users').update({ emergencyContacts: newContacts }).eq('id', user.id);
                         setEmergencyContacts(newContacts);
                     } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
                 },
@@ -215,7 +214,7 @@ export default function SettingsScreen({ navigation }) {
     const handleSignOut = () => {
         Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
             { text: 'Cancelar', style: 'cancel' },
-            { text: 'Salir', style: 'destructive', onPress: () => signOut(auth).catch(() => {}) },
+            { text: 'Salir', style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
         ]);
     };
 
@@ -226,8 +225,8 @@ export default function SettingsScreen({ navigation }) {
                 text: 'Eliminar', style: 'destructive',
                 onPress: async () => {
                     try {
-                        await deleteDoc(doc(db, 'users', user.uid));
-                        await deleteUser(auth.currentUser);
+                        await supabase.from('users').delete().eq('id', user.id);
+                        await supabase.auth.signOut();
                     } catch {
                         Alert.alert('Error', 'Vuelve a iniciar sesión antes de eliminar tu cuenta.');
                     }

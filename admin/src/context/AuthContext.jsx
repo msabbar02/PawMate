@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { supabase } from '../config/supabase';
 
 export const AuthContext = createContext();
 
@@ -9,15 +8,18 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user && user.email === 'adminpawmate@gmail.com') {
-                setIsAuthenticated(true);
-            } else {
-                setIsAuthenticated(false);
-            }
+        // Check active session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setIsAuthenticated(!!session && session.user.email === 'adminpawmate@gmail.com');
             setLoading(false);
         });
-        return unsubscribe;
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsAuthenticated(!!session && session.user.email === 'adminpawmate@gmail.com');
+            setLoading(false);
+        });
+        return () => subscription.unsubscribe();
     }, []);
 
     const login = async (email, password) => {
@@ -25,7 +27,8 @@ export const AuthProvider = ({ children }) => {
             if (email !== 'adminpawmate@gmail.com') {
                 throw new Error("Acceso denegado: este email no pertenece a un administrador.");
             }
-            await signInWithEmailAndPassword(auth, email, password);
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
             return true;
         } catch (error) {
             console.error("Error de autenticación:", error);
@@ -34,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
-        await signOut(auth);
+        await supabase.auth.signOut();
     };
 
     if (loading) return null;

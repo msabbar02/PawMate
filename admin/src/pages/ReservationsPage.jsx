@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Search, Edit2, Trash2, X, CalendarDays, Eye, FileText } from 'lucide-react';
 import './UsersPage.css'; // Shared table styles
 
@@ -23,13 +22,8 @@ export default function ReservationsPage() {
     const fetchReservations = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'reservations'), orderBy('createdAt', 'desc'));
-            const querySnapshot = await getDocs(q);
-            const resData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setReservations(resData);
+            const { data: resData } = await supabase.from('reservations').select('*').order('createdAt', { ascending: false });
+            if (resData) setReservations(resData);
         } catch (error) {
             console.error("Error fetching reservations:", error);
         } finally {
@@ -40,7 +34,7 @@ export default function ReservationsPage() {
     const handleDelete = async (resId) => {
         if (window.confirm('¿Seguro que deseas eliminar esta reserva?')) {
             try {
-                await deleteDoc(doc(db, 'reservations', resId));
+                await supabase.from('reservations').delete().eq('id', resId);
                 setReservations(reservations.filter(r => r.id !== resId));
             } catch (error) {
                 alert("Error al eliminar la reserva");
@@ -61,7 +55,7 @@ export default function ReservationsPage() {
 
     const handleSaveEdit = async () => {
         try {
-            await updateDoc(doc(db, 'reservations', selectedRes.id), { status: editStatus });
+            await supabase.from('reservations').update({ status: editStatus }).eq('id', selectedRes.id);
             setReservations(reservations.map(r => r.id === selectedRes.id ? { ...r, status: editStatus } : r));
             setIsEditModalOpen(false);
         } catch (error) {
@@ -132,7 +126,7 @@ export default function ReservationsPage() {
                                 </tr>
                             ) : (
                                 filtered.map(res => {
-                                    const created = res.createdAt?.toDate ? res.createdAt.toDate().toLocaleDateString('es-ES') : '';
+                                    const created = res.createdAt ? new Date(res.createdAt).toLocaleDateString('es-ES') : '';
                                     return (
                                         <tr key={res.id}>
                                             <td>

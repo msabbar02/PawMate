@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Search, Trash2, X, Image as ImageIcon, Eye } from 'lucide-react';
 import './UsersPage.css'; // Shared table styles
 
@@ -20,13 +19,8 @@ export default function CommunityPage() {
     const fetchPosts = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-            const querySnapshot = await getDocs(q);
-            const postsData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setPosts(postsData);
+            const { data: postsData } = await supabase.from('posts').select('*').order('createdAt', { ascending: false });
+            if (postsData) setPosts(postsData);
         } catch (error) {
             console.error("Error fetching posts:", error);
         } finally {
@@ -37,7 +31,7 @@ export default function CommunityPage() {
     const handleDelete = async (postId) => {
         if (window.confirm('¿Seguro que deseas eliminar esta publicación permanentemente?')) {
             try {
-                await deleteDoc(doc(db, 'posts', postId));
+                await supabase.from('posts').delete().eq('id', postId);
                 setPosts(posts.filter(p => p.id !== postId));
                 setIsViewModalOpen(false);
             } catch (error) {
@@ -96,7 +90,7 @@ export default function CommunityPage() {
                                 </tr>
                             ) : (
                                 filtered.map(post => {
-                                    const created = post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString('es-ES') : '';
+                                    const created = post.createdAt ? new Date(post.createdAt).toLocaleDateString('es-ES') : '';
                                     const imgs = post.imageUrls?.length > 0 ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
                                     return (
                                         <tr key={post.id}>
@@ -113,6 +107,7 @@ export default function CommunityPage() {
                                                 <div className="contact-info">
                                                     <span style={{ fontWeight: 600 }}>{post.authorName || 'Usuario'}</span>
                                                     <span className="text-muted">{created}</span>
+                                                    <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>ID: {post.authorUid || 'Desconocido'}</span>
                                                 </div>
                                             </td>
                                             <td>
@@ -166,7 +161,7 @@ export default function CommunityPage() {
                                 <div className="premium-profile-info">
                                     <h3 className="premium-profile-name">{selectedPost.authorName}</h3>
                                     <p className="premium-profile-subtitle" style={{color: 'white', fontWeight: '500'}}>
-                                        {selectedPost.createdAt?.toDate ? selectedPost.createdAt.toDate().toLocaleString('es-ES') : 'Fecha desconocida'}
+                                        {selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleString('es-ES') : 'Fecha desconocida'}
                                     </p>
                                 </div>
                             </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal,
     Image, Dimensions, Platform, TextInput, KeyboardAvoidingView,
@@ -18,11 +18,8 @@ import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 
-import { auth, db } from '../config/firebase';
-import {
-    collection, query, where, onSnapshot,
-    addDoc, doc, updateDoc, serverTimestamp
-} from 'firebase/firestore';
+import { AuthContext } from '../context/AuthContext';
+import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 import { uploadImageToStorage } from '../utils/storageHelpers';
 
@@ -115,6 +112,7 @@ const EMPTY_FORM = {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════
 export default function PawMatePetsCenter() {
+    const { user } = useContext(AuthContext);
     const { theme, isDarkMode } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
 
     // ── Core State ──────────────────────────────────
@@ -153,40 +151,58 @@ export default function PawMatePetsCenter() {
     const fadeAnim = useRef(new Animated.Value(1)).current;
 
     // ─────────────────────────────────────────────────
-    // FIREBASE: Pets Collection
+    // SUPABASE: Pets Collection
     // ─────────────────────────────────────────────────
     useEffect(() => {
-        if (!auth.currentUser) { setIsLoadingSync(false); return; }
-        const q = query(
-            collection(db, 'pets'),
-            where('ownerId', '==', auth.currentUser.uid)
-        );
-        const unsub = onSnapshot(q, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setPets(data);
-            setIsLoadingSync(false);
-            // Keep selectedPet in sync
-            if (selectedPet) {
-                const live = data.find(p => p.id === selectedPet.id);
-                if (live) setSelectedPet(live);
+        if (!user?.id) { setIsLoadingSync(false); return; }
+        
+        const fetchPets = async () => {
+            const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id);
+            if (data) {
+                setPets(data);
+                if (selectedPet) {
+                    const live = data.find(p => p.id === selectedPet.id);
+                    if (live) setSelectedPet(live);
+                }
             }
-        });
-        return () => unsub();
-    }, [selectedPet?.id]);
+            setIsLoadingSync(false);
+        };
+        fetchPets();
+
+        const channel = supabase
+            .channel('pets_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pets', filter: `ownerId=eq.${user.id}` }, () => {
+                fetchPets();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [selectedPet?.id, user?.id]);
 
     // ─────────────────────────────────────────────────
-    // FIREBASE: All Walks for Selected Pet
+    // SUPABASE: All Walks for Selected Pet
     // ─────────────────────────────────────────────────
     useEffect(() => {
         if (!selectedPet || viewMode !== 'detail') { setWalks([]); return; }
-        const q = query(collection(db, `pets/${selectedPet.id}/walks`));
-        const unsub = onSnapshot(q, (snap) => {
-            const data = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
-            setWalks(data);
-        });
-        return () => unsub();
+        
+        const fetchWalks = async () => {
+            const { data } = await supabase
+                .from('walks')
+                .select('*')
+                .eq('petId', selectedPet.id)
+                .order('endTime', { ascending: false });
+            if (data) setWalks(data);
+        };
+        fetchWalks();
+
+        const channel = supabase
+            .channel('walks_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'walks', filter: `petId=eq.${selectedPet.id}` }, () => {
+                fetchWalks();
+            })
+            .subscribe();
+            
+        return () => { supabase.removeChannel(channel); };
     }, [selectedPet?.id, viewMode]);
 
     // ─────────────────────────────────────────────────
@@ -228,10 +244,10 @@ export default function PawMatePetsCenter() {
             conditions: selectedPet.medicalConditions || 'Ninguna',
             vet: selectedPet.vetName || '',
             vetPhone: selectedPet.vetPhone || '',
-            owner: auth.currentUser?.email || '',
+            owner: user?.email || '',
             app: 'PawMate',
         });
-    }, [selectedPet]);
+    }, [selectedPet, user?.email]);
 
     // ─────────────────────────────────────────────────
     // NAVIGATION with fade transition
@@ -278,14 +294,20 @@ export default function PawMatePetsCenter() {
         const calories = Math.round(weight * totalKm * 0.6);
 
         try {
-            await addDoc(collection(db, `pets/${selectedPet.id}/walks`), {
-                route: walkRoute, totalKm, calories,
+            await supabase.from('walks').insert({
+                petId: selectedPet.id,
+                route: walkRoute,
+                totalKm,
+                calories,
                 durationSeconds: walkTimer,
                 startTime: new Date(Date.now() - walkTimer * 1000).toISOString(),
                 endTime: new Date().toISOString(),
             });
+
             const newTotal = (selectedPet.activity?.km || 0) + totalKm;
-            await updateDoc(doc(db, 'pets', selectedPet.id), { 'activity.km': newTotal });
+            const newActivity = { ...(selectedPet.activity || {}), km: newTotal };
+            await supabase.from('pets').update({ activity: newActivity }).eq('id', selectedPet.id);
+            
             Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas`);
         } catch (e) {
             Alert.alert('Error', 'No se pudo guardar el paseo');
@@ -334,9 +356,9 @@ export default function PawMatePetsCenter() {
         if (!formParams.name.trim()) return Alert.alert('Error', 'El nombre es obligatorio');
         try {
             let imageUrl = formParams.image;
-            // Upload image to Firebase Storage if it's a local URI
-            if (formParams.image && !formParams.image.startsWith('https://')) {
-                const uid = auth.currentUser.uid;
+            // Upload image to Supabase/Firebase Storage if it's a local URI
+            if (formParams.image && !formParams.image.startsWith('http')) {
+                const uid = user?.id;
                 const timestamp = Date.now();
                 const path = `pets/${uid}/${timestamp}.jpg`;
                 imageUrl = await uploadImageToStorage(formParams.image, path);
@@ -344,22 +366,21 @@ export default function PawMatePetsCenter() {
             const dataToSave = { ...formParams, image: imageUrl };
 
             if (isEditing && selectedPet) {
-                await updateDoc(doc(db, 'pets', selectedPet.id), dataToSave);
+                await supabase.from('pets').update(dataToSave).eq('id', selectedPet.id);
             } else {
-                await addDoc(collection(db, 'pets'), {
+                await supabase.from('pets').insert({
                     ...dataToSave,
-                    ownerId: auth.currentUser.uid,
+                    ownerId: user?.id,
                     activity: { km: 0 },
                     vaccines: [],
                     reminders: [],
-                    createdAt: serverTimestamp(),
                 });
             }
             setIsFormVisible(false);
             resetForm();
         } catch (e) {
             console.error('handleSavePet error:', e);
-            Alert.alert('Error', 'No se pudo guardar en Firebase');
+            Alert.alert('Error', 'No se pudo guardar la mascota');
         }
     };
 
@@ -433,7 +454,7 @@ export default function PawMatePetsCenter() {
             ? currentReminders.map(r => r.id === editingReminder.id ? { ...r, ...data } : r)
             : [...currentReminders, { id: Date.now().toString(), ...data }];
         try {
-            await updateDoc(doc(db, 'pets', selectedPet.id), { reminders: newReminders });
+            await supabase.from('pets').update({ reminders: newReminders }).eq('id', selectedPet.id);
             setIsReminderModalVisible(false);
             if (triggerTime.getTime() > Date.now()) {
                 scheduleReminder(reminderForm.title, reminderForm.description, triggerTime);
@@ -446,7 +467,7 @@ export default function PawMatePetsCenter() {
     const deleteReminder = async (id) => {
         const filtered = (selectedPet.reminders || []).filter(r => r.id !== id);
         try {
-            await updateDoc(doc(db, 'pets', selectedPet.id), { reminders: filtered });
+            await supabase.from('pets').update({ reminders: filtered }).eq('id', selectedPet.id);
             setIsReminderModalVisible(false);
         } catch { Alert.alert('Error', 'No se pudo eliminar'); }
     };

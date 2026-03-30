@@ -10,11 +10,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { auth, db } from '../config/firebase';
-import {
-    collection, query, where, onSnapshot, addDoc,
-    doc, updateDoc, serverTimestamp, getDocs, getDoc, orderBy, increment, deleteDoc,
-} from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import { createNotification, generateUniqueId } from '../utils/notificationHelpers';
 import { useSafeStripe } from '../config/stripe';
 
@@ -41,7 +37,7 @@ const MAX_WALK  = 5;
 const MAX_HOTEL = 3;
 
 export default function BookingScreen() {
-    const { userData } = useContext(AuthContext);
+    const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { initPaymentSheet, presentPaymentSheet } = useSafeStripe();
 
@@ -73,39 +69,46 @@ export default function BookingScreen() {
     const [submittingReview, setSubmittingReview] = useState(false);
 
     // ─────────────────────────────────────────────────
-    // FIREBASE: Fetch reservations
+    // FETCH RESERVATIONS
     // ─────────────────────────────────────────────────
     useEffect(() => {
-        if (!auth.currentUser) { setLoading(false); return; }
+        if (!user?.id) { setLoading(false); return; }
         const isCaregiver = userData?.role === 'caregiver';
         const field = isCaregiver ? 'caregiverUid' : 'ownerUid';
-        const q = query(collection(db, 'reservations'), where(field, '==', auth.currentUser.uid));
-
-        const unsub = onSnapshot(q, (snap) => {
-            const data = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
-            setReservations(data);
-            setConversations(data.filter(r => r.status !== 'cancelada'));
+        
+        const fetchReservations = async () => {
+            const { data } = await supabase.from('reservations').select('*').eq(field, user.id).order('createdAt', { ascending: false });
+            if (data) {
+                setReservations(data);
+                setConversations(data.filter(r => r.status !== 'cancelada'));
+            }
             setLoading(false);
-        }, () => setLoading(false));
-
-        return () => unsub();
-    }, [userData?.role]);
+        };
+        fetchReservations();
+        
+        const channel = supabase.channel('reservations_bs')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations', filter: `${field}=eq.${user.id}` }, fetchReservations)
+            .subscribe();
+            
+        return () => { supabase.removeChannel(channel); };
+    }, [userData?.role, user?.id]);
 
     // ─────────────────────────────────────────────────
-    // FIREBASE: Messages
+    // FETCH MESSAGES
     // ─────────────────────────────────────────────────
     useEffect(() => {
         if (!activeConversation) return;
-        const q = query(
-            collection(db, `messages/${activeConversation.id}/thread`),
-            orderBy('timestamp', 'asc')
-        );
-        const unsub = onSnapshot(q, snap =>
-            setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-        );
-        return () => unsub();
+        const fetchMessages = async () => {
+             const { data } = await supabase.from('messages').select('*').eq('conversationId', activeConversation.id).order('createdAt', { ascending: true });
+             if (data) setMessages(data);
+        };
+        fetchMessages();
+        
+        const channel = supabase.channel('messages_bs')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversationId=eq.${activeConversation.id}` }, fetchMessages)
+            .subscribe();
+            
+        return () => { supabase.removeChannel(channel); };
     }, [activeConversation]);
 
     // ─────────────────────────────────────────────────
@@ -113,30 +116,29 @@ export default function BookingScreen() {
     // ─────────────────────────────────────────────────
     const checkCapacity = async (caregiverId, serviceType) => {
         const maxLimit = serviceType === 'walking' ? MAX_WALK : MAX_HOTEL;
-        const q = query(
-            collection(db, 'reservations'),
-            where('caregiverUid', '==', caregiverId),
-            where('status', '==', 'aceptada'),
-            where('serviceType', '==', serviceType)
-        );
-        const snap = await getDocs(q);
-        return snap.size < maxLimit;
+        const { count } = await supabase.from('reservations')
+            .select('*', { count: 'exact', head: true })
+            .eq('caregiverUid', caregiverId)
+            .eq('status', 'aceptada')
+            .eq('serviceType', serviceType);
+        return (count || 0) < maxLimit;
     };
 
     // ─────────────────────────────────────────────────
     // ACCEPT RESERVATION
     // ─────────────────────────────────────────────────
     const handleAcceptReservation = async (reservation) => {
+        if (!user?.id) return;
         try {
-            const hasCapacity = await checkCapacity(auth.currentUser.uid, reservation.serviceType);
+            const hasCapacity = await checkCapacity(user.id, reservation.serviceType);
             if (!hasCapacity) {
                 const limit = reservation.serviceType === 'walking' ? MAX_WALK : MAX_HOTEL;
                 Alert.alert('Sin capacidad', `Ya tienes ${limit} reservas activas de este tipo.`);
                 return;
             }
-            await updateDoc(doc(db, 'reservations', reservation.id), {
-                status: 'aceptada', confirmedAt: serverTimestamp(),
-            });
+            await supabase.from('reservations').update({
+                status: 'aceptada'
+            }).eq('id', reservation.id);
             await createNotification(reservation.ownerUid, {
                 type: 'booking_confirmed',
                 bookingId: reservation.id,
@@ -195,9 +197,9 @@ export default function BookingScreen() {
     const confirmPayment = async (reservation) => {
         try {
             const qrCode = generateUniqueId();
-            await updateDoc(doc(db, 'reservations', reservation.id), {
-                status: 'activa', qrCode, activatedAt: serverTimestamp(),
-            });
+            await supabase.from('reservations').update({
+                status: 'activa', qrCode
+            }).eq('id', reservation.id);
             await createNotification(reservation.caregiverUid, {
                 type: 'booking_active',
                 bookingId: reservation.id,
@@ -222,9 +224,9 @@ export default function BookingScreen() {
                 text: 'Sí, completado',
                 onPress: async () => {
                     try {
-                        await updateDoc(doc(db, 'reservations', reservation.id), {
-                            status: 'completada', completedAt: serverTimestamp(),
-                        });
+                        await supabase.from('reservations').update({
+                            status: 'completada'
+                        }).eq('id', reservation.id);
                         await createNotification(reservation.ownerUid, {
                             type: 'booking_completed',
                             bookingId: reservation.id,
@@ -243,18 +245,18 @@ export default function BookingScreen() {
     // ─────────────────────────────────────────────────
     // QR SCANNER
     // ─────────────────────────────────────────────────
-    const handleQrScanned = async ({ data }) => {
-        if (cameraScanned) return;
+    const handleQrScanned = async ({ data: qrData }) => {
+        if (cameraScanned || !user?.id) return;
         setCameraScanned(true);
-        const q = query(
-            collection(db, 'reservations'),
-            where('caregiverUid', '==', auth.currentUser.uid),
-            where('qrCode', '==', data),
-            where('status', '==', 'activa')
-        );
         try {
-            const snap = await getDocs(q);
-            if (snap.empty) {
+            const { data, error } = await supabase.from('reservations')
+                .select('*')
+                .eq('caregiverUid', user.id)
+                .eq('qrCode', qrData)
+                .eq('status', 'activa')
+                .limit(1);
+            
+            if (error || !data || data.length === 0) {
                 Alert.alert('QR inválido', 'No se encontró ninguna reserva activa.', [
                     { text: 'OK', onPress: () => setCameraScanned(false) },
                 ]);
@@ -278,7 +280,7 @@ export default function BookingScreen() {
                 text: 'Sí, cancelar', style: 'destructive',
                 onPress: async () => {
                     try {
-                        await updateDoc(doc(db, 'reservations', reservationId), { status: 'cancelada' });
+                        await supabase.from('reservations').update({ status: 'cancelada' }).eq('id', reservationId);
                         setDetailRes(null);
                     } catch { Alert.alert('Error', 'No se pudo cancelar.'); }
                 },
@@ -293,7 +295,7 @@ export default function BookingScreen() {
                 text: 'Eliminar', style: 'destructive',
                 onPress: async () => {
                     try {
-                        await deleteDoc(doc(db, 'reservations', reservationId));
+                        await supabase.from('reservations').delete().eq('id', reservationId);
                         setDetailRes(null);
                     } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
                 },
@@ -305,31 +307,28 @@ export default function BookingScreen() {
     // SUBMIT REVIEW
     // ─────────────────────────────────────────────────
     const handleSubmitReview = async () => {
-        if (!reviewTarget || !auth.currentUser) return;
+        if (!reviewTarget || !user?.id) return;
         setSubmittingReview(true);
         try {
-            await addDoc(collection(db, 'reviews'), {
-                reviewerUid: auth.currentUser.uid,
+            await supabase.from('reviews').insert({
+                reviewerUid: user.id,
                 reviewerName: userData?.fullName || 'Usuario',
                 caregiverUid: reviewTarget.caregiverUid,
                 caregiverName: reviewTarget.caregiverName,
                 bookingId: reviewTarget.id,
                 rating: reviewRating,
                 comment: reviewText.trim(),
-                createdAt: serverTimestamp(),
             });
-            const cgRef = doc(db, 'users', reviewTarget.caregiverUid);
-            const cgSnap = await getDoc(cgRef);
-            if (cgSnap.exists()) {
-                const cgData = cgSnap.data();
+            const { data: cgData } = await supabase.from('users').select('reviewCount, rating').eq('id', reviewTarget.caregiverUid).single();
+            if (cgData) {
                 const count = (cgData.reviewCount || 0) + 1;
                 const avgRating = ((cgData.rating || 0) * (count - 1) + reviewRating) / count;
-                await updateDoc(cgRef, {
+                await supabase.from('users').update({
                     rating: Math.round(avgRating * 10) / 10,
                     reviewCount: count,
-                });
+                }).eq('id', reviewTarget.caregiverUid);
             }
-            await updateDoc(doc(db, 'reservations', reviewTarget.id), { reviewedByOwner: true });
+            await supabase.from('reservations').update({ reviewedByOwner: true }).eq('id', reviewTarget.id);
             setIsReviewModalVisible(false);
             setReviewTarget(null);
             setReviewText('');
@@ -343,14 +342,14 @@ export default function BookingScreen() {
     // SEND MESSAGE
     // ─────────────────────────────────────────────────
     const sendMessage = async () => {
-        if (!messageInput.trim() || !activeConversation) return;
+        if (!messageInput.trim() || !activeConversation || !user?.id) return;
         const text = messageInput.trim();
         try {
-            await addDoc(collection(db, `messages/${activeConversation.id}/thread`), {
-                senderId: auth.currentUser.uid,
+            await supabase.from('messages').insert({
+                conversationId: activeConversation.id,
+                senderId: user.id,
                 senderName: userData?.fullName || 'Usuario',
                 text,
-                timestamp: serverTimestamp(),
                 read: false,
             });
             setMessageInput('');
@@ -445,14 +444,14 @@ export default function BookingScreen() {
     // RENDER: Chat Message
     // ─────────────────────────────────────────────────
     const renderMessage = ({ item }) => {
-        const isMe = item.senderId === auth.currentUser?.uid;
+        const isMe = item.senderId === user?.id;
         return (
             <View style={[s.messageWrap, isMe ? s.bubbleRight : s.bubbleLeft]}>
                 <View style={[s.bubble, isMe ? s.bubbleMine : [s.bubbleOther, { backgroundColor: theme.cardBackground }]]}>
                     <Text style={[s.bubbleText, { color: isMe ? '#FFF' : theme.text }]}>{item.text}</Text>
-                    {item.timestamp?.toDate && (
+                    {item.createdAt && (
                         <Text style={[s.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>
-                            {item.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                     )}
                 </View>

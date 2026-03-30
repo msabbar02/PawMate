@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Search, Edit2, Trash2, X, AlertCircle, Shield, ShieldCheck, Eye, Dog, Globe } from 'lucide-react';
 import './UsersPage.css';
 
@@ -26,12 +25,10 @@ export default function UsersPage() {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const querySnapshot = await getDocs(collection(db, 'users'));
-            const usersData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setUsers(usersData);
+            const { data: usersData, error } = await supabase.from('users').select('*');
+            if (!error && usersData) {
+                setUsers(usersData);
+            }
         } catch (error) {
             console.error("Error fetching users:", error);
         } finally {
@@ -42,7 +39,7 @@ export default function UsersPage() {
     const handleDeleteUser = async (userId) => {
         if (window.confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción es irreversible.')) {
             try {
-                await deleteDoc(doc(db, 'users', userId));
+                await supabase.from('users').delete().eq('id', userId);
                 setUsers(users.filter(u => u.id !== userId));
             } catch (error) {
                 console.error("Error deleting user:", error);
@@ -72,11 +69,15 @@ export default function UsersPage() {
         setUserPets([]);
         setUserPosts([]);
         try {
-            const petsQ = query(collection(db, 'pets'), where('ownerId', '==', user.id));
-            const postsQ = query(collection(db, 'posts'), where('authorId', '==', user.id));
-            const [petsSnap, postsSnap] = await Promise.all([getDocs(petsQ), getDocs(postsQ)]);
-            setUserPets(petsSnap.docs.map(d => ({id: d.id, ...d.data()})));
-            setUserPosts(postsSnap.docs.map(d => ({id: d.id, ...d.data()})));
+            const [
+                { data: petsData },
+                { data: postsData }
+            ] = await Promise.all([
+                supabase.from('pets').select('*').eq('ownerId', user.id),
+                supabase.from('posts').select('*').eq('authorUid', user.id)
+            ]);
+            if (petsData) setUserPets(petsData);
+            if (postsData) setUserPosts(postsData);
         } catch (e) {
             console.error("Error fetching user details", e);
         }
@@ -90,8 +91,7 @@ export default function UsersPage() {
 
     const handleSaveEdit = async () => {
         try {
-            const userRef = doc(db, 'users', selectedUser.id);
-            await updateDoc(userRef, editForm);
+            await supabase.from('users').update(editForm).eq('id', selectedUser.id);
             
             // Update local state
             setUsers(users.map(u => 

@@ -1,44 +1,47 @@
-import { db, auth } from '../config/firebase';
-import {
-    collection, addDoc, doc, getDoc, getDocs,
-    deleteDoc, serverTimestamp, query, where, setDoc
-} from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 import { createNotification } from './notificationHelpers';
 
 /**
  * Send a friend request from current user to target user.
  */
 export const sendFriendRequest = async (toUid, toName, fromUserData) => {
-    if (!auth.currentUser || toUid === auth.currentUser.uid) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUser = session?.user;
+    if (!currentUser || toUid === currentUser.id) return;
 
     // Check if already friends
-    const friendDoc = await getDoc(doc(db, 'users', auth.currentUser.uid, 'friends', toUid));
-    if (friendDoc.exists()) throw new Error('already_friends');
+    const { data: friend } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('userId', currentUser.id)
+        .eq('friendId', toUid)
+        .maybeSingle();
+    if (friend) throw new Error('already_friends');
 
     // Check for existing pending request
-    const existing = await getDocs(query(
-        collection(db, 'friendRequests'),
-        where('fromUid', '==', auth.currentUser.uid),
-        where('toUid', '==', toUid),
-        where('status', '==', 'pending')
-    ));
-    if (!existing.empty) throw new Error('already_sent');
+    const { data: existing } = await supabase
+        .from('friendRequests')
+        .select('*')
+        .eq('fromUid', currentUser.id)
+        .eq('toUid', toUid)
+        .eq('status', 'pending');
+    
+    if (existing && existing.length > 0) throw new Error('already_sent');
 
-    await addDoc(collection(db, 'friendRequests'), {
-        fromUid: auth.currentUser.uid,
+    await supabase.from('friendRequests').insert({
+        fromUid: currentUser.id,
         fromName: fromUserData?.fullName || 'Usuario',
         fromPhotoURL: fromUserData?.photoURL || null,
         toUid,
         toName,
         status: 'pending',
-        createdAt: serverTimestamp(),
     });
 
     await createNotification(toUid, {
         type: 'friend_request',
         title: 'Solicitud de amistad 🤝',
         body: `${fromUserData?.fullName || 'Un usuario'} quiere ser tu amigo.`,
-        fromUid: auth.currentUser.uid,
+        fromUid: currentUser.id,
         icon: 'person-add-outline',
         iconBg: '#EFF6FF',
         iconColor: '#3B82F6',
@@ -49,26 +52,18 @@ export const sendFriendRequest = async (toUid, toName, fromUserData) => {
  * Accept a friend request and add both users as friends.
  */
 export const acceptFriendRequest = async (requestId, fromUid, fromName, fromPhotoURL, currentUserData) => {
-    const uid = auth.currentUser?.uid;
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
     if (!uid) return;
 
-    // Add each user to the other's friends subcollection
-    await setDoc(doc(db, 'users', uid, 'friends', fromUid), {
-        friendUid: fromUid,
-        friendName: fromName,
-        friendPhotoURL: fromPhotoURL || null,
-        addedAt: serverTimestamp(),
-    });
-
-    await setDoc(doc(db, 'users', fromUid, 'friends', uid), {
-        friendUid: uid,
-        friendName: currentUserData?.fullName || 'Usuario',
-        friendPhotoURL: currentUserData?.photoURL || null,
-        addedAt: serverTimestamp(),
-    });
+    // Add each user to the other's friends list (many-to-many relationship table)
+    await supabase.from('friends').insert([
+        { userId: uid, friendId: fromUid },
+        { userId: fromUid, friendId: uid }
+    ]);
 
     // Delete the friend request
-    await deleteDoc(doc(db, 'friendRequests', requestId));
+    await supabase.from('friendRequests').delete().eq('id', requestId);
 
     // Notify the requester their request was accepted
     await createNotification(fromUid, {
@@ -85,21 +80,25 @@ export const acceptFriendRequest = async (requestId, fromUid, fromName, fromPhot
  * Reject a friend request.
  */
 export const rejectFriendRequest = async (requestId) => {
-    await deleteDoc(doc(db, 'friendRequests', requestId));
+    await supabase.from('friendRequests').delete().eq('id', requestId);
 };
 
 /**
  * Remove a friend (both directions).
  */
 export const removeFriend = async (uid1, uid2) => {
-    await deleteDoc(doc(db, 'users', uid1, 'friends', uid2));
-    await deleteDoc(doc(db, 'users', uid2, 'friends', uid1));
+    await supabase.from('friends').delete().match({ userId: uid1, friendId: uid2 });
+    await supabase.from('friends').delete().match({ userId: uid2, friendId: uid1 });
 };
 
 /**
  * Get list of friend UIDs for a user.
  */
 export const getFriendIds = async (uid) => {
-    const snap = await getDocs(collection(db, 'users', uid, 'friends'));
-    return snap.docs.map(d => d.id);
+    const { data } = await supabase
+        .from('friends')
+        .select('friendId')
+        .eq('userId', uid);
+    
+    return data ? data.map(d => d.friendId) : [];
 };

@@ -1,5 +1,4 @@
-import { db, auth } from '../config/firebase';
-import { doc, getDoc, setDoc, getDocs, collection, updateDoc, increment } from 'firebase/firestore';
+import { supabase } from '../config/supabase';
 
 /**
  * Update user species preference after a like/unlike action.
@@ -9,13 +8,27 @@ import { doc, getDoc, setDoc, getDocs, collection, updateDoc, increment } from '
  */
 export const updatePreference = async (uid, species, delta) => {
     if (!uid || !species) return;
-    const prefRef = doc(db, 'users', uid, 'preferences', species);
-    const prefSnap = await getDoc(prefRef);
+    try {
+        const { data } = await supabase
+            .from('preferences')
+            .select('count')
+            .eq('userId', uid)
+            .eq('species', species)
+            .maybeSingle();
 
-    if (prefSnap.exists()) {
-        await updateDoc(prefRef, { count: increment(delta) });
-    } else if (delta > 0) {
-        await setDoc(prefRef, { species, count: 1 });
+        const currentCount = data ? data.count : 0;
+        const newCount = currentCount + delta;
+
+        if (newCount >= 0) {
+            await supabase
+                .from('preferences')
+                .upsert(
+                    { userId: uid, species, count: newCount },
+                    { onConflict: 'userId, species' }
+                );
+        }
+    } catch (e) {
+        console.error('Error updating preference:', e);
     }
 };
 
@@ -26,10 +39,16 @@ export const updatePreference = async (uid, species, delta) => {
  */
 export const getTopPreferences = async (uid) => {
     if (!uid) return [];
-    const snap = await getDocs(collection(db, 'users', uid, 'preferences'));
-    const prefs = snap.docs
-        .map(d => ({ species: d.id, ...d.data() }))
-        .filter(p => p.count > 0)
-        .sort((a, b) => b.count - a.count);
-    return prefs;
+    try {
+        const { data } = await supabase
+            .from('preferences')
+            .select('*')
+            .eq('userId', uid)
+            .gt('count', 0)
+            .order('count', { ascending: false });
+        
+        return data || [];
+    } catch (e) {
+        return [];
+    }
 };

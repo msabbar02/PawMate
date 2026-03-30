@@ -1,9 +1,8 @@
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 
 /**
- * Creates a notification document in Firestore for a specific user.
- * Path: notifications/{userId}/items/{auto-id}
+ * Creates a notification record for a specific user.
+ * Table: notifications
  *
  * @param {string} userId  - Target user's UID
  * @param {object} data    - Notification payload
@@ -11,10 +10,10 @@ import { db } from '../config/firebase';
 export async function createNotification(userId, data) {
     if (!userId) return;
     try {
-        await addDoc(collection(db, 'notifications', userId, 'items'), {
+        await supabase.from('notifications').insert({
+            userId,
             ...data,
             read: false,
-            createdAt: serverTimestamp(),
         });
     } catch (e) {
         console.warn('createNotification failed:', e.message);

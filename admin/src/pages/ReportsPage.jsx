@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { Search, Trash2, CheckCircle, AlertTriangle, Eye, FileText, X } from 'lucide-react';
 import './UsersPage.css';
 
@@ -23,13 +22,11 @@ export default function ReportsPage() {
         setLoading(true);
         try {
             if (tab === 'reports') {
-                const q = query(collection(db, 'reports'), orderBy('createdAt', 'desc'));
-                const snap = await getDocs(q);
-                setReports(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const { data } = await supabase.from('reports').select('*').order('createdAt', { ascending: false });
+                if (data) setReports(data);
             } else {
-                const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'));
-                const snap = await getDocs(q);
-                setReviews(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const { data } = await supabase.from('reviews').select('*').order('createdAt', { ascending: false });
+                if (data) setReviews(data);
             }
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -45,7 +42,7 @@ export default function ReportsPage() {
 
     const handleResolveReport = async (reportId) => {
         try {
-            await updateDoc(doc(db, 'reports', reportId), { status: 'resolved' });
+            await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
             setReports(reports.map(r => r.id === reportId ? { ...r, status: 'resolved' } : r));
         } catch (error) {
             alert("Error al resolver el reporte");
@@ -55,7 +52,7 @@ export default function ReportsPage() {
     const handleDeleteReport = async (reportId) => {
         if (window.confirm('¿Eliminar reporte?')) {
             try {
-                await deleteDoc(doc(db, 'reports', reportId));
+                await supabase.from('reports').delete().eq('id', reportId);
                 setReports(reports.filter(r => r.id !== reportId));
             } catch (error) {
                 alert("Error al eliminar el reporte");
@@ -66,7 +63,7 @@ export default function ReportsPage() {
     const handleDeleteReview = async (reviewId) => {
         if (window.confirm('¿Eliminar reseña de la plataforma? Esto afectará la puntuación del cuidador.')) {
             try {
-                await deleteDoc(doc(db, 'reviews', reviewId));
+                await supabase.from('reviews').delete().eq('id', reviewId);
                 setReviews(reviews.filter(r => r.id !== reviewId));
             } catch (error) {
                 alert("Error al eliminar la reseña");
@@ -130,7 +127,7 @@ export default function ReportsPage() {
                                         <tr><td colSpan="5" className="empty-cell">No hay reportes activos</td></tr>
                                     ) : (
                                         filteredReports.map(report => {
-                                            const created = report.createdAt?.toDate ? report.createdAt.toDate().toLocaleDateString('es-ES') : '';
+                                            const created = report.createdAt ? new Date(report.createdAt).toLocaleDateString('es-ES') : '';
                                             return (
                                                 <tr key={report.id}>
                                                     <td>{created}</td>
@@ -182,7 +179,7 @@ export default function ReportsPage() {
                                         <tr><td colSpan="4" className="empty-cell">No hay reseñas</td></tr>
                                     ) : (
                                         filteredReviews.map(review => {
-                                            const created = review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString('es-ES') : '';
+                                            const created = review.createdAt ? new Date(review.createdAt).toLocaleDateString('es-ES') : '';
                                             return (
                                                 <tr key={review.id}>
                                                     <td>{created}</td>
@@ -240,7 +237,7 @@ export default function ReportsPage() {
                                         {tab === 'reports' ? `Reporte de ${selectedItem.reporterName}` : `Reseña de ${selectedItem.reviewerName}`}
                                     </h3>
                                     <p className="premium-profile-subtitle" style={{color: 'white', fontWeight: '500'}}>
-                                        {selectedItem.createdAt?.toDate ? selectedItem.createdAt.toDate().toLocaleString('es-ES') : 'Fecha desconocida'}
+                                        {selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleString('es-ES') : 'Fecha desconocida'}
                                     </p>
                                 </div>
                                 <div className="premium-top-right-badge">
