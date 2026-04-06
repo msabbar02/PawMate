@@ -8,9 +8,10 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    TouchableWithoutFeedback,
     Keyboard,
     Dimensions,
+    ScrollView,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -108,14 +109,52 @@ export default function LoginScreen({ navigation }) {
         }
     };
 
+    const handleResetPassword = async () => {
+        if (!formData.email.trim()) {
+            setErrors({ email: 'Ingresa tu correo para restablecer la contraseña.' });
+            return;
+        }
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(formData.email);
+            if (error) throw error;
+            Alert.alert('¡Enlace enviado! ✉️', 'Revisa tu correo para cambiar la contraseña.');
+        } catch (error) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleMagicLink = async () => {
+        if (!formData.email.trim()) {
+            setErrors({ email: 'Ingresa un correo para mandar el Magic Link.' });
+            return;
+        }
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
+            if (error) throw error;
+            Alert.alert('¡Magic Link enviado! 🪄', 'Pide a tu compi que revise su correo para entrar.');
+        } catch (error) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <StatusBar style="dark" />
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View style={styles.scrollContent}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+            >
 
                     <View style={styles.decorativeCircle1} />
                     <View style={styles.decorativeCircle2} />
@@ -158,7 +197,7 @@ export default function LoginScreen({ navigation }) {
                                 onTogglePassword={() => setShowPassword(!showPassword)}
                             />
 
-                            <TouchableOpacity style={styles.forgotPassword}>
+                            <TouchableOpacity style={styles.forgotPassword} onPress={handleResetPassword}>
                                 <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
                             </TouchableOpacity>
 
@@ -173,6 +212,18 @@ export default function LoginScreen({ navigation }) {
                                     <ActivityIndicator color={COLORS.background} />
                                 ) : (
                                     <Text style={styles.submitButtonText}>Entrar</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.submitButton, { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.primary, marginTop: 12 }]}
+                                onPress={handleMagicLink}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color={COLORS.primary} />
+                                ) : (
+                                    <Text style={[styles.submitButtonText, { color: COLORS.primary }]}>Mandar Magic Link 🪄</Text>
                                 )}
                             </TouchableOpacity>
 
@@ -205,15 +256,14 @@ export default function LoginScreen({ navigation }) {
                         </View>
 
                     </View>
-                </View>
-            </TouchableWithoutFeedback>
+            </ScrollView>
         </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    scrollContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+    scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
     decorativeCircle1: { position: 'absolute', top: -100, right: -50, width: 300, height: 300, borderRadius: 150, backgroundColor: COLORS.primaryLight, opacity: 0.2 },
     decorativeCircle2: { position: 'absolute', bottom: -150, left: -100, width: 400, height: 400, borderRadius: 200, backgroundColor: COLORS.primary, opacity: 0.1 },
     glassCard: { width: '100%', maxWidth: 400, backgroundColor: COLORS.glass, borderRadius: 30, padding: 25, shadowColor: COLORS.primary, shadowOpacity: 0.1, shadowOffset: { width: 0, height: 10 }, shadowRadius: 30, elevation: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },

@@ -49,7 +49,7 @@ const Field = ({ label, value, onChangeText, placeholder, keyboardType, editable
 
 // ─── Main Component ───────────────────────────────────────────
 export default function ProfileScreen({ navigation }) {
-    const { userData, user } = useContext(AuthContext);
+    const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
 
     // ── Editable fields state (initialized from userData)
@@ -164,6 +164,7 @@ export default function ProfileScreen({ navigation }) {
             // Save as base64 directly to Supabase storage by using saveAvatarToFirestore (now maps to Supabase)
             const base64Url = await saveAvatarToFirestore(localUri, user.id);
             setPhotoUri(base64Url);
+            await refreshUserData();
         } catch (e) {
             // Revert to previous photo on failure
             const prev = rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null;
@@ -173,6 +174,19 @@ export default function ProfileScreen({ navigation }) {
             setUploadingPhoto(false);
         }
     };
+
+    // ── Profile Completion ──────────────────────────────────
+    const completionFields = [
+        !!firstName.trim(),
+        !!lastName.trim(),
+        !!phone.trim(),
+        !!city.trim(),
+        !!postalCode.trim(),
+        !!province.trim(),
+        !!photoUri,
+        birthDate && birthDate.getFullYear() !== 1990,
+    ];
+    const completionPercent = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
 
     // ── Save All Profile Data ──────────────────────────────
     const handleSave = async () => {
@@ -184,7 +198,6 @@ export default function ProfileScreen({ navigation }) {
                 lastName:     lastName.trim(),
                 fullName:     `${firstName.trim()} ${lastName.trim()}`.trim(),
                 phone:        phone.trim(),
-                // Store location in 'address' sub-object to match existing schema
                 address: {
                     city:       city.trim(),
                     postalCode: postalCode.trim(),
@@ -192,10 +205,14 @@ export default function ProfileScreen({ navigation }) {
                     country:    country.trim(),
                 },
                 city:         city.trim(),
+                postalCode:   postalCode.trim(),
+                province:     province.trim(),
+                country:      country.trim(),
                 birthDate:    birthDate.toISOString(),
                 saveWalks,
                 saveLocation,
             }).eq('id', user.id);
+            await refreshUserData();
             Alert.alert('✅ Guardado', 'Tu perfil ha sido actualizado.');
         } catch (e) {
             Alert.alert('Error', 'No se pudo guardar. Inténtalo de nuevo.');
@@ -301,6 +318,31 @@ export default function ProfileScreen({ navigation }) {
                         </View>
                     ))}
                 </View>
+
+                {/* ── PROFILE COMPLETION BAR ── */}
+                {completionPercent < 100 && (
+                    <View style={[styles.section, { paddingTop: 14 }]}>
+                        <View style={[styles.completionCard, { backgroundColor: theme.cardBackground }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <Text style={[styles.completionTitle, { color: theme.text }]}>
+                                    Completa tu perfil
+                                </Text>
+                                <Text style={[styles.completionPercent, { color: COLORS.primary }]}>
+                                    {completionPercent}%
+                                </Text>
+                            </View>
+                            <View style={styles.completionTrack}>
+                                <View style={[styles.completionFill, { width: `${completionPercent}%` }]} />
+                            </View>
+                            <Text style={[styles.completionHint, { color: theme.textSecondary }]}>
+                                {!photoUri ? '📷 Añade una foto de perfil' :
+                                 !phone.trim() ? '📞 Añade tu teléfono' :
+                                 !city.trim() ? '📍 Añade tu ciudad' :
+                                 '✨ ¡Ya casi está!'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
 
                 {/* ── PERSONAL DATA ── */}
                 <View style={styles.section}>
@@ -597,4 +639,21 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
     },
     logoutBtnText: { fontWeight: '700', fontSize: 15 },
+
+    // Profile completion bar
+    completionCard: {
+        borderRadius: 18, padding: 16,
+        shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    },
+    completionTitle: { fontSize: 15, fontWeight: '800' },
+    completionPercent: { fontSize: 18, fontWeight: '900' },
+    completionTrack: {
+        height: 8, borderRadius: 4,
+        backgroundColor: COLORS.border, overflow: 'hidden',
+    },
+    completionFill: {
+        height: 8, borderRadius: 4,
+        backgroundColor: COLORS.primary,
+    },
+    completionHint: { fontSize: 13, marginTop: 10, fontWeight: '500' },
 });

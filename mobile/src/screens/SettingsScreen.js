@@ -60,8 +60,8 @@ PawMate · soporte@pawmate.app
 Para consultas sobre privacidad: privacidad@pawmate.app`;
 
 export default function SettingsScreen({ navigation }) {
-    const { userData, user } = useContext(AuthContext);
-    const { theme, toggleTheme, isDarkMode } = useContext(ThemeContext);
+    const { userData, user, refreshUserData } = useContext(AuthContext);
+    const { theme, toggleTheme, isDarkMode, isLeftHanded, toggleHandedness } = useContext(ThemeContext);
 
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [photoUri, setPhotoUri]             = useState(userData?.photoURL || null);
@@ -127,6 +127,7 @@ export default function SettingsScreen({ navigation }) {
         try {
             const url = await uploadImageToStorage(localUri, `avatars/${user.id}.jpg`);
             await supabase.from('users').update({ photoURL: url, avatar: url }).eq('id', user.id);
+            await refreshUserData();
         } catch {
             Alert.alert('Error', 'No se pudo subir la foto.');
         } finally {
@@ -190,6 +191,7 @@ export default function SettingsScreen({ navigation }) {
             await supabase.from('users').update({ emergencyContacts: newContacts }).eq('id', user.id);
             setEmergencyContacts(newContacts);
             setShowContactModal(false);
+            await refreshUserData();
         } catch { Alert.alert('Error', 'No se pudo guardar el contacto.'); }
         finally { setSavingContact(false); }
     };
@@ -204,6 +206,7 @@ export default function SettingsScreen({ navigation }) {
                     try {
                         await supabase.from('users').update({ emergencyContacts: newContacts }).eq('id', user.id);
                         setEmergencyContacts(newContacts);
+                        await refreshUserData();
                     } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
                 },
             },
@@ -379,11 +382,25 @@ export default function SettingsScreen({ navigation }) {
                         iconBg={isDarkMode ? theme.primaryBg : '#FEF9C3'}
                         label={isDarkMode ? 'Modo oscuro' : 'Modo claro'}
                         sublabel="Cambia el aspecto de la app"
-                        last
                         right={
                             <Switch
                                 value={isDarkMode}
                                 onValueChange={toggleTheme}
+                                trackColor={{ false: theme.border, true: theme.primary }}
+                                thumbColor="#FFF"
+                            />
+                        }
+                    />
+                    <SettingRow
+                        icon="hand-left-outline"
+                        iconBg={isLeftHanded ? theme.primaryBg : '#FEF9C3'}
+                        label="Modo zurdo"
+                        sublabel="Mueve los botones al lado izquierdo"
+                        last
+                        right={
+                            <Switch
+                                value={isLeftHanded}
+                                onValueChange={toggleHandedness}
                                 trackColor={{ false: theme.border, true: theme.primary }}
                                 thumbColor="#FFF"
                             />

@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import {
     Flame, Clock, Plus, QrCode, X, PenSquare, Bell, Map,
-    Share2, ChevronRight, Phone, User
+    Share2, ChevronRight, Phone, User, Trash2, StopCircle, Eye
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { StatusBar } from 'expo-status-bar';
@@ -17,11 +17,14 @@ import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
-import { uploadImageToStorage } from '../utils/storageHelpers';
+import { uploadPetImage } from '../utils/storageHelpers';
+import { logActivity } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -113,7 +116,7 @@ const EMPTY_FORM = {
 // ═══════════════════════════════════════════════════
 export default function PawMatePetsCenter() {
     const { user } = useContext(AuthContext);
-    const { theme, isDarkMode } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
+    const { theme, isDarkMode, isLeftHanded } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
 
     // ── Core State ──────────────────────────────────
     const [pets, setPets] = useState([]);
@@ -249,6 +252,51 @@ export default function PawMatePetsCenter() {
         });
     }, [selectedPet, user?.email]);
 
+    const generatePawPortPDF = async () => {
+        if (!selectedPet) return;
+        try {
+            const html = `
+            <html>
+                <body style="font-family: Helvetica, Arial, sans-serif; padding: 40px; color: #1a1a2e; background-color: #f8fafc;">
+                    <div style="text-align: center; border-bottom: 3px solid #00c48c; padding-bottom: 20px; margin-bottom: 30px;">
+                        <h1 style="color: #00c48c; font-size: 36px; margin: 0;">PASAPORTE BIOMÉTRICO PAWMATE</h1>
+                        <h2 style="color: #4a5568; font-size: 24px; margin-top: 10px;">${selectedPet.name}</h2>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <div style="flex: 1; margin-right: 20px;">
+                            <h3 style="color: #00c48c; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Datos Básicos</h3>
+                            <p><strong>Especie:</strong> ${getSpeciesLabel(selectedPet.species)}</p>
+                            <p><strong>Raza:</strong> ${selectedPet.breed || 'N/A'}</p>
+                            <p><strong>Sexo:</strong> ${selectedPet.gender === 'female' ? 'Hembra' : 'Macho'}</p>
+                            <p><strong>Peso:</strong> ${selectedPet.weight || 'N/A'} kg</p>
+                            <p><strong>Color:</strong> ${selectedPet.color || 'N/A'}</p>
+                            <p><strong>Chip ID:</strong> ${selectedPet.chipId || 'N/A'}</p>
+                        </div>
+                        <div style="flex: 1;">
+                            <h3 style="color: #ef4444; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Datos Médicos / Emergencia</h3>
+                            <p><strong>⚠️ Alergias:</strong> ${selectedPet.allergies || 'Ninguna documentada'}</p>
+                            <p><strong>💊 Medicamentos:</strong> ${selectedPet.medications || 'Ninguno'}</p>
+                            <p><strong>📋 Condiciones:</strong> ${selectedPet.medicalConditions || 'Ninguna'}</p>
+                            <p><strong>Veterinario:</strong> ${selectedPet.vetName || 'N/A'} (${selectedPet.vetPhone || 'Sin teléfono'})</p>
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin-top: 50px; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+                        Documento generado por <strong>PawMate App</strong>. Propiedad de ${user?.email || 'Usuario PawMate'}.
+                    </div>
+                </body>
+            </html>
+            `;
+            const { uri } = await Print.printToFileAsync({ html });
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri);
+            } else {
+                Alert.alert('Error', 'Tu dispositivo no soporta compartir este archivo.');
+            }
+        } catch (e) {
+            Alert.alert('Error', 'No se pudo generar el PDF del pasaporte.');
+        }
+    };
+
     // ─────────────────────────────────────────────────
     // NAVIGATION with fade transition
     // ─────────────────────────────────────────────────
@@ -308,6 +356,8 @@ export default function PawMatePetsCenter() {
             const newActivity = { ...(selectedPet.activity || {}), km: newTotal };
             await supabase.from('pets').update({ activity: newActivity }).eq('id', selectedPet.id);
             
+            await logActivity(user?.id, 'Paseo Completado', `${totalKm} km en la saca con ${selectedPet?.name}`, 'walk', 'walk');
+
             Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas`);
         } catch (e) {
             Alert.alert('Error', 'No se pudo guardar el paseo');
@@ -356,17 +406,39 @@ export default function PawMatePetsCenter() {
         if (!formParams.name.trim()) return Alert.alert('Error', 'El nombre es obligatorio');
         try {
             let imageUrl = formParams.image;
-            // Upload image to Supabase/Firebase Storage if it's a local URI
-            if (formParams.image && !formParams.image.startsWith('http')) {
+            // Upload image to Supabase Storage using dedicated pet upload function
+            if (formParams.image && !formParams.image.startsWith('http') && !formParams.image.startsWith('data:')) {
                 const uid = user?.id;
                 const timestamp = Date.now();
                 const path = `pets/${uid}/${timestamp}.jpg`;
-                imageUrl = await uploadImageToStorage(formParams.image, path);
+                imageUrl = await uploadPetImage(formParams.image, path);
             }
-            const dataToSave = { ...formParams, image: imageUrl };
+
+            // Build data object with only valid schema columns
+            const dataToSave = {
+                name: formParams.name.trim(),
+                species: formParams.species,
+                breed: formParams.breed || null,
+                weight: formParams.weight ? parseFloat(formParams.weight) : null,
+                gender: formParams.gender || null,
+                sex: formParams.gender === 'female' ? 'female' : 'male',
+                birthdate: formParams.birthdate || null,
+                color: formParams.color || null,
+                sterilized: formParams.sterilized || false,
+                chipId: formParams.chipId || null,
+                allergies: formParams.allergies || null,
+                medications: formParams.medications || null,
+                medicalConditions: formParams.medicalConditions || null,
+                insurance: formParams.insurance || null,
+                vetName: formParams.vetName || null,
+                vetPhone: formParams.vetPhone || null,
+                image: imageUrl,
+                photoURL: imageUrl,
+            };
 
             if (isEditing && selectedPet) {
                 await supabase.from('pets').update(dataToSave).eq('id', selectedPet.id);
+                await logActivity(user?.id, 'Mascota Actualizada', `Perfil de ${dataToSave.name} editado con éxito`, 'pet', 'create-outline');
             } else {
                 await supabase.from('pets').insert({
                     ...dataToSave,
@@ -375,13 +447,50 @@ export default function PawMatePetsCenter() {
                     vaccines: [],
                     reminders: [],
                 });
+                await logActivity(user?.id, 'Nueva Mascota', `Damos la bienvenida a ${dataToSave.name} 🐾`, 'pet', 'paw');
             }
             setIsFormVisible(false);
             resetForm();
         } catch (e) {
             console.error('handleSavePet error:', e);
             Alert.alert('Error', 'No se pudo guardar la mascota');
+        } finally {
+            // Force re-fetch since Realtime might not be hooked up correctly on the DB
+            const { data } = await supabase.from('pets').select('*').eq('ownerId', user?.id || '');
+            if (data) setPets(data);
         }
+    };
+
+    const handleDeletePet = (petId) => {
+        Alert.alert('Eliminar mascota', '¿Seguro que quieres eliminar esta mascota? Esta acción es irreversible.', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Eliminar', style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await supabase.from('pets').delete().eq('id', petId);
+                        setPets(prev => prev.filter(p => p.id !== petId));
+                        if (selectedPet?.id === petId) setViewMode('list');
+                        Alert.alert('Mascota eliminada');
+                    } catch (e) { Alert.alert('Error', 'No se pudo eliminar la mascota'); }
+                }
+            }
+        ]);
+    };
+
+    const handleDeleteWalk = (walkId) => {
+        Alert.alert('Eliminar paseo', '¿Seguro que quieres eliminar este paseo del historial?', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Eliminar', style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await supabase.from('walks').delete().eq('id', walkId);
+                        setWalks(prev => prev.filter(w => w.id !== walkId));
+                    } catch (e) { Alert.alert('Error', 'No se pudo eliminar el paseo'); }
+                }
+            }
+        ]);
     };
 
     const resetForm = () => {
@@ -483,12 +592,6 @@ export default function PawMatePetsCenter() {
         >
             <View style={styles.listHeaderRow}>
                 <Text style={[styles.screenTitle, { color: theme.text }]}>Mis Mascotas</Text>
-                <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={() => { resetForm(); setIsFormVisible(true); }}
-                >
-                    <Plus size={22} color="#FFF" />
-                </TouchableOpacity>
             </View>
 
             {pets.length === 0 ? (
@@ -543,11 +646,24 @@ export default function PawMatePetsCenter() {
                         {/* Actions */}
                         <View style={[styles.petCardBottom, { borderTopColor: theme.border }]}>
                             <TouchableOpacity
-                                style={[styles.editChip, { backgroundColor: theme.primaryBg }]}
+                                style={[styles.actionChip, { backgroundColor: theme.primaryBg, marginRight: 8 }]}
                                 onPress={() => openEditModal(pet)}
                             >
                                 <PenSquare size={14} color={COLORS.primary} />
-                                <Text style={styles.editChipText}>Editar</Text>
+                                <Text style={[styles.actionChipText, { color: COLORS.primary }]}>Editar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.actionChip, { backgroundColor: theme.cardBackground, borderWidth: 1, borderColor: theme.border, marginRight: 8 }]}
+                                onPress={() => navigateTo('detail', pet)}
+                            >
+                                <Eye size={14} color={theme.textSecondary} />
+                                <Text style={[styles.actionChipText, { color: theme.textSecondary }]}>Ver detalles</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.actionChip, { backgroundColor: '#FEE2E2', marginLeft: 'auto' }]}
+                                onPress={() => handleDeletePet(pet.id)}
+                            >
+                                <Trash2 size={14} color="#EF4444" />
                             </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
@@ -622,23 +738,23 @@ export default function PawMatePetsCenter() {
                     </View>
                 )}
 
-                {/* QR Paw-Port */}
+                {/* QR Paw-Port / PDF */}
                 <TouchableOpacity
                     style={styles.passportBanner}
-                    onPress={() => setIsPassportVisible(true)}
+                    onPress={generatePawPortPDF}
                     activeOpacity={0.88}
                 >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <View style={styles.passportIconBox}>
-                            <QrCode size={24} color={COLORS.primary} />
+                            <Ionicons name="document-text" size={24} color={COLORS.primary} />
                         </View>
                         <View style={{ marginLeft: 14 }}>
-                            <Text style={styles.passportTitle}>Paw-Port QR Biométrico</Text>
-                            <Text style={styles.passportSub}>ID de emergencia digital</Text>
+                            <Text style={styles.passportTitle}>Paw-Port Biométrico PDF</Text>
+                            <Text style={styles.passportSub}>Descargar ID de emergencia completo</Text>
                         </View>
                     </View>
                     <View style={styles.passportChevron}>
-                        <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+                        <Ionicons name="download-outline" size={18} color={COLORS.primary} />
                     </View>
                 </TouchableOpacity>
 
@@ -723,12 +839,22 @@ export default function PawMatePetsCenter() {
                         const region = hasRoute ? getRouteRegion(walk.route) : null;
                         const mins = Math.round((walk.durationSeconds || 0) / 60);
                         const walkDate = walk.endTime ? new Date(walk.endTime) : null;
+                        const totalKm = parseFloat(walk.totalKm) || 0;
+                        const paceMin = (walk.durationSeconds > 0 && totalKm > 0)
+                            ? Math.floor((walk.durationSeconds / 60) / totalKm)
+                            : 0;
+                        const paceSec = (walk.durationSeconds > 0 && totalKm > 0)
+                            ? Math.round(((walk.durationSeconds / 60) / totalKm - paceMin) * 60)
+                            : 0;
+                        const speedKmh = (walk.durationSeconds > 0 && totalKm > 0)
+                            ? (totalKm / (walk.durationSeconds / 3600)).toFixed(1)
+                            : '0.0';
 
                         return (
-                            <View key={walk.id} style={[styles.walkCard, { backgroundColor: theme.cardBackground }]}>
+                            <View key={walk.id} style={{ marginBottom: 18, borderRadius: 22, overflow: 'hidden', backgroundColor: theme.cardBackground, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: isDarkMode ? 0 : 1, borderColor: theme.border }}>
                                 {/* Map Thumbnail */}
                                 {hasRoute && region && (
-                                    <View style={styles.walkMapBox}>
+                                    <View style={{ height: 200, position: 'relative' }}>
                                         <MapView
                                             style={StyleSheet.absoluteFillObject}
                                             provider={PROVIDER_GOOGLE}
@@ -737,10 +863,17 @@ export default function PawMatePetsCenter() {
                                             scrollEnabled={false}
                                             pitchEnabled={false}
                                             rotateEnabled={false}
+                                            customMapStyle={!isDarkMode ? [] : [
+                                                { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+                                                { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+                                                { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+                                                { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+                                                { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+                                            ]}
                                         >
                                             <Polyline
                                                 coordinates={walk.route}
-                                                strokeColor={COLORS.primary}
+                                                strokeColor="#FF6B35"
                                                 strokeWidth={4}
                                             />
                                             <Marker coordinate={walk.route[0]} pinColor="green" />
@@ -756,7 +889,7 @@ export default function PawMatePetsCenter() {
                                 {/* Walk Stats */}
                                 <View style={styles.walkInfo}>
                                     {walkDate && (
-                                        <Text style={styles.walkDate}>
+                                        <Text style={[styles.walkDate, { color: theme.textSecondary }]}>
                                             {walkDate.toLocaleDateString('es-ES', {
                                                 weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
                                             })}
@@ -773,16 +906,24 @@ export default function PawMatePetsCenter() {
                                             />
                                         )}
                                     </View>
-
-                                    {/* Share Button */}
-                                    <TouchableOpacity
-                                        style={styles.shareBtn}
-                                        onPress={() => shareWalk(walk)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Share2 size={15} color={COLORS.secondary} />
-                                        <Text style={styles.shareBtnText}>Compartir en Redes Sociales</Text>
-                                    </TouchableOpacity>
+                                    {/* Action Buttons Row */}
+                                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                                        <TouchableOpacity
+                                            style={[styles.shareBtn, { flex: 1, backgroundColor: isDarkMode ? '#282942' : '#F3F4F6' }]}
+                                            onPress={() => shareWalk(walk)}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Share2 size={15} color={COLORS.secondary} />
+                                            <Text style={[styles.shareBtnText, { color: theme.text }]}>Compartir</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.shareBtn, { backgroundColor: '#FEE2E2', paddingHorizontal: 16 }]}
+                                            onPress={() => handleDeleteWalk(walk.id)}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Trash2 size={15} color="#EF4444" />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
                         );
@@ -969,6 +1110,18 @@ export default function PawMatePetsCenter() {
             {viewMode === 'list' ? renderListView() : renderDetailView()}
 
             {/* ── MODAL: CREAR / EDITAR MASCOTA ──────── */}
+            {!isFormVisible && viewMode === 'list' && (
+                <TouchableOpacity
+                    style={[
+                        styles.fabBtn,
+                        isLeftHanded ? { left: 20 } : { right: 20 }
+                    ]}
+                    onPress={() => { resetForm(); setIsFormVisible(true); }}
+                >
+                    <Plus size={24} color="#FFF" />
+                </TouchableOpacity>
+            )}
+
             <Modal visible={isFormVisible} animationType="slide" presentationStyle="formSheet">
                 <KeyboardAvoidingView
                     style={{ flex: 1, backgroundColor: theme.background }}
@@ -1460,13 +1613,25 @@ const styles = StyleSheet.create({
     petBadgeText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
     petCardBottom: {
         borderTopWidth: 1, borderTopColor: '#e2ede8',
-        marginTop: 14, paddingTop: 12, flexDirection: 'row', justifyContent: 'flex-end',
+        marginTop: 14, paddingTop: 12, flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8,
     },
+    actionChip: {
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
+    },
+    actionChipText: { fontWeight: '700', fontSize: 13 },
     editChip: {
         flexDirection: 'row', alignItems: 'center', gap: 5,
-        backgroundColor: '#e8f5ee', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12,
+        backgroundColor: '#e8f5ee', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
     },
     editChipText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
+    fabBtn: {
+        position: 'absolute', bottom: 20,
+        backgroundColor: COLORS.primary, width: 56, height: 56, borderRadius: 28,
+        justifyContent: 'center', alignItems: 'center',
+        shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5,
+        zIndex: 100,
+    },
 
     emptyCard: {
         backgroundColor: COLORS.surface, borderRadius: 24, padding: 40,

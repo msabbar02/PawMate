@@ -30,6 +30,22 @@ CREATE TABLE IF NOT EXISTS public.users (
   "totalMinutes" integer DEFAULT 0,
   "emergencyContacts" jsonb DEFAULT '[]'::jsonb,
   "fcmToken" text,
+  -- Verification fields
+  "verificationRequestedAt" timestamp with time zone,
+  "pendingRole" text,
+  "idFrontUrl" text,
+  "idBackUrl" text,
+  "selfieUrl" text,
+  "certDocUrl" text,
+  -- Caregiver-specific fields
+  "acceptedSpecies" text[],
+  "serviceTypes" text[],
+  "serviceRadius" integer,
+  "maxConcurrentWalks" integer,
+  "maxConcurrentHotel" integer,
+  latitude numeric,
+  longitude numeric,
+  "isOnline" boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -42,67 +58,30 @@ CREATE TABLE IF NOT EXISTS public.pets (
   breed text,
   weight numeric,
   "photoURL" text,
+  image text,
   size text,
   "energyLevel" text,
   description text,
   "birthDate" timestamp with time zone,
+  birthdate timestamp with time zone,
   sex text,
+  gender text,
+  color text,
+  sterilized boolean DEFAULT false,
+  "chipId" text,
+  allergies text,
+  medications text,
+  "medicalConditions" text,
+  insurance text,
+  "vetName" text,
+  "vetPhone" text,
+  activity jsonb DEFAULT '{}'::jsonb,
+  vaccines jsonb DEFAULT '[]'::jsonb,
+  reminders jsonb DEFAULT '[]'::jsonb,
   created_at timestamp with time zone DEFAULT now()
 );
 
--- 3. Tabla: posts
-CREATE TABLE IF NOT EXISTS public.posts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "authorUid" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "authorName" text,
-  "authorRole" text,
-  "authorPhotoURL" text,
-  caption text,
-  "imageUrl" text,      -- Mantenido por retrocompatibilidad
-  "imageUrls" text[],   -- Array para multiples imagenes
-  "speciesTags" text[],
-  "likesCount" integer DEFAULT 0,
-  "commentsCount" integer DEFAULT 0,
-  "engagementScore" integer DEFAULT 0,
-  "likedBy" uuid[] DEFAULT '{}',
-  created_at timestamp with time zone DEFAULT now()
-);
-
--- 4. Tabla: comments
-CREATE TABLE IF NOT EXISTS public.comments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "postId" uuid REFERENCES public.posts(id) ON DELETE CASCADE,
-  "authorUid" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "authorName" text,
-  "authorPhotoURL" text,
-  text text NOT NULL,
-  "replyTo" jsonb,
-  "likedBy" uuid[] DEFAULT '{}',
-  "likesCount" integer DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now()
-);
-
--- 5. Tabla: friendRequests
-CREATE TABLE IF NOT EXISTS public."friendRequests" (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "fromUid" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "fromName" text,
-  "fromPhotoURL" text,
-  "toUid" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "toName" text,
-  status text DEFAULT 'pending', -- 'pending', 'accepted', 'rejected'
-  created_at timestamp with time zone DEFAULT now()
-);
-
--- 6. Tabla: friends (tabla relacional muchos a muchos)
-CREATE TABLE IF NOT EXISTS public.friends (
-  "userId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "friendId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  created_at timestamp with time zone DEFAULT now(),
-  PRIMARY KEY ("userId", "friendId")
-);
-
--- 7. Tabla: preferences
+-- 3. Tabla: preferences
 CREATE TABLE IF NOT EXISTS public.preferences (
   "userId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
   species text,
@@ -110,20 +89,7 @@ CREATE TABLE IF NOT EXISTS public.preferences (
   PRIMARY KEY ("userId", species)
 );
 
--- 8. Tabla: reports
-CREATE TABLE IF NOT EXISTS public.reports (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "postId" uuid REFERENCES public.posts(id) ON DELETE SET NULL, -- Si el post se borra, el reporte persiste
-  "reporterUid" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "reporterName" text,
-  "authorUid" uuid REFERENCES public.users(id) ON DELETE CASCADE,
-  "authorName" text,
-  reason text,
-  status text DEFAULT 'pending', -- 'pending', 'resolved', 'dismissed'
-  created_at timestamp with time zone DEFAULT now()
-);
-
--- 9. Tabla: notifications
+-- 4. Tabla: notifications
 CREATE TABLE IF NOT EXISTS public.notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "userId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
@@ -138,7 +104,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at timestamp with time zone DEFAULT now()
 );
 
--- 10. Tabla: reservations
+-- 5. Tabla: reservations
 CREATE TABLE IF NOT EXISTS public.reservations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "ownerId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
@@ -154,7 +120,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   created_at timestamp with time zone DEFAULT now()
 );
 
--- 11. Tabla: messages
+-- 6. Tabla: messages
 CREATE TABLE IF NOT EXISTS public.messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "senderId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
@@ -165,11 +131,57 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at timestamp with time zone DEFAULT now()
 );
 
+-- 7. Tabla: walks
+CREATE TABLE IF NOT EXISTS public.walks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "petId" uuid REFERENCES public.pets(id) ON DELETE CASCADE,
+  route jsonb DEFAULT '[]'::jsonb,
+  "totalKm" numeric DEFAULT 0,
+  calories integer DEFAULT 0,
+  "durationSeconds" integer DEFAULT 0,
+  "startTime" timestamp with time zone,
+  "endTime" timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- 8. Tabla: recent_activity
+CREATE TABLE IF NOT EXISTS public.recent_activity (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text,
+  type text, -- 'pet', 'walk', 'reservation', 'system', 'profile'
+  icon text DEFAULT 'paw',
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- ==========================================
+-- REALTIME
+-- ==========================================
+-- Activar Realtime en las tablas clave usando REPLICA IDENTITY FULL
+-- Esto asgura poder escuchar los deletes/updates a nivel cliente.
+ALTER TABLE public.pets REPLICA IDENTITY FULL;
+ALTER TABLE public.walks REPLICA IDENTITY FULL;
+ALTER TABLE public.messages REPLICA IDENTITY FULL;
+ALTER TABLE public.reservations REPLICA IDENTITY FULL;
+ALTER TABLE public.recent_activity REPLICA IDENTITY FULL;
+
+-- IMPORTANTE: Crear la publicación supabase_realtime si no existe o añadirle las tablas.
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime;
+COMMIT;
+ALTER PUBLICATION supabase_realtime ADD TABLE 
+  public.pets, 
+  public.walks, 
+  public.messages, 
+  public.reservations,
+  public.notifications,
+  public.recent_activity;
+
 -- ==========================================
 -- TRIGGER DE AUTENTICACION
 -- ==========================================
--- Este trigger crea automáticamente un registro en public.users
--- cada vez que un usuario se registra mediante Supabase Auth
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger as $$
 BEGIN
@@ -190,10 +202,11 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- ==========================================
--- ACTIVACION RLS (Row Level Security) (OPCIONAL/INICIAL)
--- Para simplificar la migración al inicio, las politicas 
--- permitiran el acceso anonimo/autenticado total. 
--- DEBES restringir esto despues para producción.
--- ==========================================
--- (Puedes omitir esto si quieres gestionar las politicas desde el Panel de Supabase)
+-- IMPORTANTE: POLÍTICAS RLS BÁSICAS PARA DESARROLLO (Podes tunear luego)
+ALTER TABLE public.pets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.walks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recent_activity ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "pets_accessAll" ON public.pets FOR ALL USING (true);
+CREATE POLICY "walks_accessAll" ON public.walks FOR ALL USING (true);
+CREATE POLICY "activity_accessAll" ON public.recent_activity FOR ALL USING (true);

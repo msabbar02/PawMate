@@ -8,7 +8,6 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    TouchableWithoutFeedback,
     Keyboard,
     Dimensions,
     ScrollView,
@@ -102,6 +101,20 @@ export default function SignupScreen({ navigation }) {
         return isValid;
     };
 
+    const checkEmailExists = async (email) => {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', email.toLowerCase().trim())
+                .maybeSingle();
+            if (error) return false;
+            return !!data;
+        } catch {
+            return false;
+        }
+    };
+
     const handleSignup = async () => {
         Keyboard.dismiss();
 
@@ -111,31 +124,66 @@ export default function SignupScreen({ navigation }) {
         setErrors({});
 
         try {
-            // 1. Crear el usuario en Supabase Auth
-            const { error } = await supabase.auth.signUp({
-                email: formData.email,
+            // Check email already registered
+            const emailTaken = await checkEmailExists(formData.email);
+            if (emailTaken) {
+                setErrors({ email: 'Este correo electrónico ya está registrado.' });
+                return;
+            }
+
+            const { data, error } = await supabase.auth.signUp({
+                email: formData.email.toLowerCase().trim(),
                 password: formData.password,
                 options: {
                     data: {
-                        fullName: formData.fullName,
-                        firstName: formData.fullName.split(' ')[0],
-                        lastName: formData.fullName.split(' ').slice(1).join(' ') || ''
+                        fullName: formData.fullName.trim(),
+                        firstName: formData.fullName.trim().split(' ')[0],
+                        lastName: formData.fullName.trim().split(' ').slice(1).join(' ') || '',
+                        email: formData.email.toLowerCase().trim(),
                     }
                 }
             });
-            if (error) throw error;
 
-            // El trigger en la base de datos de Supabase se encarga de crear el doc en public.users
-            // El onAuthStateChanged general se encargará de la redirección
-        } catch (error) {
-            console.error("Supabase Signup Error:", error.message);
-            let errorMsg = 'Ocurrió un error. Intenta de nuevo.';
-            if (error.message.includes('User already registered')) {
-                errorMsg = 'Este correo electrónico ya está registrado.';
-            } else if (error.message.includes('FetchError') || error.message.includes('Network request failed')) {
-                errorMsg = 'Error de red. Revisa tu conexión a internet.';
+            // Supabase devuelve error si falla el envío del email de confirmación
+            // pero el usuario SÍ queda creado — en ese caso mostramos mensaje amigable
+            if (error) {
+                const msg = error.message || '';
+                if (
+                    msg.toLowerCase().includes('sending confirmation email') ||
+                    msg.toLowerCase().includes('email') ||
+                    msg.toLowerCase().includes('smtp')
+                ) {
+                    // Usuario creado pero email de confirmación falló
+                    // Si hay sesión activa, el AuthContext redirigirá automáticamente
+                    if (!data?.session) {
+                        setErrors({
+                            form: '¡Cuenta creada! Revisa tu bandeja de entrada para confirmar tu correo.',
+                        });
+                    }
+                    return;
+                }
+                if (msg.includes('User already registered') || msg.includes('already registered')) {
+                    setErrors({ email: 'Este correo electrónico ya está registrado.' });
+                    return;
+                }
+                if (msg.includes('FetchError') || msg.includes('Network request failed') || msg.includes('fetch')) {
+                    setErrors({ form: 'Error de red. Revisa tu conexión a internet.' });
+                    return;
+                }
+                throw error;
             }
-            setErrors({ form: errorMsg });
+
+            // Si no se requiere confirmación de email, el usuario queda logueado
+            // y AuthContext lo redirige automáticamente.
+            // Si se requiere confirmación, mostramos aviso.
+            if (data?.user && !data?.session) {
+                setErrors({
+                    form: '¡Cuenta creada! Revisa tu correo para confirmar tu cuenta.',
+                });
+            }
+        } catch (error) {
+            console.error('Supabase Signup Error:', error.message);
+            setErrors({ form: 'Ocurrió un error. Inténtalo de nuevo.' });
         } finally {
             setLoading(false);
         }
@@ -144,11 +192,15 @@ export default function SignupScreen({ navigation }) {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <StatusBar style="dark" />
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                >
 
                     <View style={styles.decorativeCircle1} />
                     <View style={styles.decorativeCircle2} />
@@ -234,7 +286,14 @@ export default function SignupScreen({ navigation }) {
                             </View>
                             {errors.terms && <Text style={[styles.errorText, { marginTop: -10, marginBottom: 15 }]}>{errors.terms}</Text>}
 
-                            {errors.form && <Text style={styles.serverError}>{errors.form}</Text>}
+                            {errors.form && (
+                                <Text style={[
+                                    styles.serverError,
+                                    errors.form.includes('creada') && { backgroundColor: '#16a34a' }
+                                ]}>
+                                    {errors.form}
+                                </Text>
+                            )}
 
                             <TouchableOpacity
                                 style={styles.submitButton}
@@ -259,7 +318,6 @@ export default function SignupScreen({ navigation }) {
 
                     </View>
                 </ScrollView>
-            </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
     );
 }

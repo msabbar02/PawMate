@@ -1,10 +1,10 @@
 import React, { useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 
@@ -12,8 +12,10 @@ import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import MyPetsScreen from '../screens/MyPetsScreen';
-import CommunityScreen from '../screens/CommunityScreen';
 import BookingScreen from '../screens/BookingScreen';
+import CaregiversScreen from '../screens/CaregiversScreen';
+import CaregiverProfileScreen from '../screens/CaregiverProfileScreen';
+import MessagesScreen from '../screens/MessagesScreen';
 import VerifyOwnerScreen from '../screens/VerifyOwnerScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -21,6 +23,36 @@ import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// ── Profile Incomplete Banner ──────────────────────────────────
+function ProfileIncompleteBanner() {
+    const { userData } = useContext(AuthContext);
+    const { theme } = useContext(ThemeContext);
+    const navigation = useNavigation();
+
+    if (!userData) return null;
+
+    const missing = [];
+    if (!userData.firstName && !userData.fullName) missing.push('nombre');
+    if (!userData.phone) missing.push('teléfono');
+    if (!userData.city && !userData.address?.city) missing.push('ciudad');
+
+    if (missing.length === 0) return null;
+
+    return (
+        <TouchableOpacity
+            style={styles.incompleteBanner}
+            onPress={() => navigation.navigate('Profile')}
+            activeOpacity={0.85}
+        >
+            <Ionicons name="alert-circle-outline" size={18} color="#fff" />
+            <Text style={styles.incompleteBannerText}>
+                Completa tu perfil: falta {missing.join(', ')}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color="#fff" />
+        </TouchableOpacity>
+    );
+}
 
 // Wrapper that locks the Booking tab for 'normal' users
 function BookingTabScreen() {
@@ -79,8 +111,8 @@ const MainTabNavigator = () => {
                             );
                         }
                         iconName = focused ? 'calendar' : 'calendar-outline';
-                    } else if (route.name === 'Comunidad') {
-                        iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+                    } else if (route.name === 'Cuidadores') {
+                        iconName = focused ? 'people' : 'people-outline';
                     } else if (route.name === 'Ajustes') {
                         iconName = focused ? 'settings' : 'settings-outline';
                     }
@@ -121,9 +153,9 @@ const MainTabNavigator = () => {
                 options={{ tabBarLabel: 'Reservas' }}
             />
             <Tab.Screen
-                name="Comunidad"
-                component={CommunityScreen}
-                options={{ tabBarLabel: 'Comunidad' }}
+                name="Cuidadores"
+                component={CaregiversScreen}
+                options={{ tabBarLabel: 'Cuidadores' }}
             />
             <Tab.Screen
                 name="Ajustes"
@@ -133,6 +165,15 @@ const MainTabNavigator = () => {
         </Tab.Navigator>
     );
 };
+
+function MainTabsWithBanner() {
+    return (
+        <View style={{ flex: 1 }}>
+            <ProfileIncompleteBanner />
+            <MainTabNavigator />
+        </View>
+    );
+}
 
 export default function AppNavigator() {
     const { user, isLoading } = useContext(AuthContext);
@@ -151,7 +192,20 @@ export default function AppNavigator() {
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {user ? (
                     <>
-                        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+                        <Stack.Screen
+                            name="MainTabs"
+                            component={MainTabsWithBanner}
+                        />
+                        <Stack.Screen
+                            name="CaregiverProfile"
+                            component={CaregiverProfileScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen 
+                            name="Messages" 
+                            component={MessagesScreen} 
+                            options={{ headerShown: false }} 
+                        />
                         <Stack.Screen
                             name="Verify"
                             component={VerifyOwnerScreen}
@@ -185,6 +239,21 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
+    incompleteBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f59e0b',
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        gap: 8,
+        paddingTop: Platform.OS === 'ios' ? 52 : 9,
+    },
+    incompleteBannerText: {
+        flex: 1,
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+    },
     lockContainer: {
         flex: 1,
         justifyContent: 'center',

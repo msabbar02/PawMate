@@ -6,12 +6,25 @@ export const AuthContext = createContext({
     user: null, // The Supabase user object
     userData: null, // Additional user data from Postgres
     isLoading: true, // Loading state
+    refreshUserData: async () => {}, // Force manual refresh of user data
 });
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    const refreshUserData = async () => {
+        if (!user) return;
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+        if (data && !error) {
+            setUserData(data);
+        }
+    };
 
     useEffect(() => {
         let subscriptionChannel = null;
@@ -85,7 +98,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, userData, isLoading }}>
+        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData }}>
             {children}
         </AuthContext.Provider>
     );

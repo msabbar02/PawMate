@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
+import { uploadVerificationDoc } from '../utils/storageHelpers';
 
 const SPECIES_OPTIONS = [
     { value: 'dog',    label: '🐕 Perro' },
@@ -77,19 +78,29 @@ export default function VerifyOwnerScreen({ navigation }) {
 
         setSubmitting(true);
         try {
+            const uid = user?.id;
+            const ts = Date.now();
+
+            // Upload all docs to Supabase Storage in parallel
+            const [frontUrl, backUrl, selfieUrl, certUrl] = await Promise.all([
+                uploadVerificationDoc(idFront, `verification/${uid}/${ts}_front.jpg`),
+                uploadVerificationDoc(idBack, `verification/${uid}/${ts}_back.jpg`),
+                uploadVerificationDoc(selfie, `verification/${uid}/${ts}_selfie.jpg`),
+                certDoc ? uploadVerificationDoc(certDoc, `verification/${uid}/${ts}_cert.jpg`) : Promise.resolve(null),
+            ]);
+
             const updateData = {
                 verificationStatus: 'pending',
                 verificationRequestedAt: new Date().toISOString(),
                 pendingRole: targetRole,
-                // In production: upload images to Supabase Storage and store URLs
-                idFrontUrl: idFront,
-                idBackUrl: idBack,
-                selfieUrl: selfie,
+                idFrontUrl: frontUrl,
+                idBackUrl: backUrl,
+                selfieUrl: selfieUrl,
             };
 
             if (targetRole === 'caregiver') {
                 Object.assign(updateData, {
-                    certDocUrl: certDoc,
+                    certDocUrl: certUrl,
                     acceptedSpecies,
                     serviceTypes,
                     serviceRadius: parseInt(serviceRadius) || 5,
@@ -98,11 +109,12 @@ export default function VerifyOwnerScreen({ navigation }) {
                 });
             }
 
-            if (user?.id) {
-                await supabase.from('users').update(updateData).eq('id', user.id);
+            if (uid) {
+                await supabase.from('users').update(updateData).eq('id', uid);
             }
             setStep(3);
         } catch (e) {
+            console.error('Verification submit error:', e);
             Alert.alert('Error', 'No se pudo enviar la solicitud. Inténtalo de nuevo.');
         } finally {
             setSubmitting(false);
