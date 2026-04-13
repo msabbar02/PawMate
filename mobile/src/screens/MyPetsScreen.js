@@ -24,7 +24,7 @@ import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 import { uploadPetImage } from '../utils/storageHelpers';
-import { logActivity } from '../utils/logger';
+import { logActivity, logSystemAction } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -115,7 +115,7 @@ const EMPTY_FORM = {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════
 export default function PawMatePetsCenter() {
-    const { user } = useContext(AuthContext);
+    const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
 
     // ── Core State ──────────────────────────────────
@@ -255,35 +255,102 @@ export default function PawMatePetsCenter() {
     const generatePawPortPDF = async () => {
         if (!selectedPet) return;
         try {
+            const age = getAge(selectedPet?.birthdate) || 'Desconocida';
+            const genderStr = selectedPet.gender === 'female' ? 'Hembra' : 'Macho';
             const html = `
-            <html>
-                <body style="font-family: Helvetica, Arial, sans-serif; padding: 40px; color: #1a1a2e; background-color: #f8fafc;">
-                    <div style="text-align: center; border-bottom: 3px solid #00c48c; padding-bottom: 20px; margin-bottom: 30px;">
-                        <h1 style="color: #00c48c; font-size: 36px; margin: 0;">PASAPORTE BIOMÉTRICO PAWMATE</h1>
-                        <h2 style="color: #4a5568; font-size: 24px; margin-top: 10px;">${selectedPet.name}</h2>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <div style="flex: 1; margin-right: 20px;">
-                            <h3 style="color: #00c48c; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Datos Básicos</h3>
-                            <p><strong>Especie:</strong> ${getSpeciesLabel(selectedPet.species)}</p>
-                            <p><strong>Raza:</strong> ${selectedPet.breed || 'N/A'}</p>
-                            <p><strong>Sexo:</strong> ${selectedPet.gender === 'female' ? 'Hembra' : 'Macho'}</p>
-                            <p><strong>Peso:</strong> ${selectedPet.weight || 'N/A'} kg</p>
-                            <p><strong>Color:</strong> ${selectedPet.color || 'N/A'}</p>
-                            <p><strong>Chip ID:</strong> ${selectedPet.chipId || 'N/A'}</p>
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 40px; background-color: #f0fdf4; color: #1e293b; }
+                    .passport-container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 2px solid #22c55e; }
+                    .header { background: linear-gradient(135deg, #15803d, #22c55e); color: white; padding: 30px 40px; display: flex; align-items: center; justify-content: space-between; }
+                    .header h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+                    .header p { margin: 5px 0 0; opacity: 0.9; font-size: 14px; }
+                    .header-logo { font-size: 40px; }
+                    .content { padding: 40px; display: flex; gap: 40px; }
+                    .avatar-section { flex: 0 0 200px; text-align: center; }
+                    .avatar { width: 180px; height: 180px; border-radius: 90px; object-fit: cover; border: 6px solid #f0fdf4; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: #e2e8f0; font-size: 80px; line-height: 180px; margin: 0 auto 20px; }
+                    .pet-name { font-size: 32px; font-weight: 900; margin: 0 0 5px; color: #166534; }
+                    .pet-tag { display: inline-block; background: #dcfce7; color: #166534; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+                    .info-section { flex: 1; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+                    .info-box { background: #f8fafc; padding: 15px; border-radius: 12px; border-left: 4px solid #22c55e; }
+                    .info-label { font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 5px; }
+                    .info-val { font-size: 16px; font-weight: 600; color: #0f172a; margin: 0; }
+                    .medical-section { background: #fee2e2; border-radius: 16px; padding: 25px; border: 1px solid #fecaca; }
+                    .medical-title { color: #b91c1c; font-size: 18px; font-weight: 800; margin: 0 0 20px; display: flex; align-items: center; gap: 10px; }
+                    .medical-item { margin-bottom: 15px; }
+                    .medical-item:last-child { margin-bottom: 0; }
+                    .medical-label { font-size: 13px; color: #991b1b; font-weight: bold; margin-bottom: 3px; }
+                    .medical-val { font-size: 15px; color: #7f1d1d; margin: 0; }
+                    .footer { text-align: center; padding: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; background: #f8fafc; }
+                </style>
+            </head>
+            <body>
+                <div class="passport-container">
+                    <div class="header">
+                        <div>
+                            <h1>Paw-Port Biométrico</h1>
+                            <p>Documento de Identificación y Emergencia</p>
                         </div>
-                        <div style="flex: 1;">
-                            <h3 style="color: #ef4444; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Datos Médicos / Emergencia</h3>
-                            <p><strong>⚠️ Alergias:</strong> ${selectedPet.allergies || 'Ninguna documentada'}</p>
-                            <p><strong>💊 Medicamentos:</strong> ${selectedPet.medications || 'Ninguno'}</p>
-                            <p><strong>📋 Condiciones:</strong> ${selectedPet.medicalConditions || 'Ninguna'}</p>
-                            <p><strong>Veterinario:</strong> ${selectedPet.vetName || 'N/A'} (${selectedPet.vetPhone || 'Sin teléfono'})</p>
+                        <div class="header-logo">🐾</div>
+                    </div>
+                    <div class="content">
+                        <div class="avatar-section">
+                            ${selectedPet.image 
+                                ? `<img src="${selectedPet.image}" class="avatar" />`
+                                : `<div class="avatar">${getSpeciesEmoji(selectedPet.species)}</div>`
+                            }
+                            <h2 class="pet-name">${selectedPet.name}</h2>
+                            <div class="pet-tag">${getSpeciesLabel(selectedPet.species)}</div>
+                        </div>
+                        <div class="info-section">
+                            <h3 style="color: #166534; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 0;">Datos del Animal</h3>
+                            <div class="info-grid">
+                                <div class="info-box"><div class="info-label">Raza</div><p class="info-val">${selectedPet.breed || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">Sexo y Edad</div><p class="info-val">${genderStr} • ${age}</p></div>
+                                <div class="info-box"><div class="info-label">Nº Microchip</div><p class="info-val" style="font-family: monospace; letter-spacing: 1px;">${selectedPet.chipId || 'Sin registrar'}</p></div>
+                                <div class="info-box"><div class="info-label">Peso / Color</div><p class="info-val">${selectedPet.weight ? selectedPet.weight + ' kg' : '—'} • ${selectedPet.color || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">Dueño Responsable</div><p class="info-val">${user?.email || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">Teléfono del Dueño</div><p class="info-val">${userData?.phone || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">Esterilizado</div><p class="info-val">${selectedPet.sterilized ? 'Sí' : 'No'}</p></div>
+                            </div>
+                            
+                            <div class="medical-section">
+                                <h3 class="medical-title">🏥 Información Médica y Emergencias</h3>
+                                <div class="medical-item">
+                                    <div class="medical-label">Alergias</div>
+                                    <p class="medical-val">${selectedPet.allergies || 'Ninguna documentada'}</p>
+                                </div>
+                                <div class="medical-item">
+                                    <div class="medical-label">Medicamentos Actuales</div>
+                                    <p class="medical-val">${selectedPet.medications || 'Ninguno'}</p>
+                                </div>
+                                <div class="medical-item">
+                                    <div class="medical-label">Condiciones Médicas</div>
+                                    <p class="medical-val">${selectedPet.medicalConditions || 'Ninguna'}</p>
+                                </div>
+                                <div style="display: flex; gap: 20px; margin-top: 20px; padding-top: 15px; border-top: 1px dashed #fca5a5;">
+                                    <div style="flex: 1;">
+                                        <div class="medical-label">Veterinario Principal</div>
+                                        <p class="medical-val">${selectedPet.vetName || 'No especificado'}</p>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div class="medical-label">Teléfono Emergencia</div>
+                                        <p class="medical-val">${selectedPet.vetPhone || 'No especificado'}</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div style="text-align: center; margin-top: 50px; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                        Documento generado por <strong>PawMate App</strong>. Propiedad de ${user?.email || 'Usuario PawMate'}.
+                    <div class="footer">
+                        Documento oficial generado por la aplicación <strong>PawMate</strong> en fecha ${new Date().toLocaleDateString('es-ES')}.<br/>
+                        En caso de encontrar esta mascota, por favor contactar de inmediato con su dueño o veterinario habitual.
                     </div>
-                </body>
+                </div>
+            </body>
             </html>
             `;
             const { uri } = await Print.printToFileAsync({ html });
@@ -357,6 +424,7 @@ export default function PawMatePetsCenter() {
             await supabase.from('pets').update({ activity: newActivity }).eq('id', selectedPet.id);
             
             await logActivity(user?.id, 'Paseo Completado', `${totalKm} km en la saca con ${selectedPet?.name}`, 'walk', 'walk');
+            await logSystemAction(user?.id, userData?.email || 'Desconocido', 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: selectedPet?.name });
 
             Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas`);
         } catch (e) {
@@ -439,6 +507,7 @@ export default function PawMatePetsCenter() {
             if (isEditing && selectedPet) {
                 await supabase.from('pets').update(dataToSave).eq('id', selectedPet.id);
                 await logActivity(user?.id, 'Mascota Actualizada', `Perfil de ${dataToSave.name} editado con éxito`, 'pet', 'create-outline');
+                await logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_UPDATED', 'Pets', { petName: dataToSave.name });
             } else {
                 await supabase.from('pets').insert({
                     ...dataToSave,
@@ -448,6 +517,7 @@ export default function PawMatePetsCenter() {
                     reminders: [],
                 });
                 await logActivity(user?.id, 'Nueva Mascota', `Damos la bienvenida a ${dataToSave.name} 🐾`, 'pet', 'paw');
+                await logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_CREATED', 'Pets', { petName: dataToSave.name });
             }
             setIsFormVisible(false);
             resetForm();
@@ -740,21 +810,24 @@ export default function PawMatePetsCenter() {
 
                 {/* QR Paw-Port / PDF */}
                 <TouchableOpacity
-                    style={styles.passportBanner}
+                    style={[styles.passportBanner, { backgroundColor: isDarkMode ? '#1e293b' : '#1e1b4b', padding: 22, borderRadius: 24, marginTop: 16, shadowColor: '#312e81', shadowOpacity: 0.3, shadowRadius: 15, elevation: 8, borderWidth: 1, borderColor: '#4338ca', overflow: 'hidden', justifyContent: 'center' }]}
                     onPress={generatePawPortPDF}
                     activeOpacity={0.88}
                 >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={styles.passportIconBox}>
-                            <Ionicons name="document-text" size={24} color={COLORS.primary} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 2, paddingRight: 40 }}>
+                        <View style={[styles.passportIconBox, { backgroundColor: '#4f46e5', width: 50, height: 50, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name="document-text" size={26} color="#FFF" />
                         </View>
-                        <View style={{ marginLeft: 14 }}>
-                            <Text style={styles.passportTitle}>Paw-Port Biométrico PDF</Text>
-                            <Text style={styles.passportSub}>Descargar ID de emergencia completo</Text>
+                        <View style={{ marginLeft: 16, flex: 1 }}>
+                            <Text style={[styles.passportTitle, { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }]}>PREMIUM PAW-PORT</Text>
+                            <Text style={[styles.passportSub, { color: '#a5b4fc', fontSize: 13, marginTop: 2 }]}>Documento oficial biométrico PDF</Text>
                         </View>
                     </View>
-                    <View style={styles.passportChevron}>
-                        <Ionicons name="download-outline" size={18} color={COLORS.primary} />
+                    <View style={[styles.passportChevron, { position: 'absolute', right: 22, backgroundColor: 'rgba(255,255,255,0.15)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', zIndex: 3 }]}>
+                        <Ionicons name="download-outline" size={20} color="#FFF" />
+                    </View>
+                    <View style={{ position: 'absolute', right: -20, bottom: -20, opacity: 0.1, zIndex: 1, transform: [{ rotate: '-15deg' }] }}>
+                        <Ionicons name="shield-checkmark" size={130} color="#FFF" />
                     </View>
                 </TouchableOpacity>
 

@@ -11,6 +11,7 @@ import ReservationsPage from './pages/ReservationsPage';
 import MessagesPage from './pages/MessagesPage';
 import CommunityPage from './pages/CommunityPage';
 import ReportsPage from './pages/ReportsPage';
+import LogsPage from './pages/LogsPage';
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated } = useContext(AuthContext);
@@ -39,6 +40,7 @@ function App() {
         <Route path="messages" element={<MessagesPage />} />
         <Route path="community" element={<CommunityPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="logs" element={<LogsPage />} />
       </Route>
     </Routes>
   );

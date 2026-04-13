@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { registerForPushNotifications } from '../utils/pushNotifications';
+import { logSystemAction } from '../utils/logger';
 
 export const AuthContext = createContext({
     user: null, // The Supabase user object
@@ -87,6 +88,11 @@ export const AuthProvider = ({ children }) => {
         // Listen for changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
             handleAuthChange(session);
+            if (_evt === 'SIGNED_IN' && session?.user) {
+                logSystemAction(session.user.id, session.user.email, 'USER_LOGIN', 'Auth', { event: _evt });
+            } else if (_evt === 'SIGNED_OUT') {
+                logSystemAction(user?.id || 'Sistema', user?.email || 'Sistema', 'USER_LOGOUT', 'Auth', { event: _evt });
+            }
         });
 
         return () => {

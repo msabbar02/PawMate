@@ -93,46 +93,72 @@ const MainTabNavigator = () => {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
+                tabBarShowLabel: false,
+                tabBarIcon: ({ focused, color }) => {
                     let iconName;
-                    if (route.name === 'Home') {
-                        iconName = focused ? 'home' : 'home-outline';
-                    } else if (route.name === 'Mascotas') {
-                        iconName = focused ? 'paw' : 'paw-outline';
-                    } else if (route.name === 'Reservas') {
-                        if (isLocked) {
-                            return (
-                                <View style={{ position: 'relative' }}>
-                                    <Ionicons name="calendar-outline" size={size} color={color} />
-                                    <View style={styles.lockBadge}>
-                                        <Ionicons name="lock-closed" size={8} color="#fff" />
-                                    </View>
-                                </View>
-                            );
-                        }
-                        iconName = focused ? 'calendar' : 'calendar-outline';
-                    } else if (route.name === 'Cuidadores') {
-                        iconName = focused ? 'people' : 'people-outline';
-                    } else if (route.name === 'Ajustes') {
-                        iconName = focused ? 'settings' : 'settings-outline';
+                    if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
+                    else if (route.name === 'Mascotas') iconName = focused ? 'paw' : 'paw-outline';
+                    else if (route.name === 'Reservas') {
+                        iconName = isLocked ? 'lock-closed' : (focused ? 'calendar' : 'calendar-outline');
                     }
-                    return <Ionicons name={iconName} size={size} color={color} />;
+                    else if (route.name === 'Cuidadores') iconName = focused ? 'people' : 'people-outline';
+                    else if (route.name === 'Ajustes') iconName = focused ? 'settings' : 'settings-outline';
+
+                    const primaryColor = theme.primary || '#10b981';
+                    const routeLabel = route.name === 'Reservas' ? 'Reservas' : route.name === 'Mascotas' ? 'Mascotas' : route.name === 'Cuidadores' ? 'Cuidar' : route.name === 'Ajustes' ? 'Ajustes' : 'Inicio';
+
+                    if (focused) {
+                        return (
+                            <View style={{ alignItems: 'center', justifyContent: 'center', width: 60, height: 70 }}>
+                                <View style={{
+                                    position: 'absolute',
+                                    top: -8, // Lowered even further per request
+                                    width: 50,
+                                    height: 50,
+                                    borderRadius: 25,
+                                    backgroundColor: primaryColor,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    borderWidth: 4,
+                                    borderColor: theme.background || '#f8fafc',
+                                    shadowColor: primaryColor,
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 5,
+                                    elevation: 6,
+                                }}>
+                                    <Ionicons name={iconName} size={22} color="#FFF" />
+                                </View>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: primaryColor, position: 'absolute', bottom: 8 }}>
+                                    {routeLabel}
+                                </Text>
+                            </View>
+                        );
+                    }
+
+                    return (
+                        <View style={{ alignItems: 'center', justifyContent: 'center', width: 60, height: 70 }}>
+                            <Ionicons name={iconName} size={24} color="#94a3b8" />
+                            {isLocked && route.name === 'Reservas' && (
+                                <View style={[styles.lockBadge, { position: 'absolute', top: 12, right: 12 }]}>
+                                    <Ionicons name="lock-closed" size={10} color="#fff" />
+                                </View>
+                            )}
+                            <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                                {routeLabel}
+                            </Text>
+                        </View>
+                    );
                 },
-                tabBarActiveTintColor: theme.tabBarActive,
-                tabBarInactiveTintColor: theme.tabBarInactive,
                 tabBarStyle: {
-                    backgroundColor: theme.tabBar,
-                    borderTopColor: theme.border,
-                    borderTopWidth: 1,
-                    elevation: 0,
-                    shadowOpacity: 0,
-                    height: Platform.OS === 'ios' ? 84 : 60,
-                    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-                    paddingTop: 8,
-                },
-                tabBarLabelStyle: {
-                    fontSize: 11,
-                    fontWeight: '600',
+                    backgroundColor: theme.tabBar || '#ffffff',
+                    height: Platform.OS === 'ios' ? 85 : 65,
+                    borderTopWidth: 0,
+                    elevation: 10,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: -2 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 10,
                 },
                 headerShown: false,
             })}

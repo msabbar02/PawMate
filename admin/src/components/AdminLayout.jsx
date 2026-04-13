@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { 
     LayoutDashboard, Users, Dog, CalendarDays, 
     MessageSquare, Globe, AlertTriangle, 
-    LogOut, Menu, X 
+    LogOut, Menu, X, Activity
 } from 'lucide-react';
 import './AdminLayout.css';
 
@@ -29,6 +29,7 @@ export default function AdminLayout() {
         { path: '/messages', label: 'Mensajes', icon: <MessageSquare size={20} /> },
         { path: '/community', label: 'Comunidad', icon: <Globe size={20} /> },
         { path: '/reports', label: 'Reportes y Reseñas', icon: <AlertTriangle size={20} /> },
+        { path: '/logs', label: 'Audit Logs', icon: <Activity size={20} /> },
     ];
 
     return (

@@ -210,3 +210,13 @@ ALTER TABLE public.recent_activity ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "pets_accessAll" ON public.pets FOR ALL USING (true);
 CREATE POLICY "walks_accessAll" ON public.walks FOR ALL USING (true);
 CREATE POLICY "activity_accessAll" ON public.recent_activity FOR ALL USING (true);
+
+-- ==========================================
+-- MIGRATION: REALTIME MAP MODULES (execute in Supabase SQL Editor)
+-- ==========================================
+-- Columna para Modo Manada 🐾
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "isGroupWalking" boolean DEFAULT false;
+
+-- Activar Realtime en public.users (para cuidadores online + modo manada)
+ALTER TABLE public.users REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.users;

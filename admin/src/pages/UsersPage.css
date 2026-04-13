@@ -12,20 +12,21 @@
 }
 
 .admin-table th {
-    padding: 16px;
-    font-size: 13px;
-    font-weight: 600;
+    padding: 16px 20px;
+    font-size: 12px;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 1px;
     border-bottom: 1px solid var(--border-color);
-    background-color: rgba(15, 23, 42, 0.4);
+    background-color: rgba(255, 255, 255, 0.02);
 }
 
 .admin-table td {
-    padding: 16px;
+    padding: 16px 20px;
     vertical-align: middle;
     border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
 }
 
 .admin-table tr:last-child td {
@@ -33,7 +34,7 @@
 }
 
 .admin-table tr:hover td {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: rgba(255, 255, 255, 0.04);
 }
 
 .empty-cell {
@@ -85,18 +86,20 @@
 
 .search-box input, .filter-select, .form-control {
     width: 100%;
-    padding: 12px 14px;
-    background-color: rgba(15, 23, 42, 0.6);
+    padding: 14px 16px;
+    background-color: rgba(15, 23, 42, 0.4);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 12px;
     color: var(--text-main);
     font-size: 14px;
+    transition: all 0.3s ease;
 }
-.search-box input { padding-left: 40px; }
+.search-box input { padding-left: 44px; }
 
 .search-box input:focus, .filter-select:focus, .form-control:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .filter-select {

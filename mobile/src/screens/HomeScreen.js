@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity,
-    Image, ActivityIndicator, Platform, ScrollView
+    Image, ActivityIndicator, Platform, Modal, Animated
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -12,6 +12,21 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 
+const DARK_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+    { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#4b6878' }] },
+    { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#64779e' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2c6675' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4e6d70' }] },
+    { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
+
 export default function HomeScreen({ navigation }) {
     const { userData, user } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = useContext(ThemeContext);
@@ -19,10 +34,15 @@ export default function HomeScreen({ navigation }) {
     const [location, setLocation] = useState(null);
     const [cityName, setCityName] = useState('');
     const [weatherData, setWeatherData] = useState({ temp: '--', icon: 'partly-sunny' });
-    const [caregivers, setCaregivers] = useState([]);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-    const [recentActivity, setRecentActivity] = useState([]);
-    const [loadingActivity, setLoadingActivity] = useState(true);
+    const [panelOpen, setPanelOpen] = useState(true);
+    const panelAnim = useRef(new Animated.Value(1)).current; // 1=open, 0=closed
+    const [onlineCaregivers, setOnlineCaregivers] = useState([]);
+    const [groupWalkers, setGroupWalkers] = useState([]);
+    const [isGroupWalking, setIsGroupWalking] = useState(false);
+    const [selectedCaregiver, setSelectedCaregiver] = useState(null);
+    const [mapMode, setMapMode] = useState('caregivers'); // 'caregivers' | 'pack'
+    const realtimeRefs = useRef([]);
 
     const mapRef = useRef(null);
 
@@ -45,38 +65,63 @@ export default function HomeScreen({ navigation }) {
             } catch { /* ignore */ }
 
             fetchWeather(latitude, longitude);
-            fetchCaregivers();
-            fetchRecentActivity();
+            fetchOnlineCaregivers();
+            fetchGroupWalkers();
         })();
+        return () => { realtimeRefs.current.forEach(c => supabase.removeChannel(c)); };
     }, []);
 
-    const fetchRecentActivity = async () => {
-        if (!user?.id) return;
-        setLoadingActivity(true);
+    const fetchOnlineCaregivers = async () => {
         try {
-            const { data } = await supabase.from('recent_activity')
-                .select('*')
-                .eq('userId', user.id)
-                .order('created_at', { ascending: false })
-                .limit(4);
-            setRecentActivity(data || []);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoadingActivity(false);
-        }
+            const { data } = await supabase.from('users')
+                .select('id,fullName,avatar,photoURL,latitude,longitude,isOnline')
+                .eq('role', 'caregiver').eq('isOnline', true)
+                .not('latitude', 'is', null).not('longitude', 'is', null);
+            setOnlineCaregivers(data || []);
+        } catch { /* ignore */ }
     };
 
-    const fetchCaregivers = async () => {
+    const fetchGroupWalkers = async () => {
         try {
-            const { data, error } = await supabase.from('users').select('*').eq('role', 'caregiver')
+            const { data } = await supabase.from('users')
+                .select('id,fullName,avatar,photoURL,latitude,longitude')
+                .eq('isGroupWalking', true)
                 .not('latitude', 'is', null).not('longitude', 'is', null);
-            if (error) throw error;
-            setCaregivers(data || []);
-        } catch (e) {
-            console.warn("fetchCaregivers error:", e.message);
-        }
+            setGroupWalkers(data || []);
+        } catch { /* ignore */ }
     };
+
+    // Realtime channels
+    useEffect(() => {
+        const cgChannel = supabase.channel('caregivers-online')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, ({ new: row }) => {
+                if (row.role !== 'caregiver') return;
+                setOnlineCaregivers(prev => {
+                    if (row.isOnline && row.latitude) {
+                        const exists = prev.find(c => c.id === row.id);
+                        return exists ? prev.map(c => c.id === row.id ? row : c) : [...prev, row];
+                    } else {
+                        return prev.filter(c => c.id !== row.id);
+                    }
+                });
+            }).subscribe();
+
+        const packChannel = supabase.channel('group-walkers')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, ({ new: row }) => {
+                setGroupWalkers(prev => {
+                    if (row.isGroupWalking && row.latitude) {
+                        const exists = prev.find(u => u.id === row.id);
+                        return exists ? prev.map(u => u.id === row.id ? row : u) : [...prev, row];
+                    } else {
+                        return prev.filter(u => u.id !== row.id);
+                    }
+                });
+            }).subscribe();
+
+        realtimeRefs.current = [cgChannel, packChannel];
+        return () => { supabase.removeChannel(cgChannel); supabase.removeChannel(packChannel); };
+    }, []);
+
 
     const fetchWeather = async (lat, lon) => {
         try {
@@ -120,6 +165,35 @@ export default function HomeScreen({ navigation }) {
         } catch { /* ignore */ }
     };
 
+    const handleToggleGroupWalk = async () => {
+        const newVal = !isGroupWalking;
+        setIsGroupWalking(newVal);
+        setMapMode(newVal ? 'pack' : 'caregivers');
+        if (!user?.id) return;
+        const update = { isGroupWalking: newVal };
+        if (newVal && location) { update.latitude = location.latitude; update.longitude = location.longitude; }
+        await supabase.from('users').update(update).eq('id', user.id);
+    };
+
+    const handleToggleOnline = async () => {
+        const newVal = !userData?.isOnline;
+        const update = { isOnline: newVal };
+        if (newVal && location) { update.latitude = location.latitude; update.longitude = location.longitude; }
+        await supabase.from('users').update(update).eq('id', user.id);
+    };
+
+    const togglePanel = () => {
+        const toVal = panelOpen ? 0 : 1;
+        setPanelOpen(!panelOpen);
+        Animated.spring(panelAnim, { toValue: toVal, useNativeDriver: false, tension: 80, friction: 12 }).start();
+    };
+
+    const isCaregiver = userData?.role === 'caregiver';
+
+    const handleStartWalk = () => {
+        navigation.navigate('Mascotas');
+    };
+
     const firstName = userData?.fullName?.split(' ')[0] || userData?.email?.split('@')[0] || 'amigo';
     const userPhoto = user?.photoURL || userData?.photoURL || null;
 
@@ -127,8 +201,10 @@ export default function HomeScreen({ navigation }) {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-            {/* SECCIÓN DEL MAPA SUPERIOR */}
-            <View style={styles.mapSection}>
+        {/* SECCIÓN DEL MAPA - crece cuando el panel está cerrado */}
+            <Animated.View style={[styles.mapSection, {
+                flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.68] })
+            }]}>
                 {location ? (
                     <MapView
                         ref={mapRef}
@@ -137,12 +213,22 @@ export default function HomeScreen({ navigation }) {
                         showsUserLocation
                         showsMyLocationButton={false}
                         showsCompass={false}
+                        customMapStyle={isDarkMode ? DARK_MAP_STYLE : []}
                     >
-                        {caregivers.map((cg) => (
-                            <Marker key={cg.id} coordinate={{ latitude: cg.latitude, longitude: cg.longitude }} onPress={() => navigation.navigate('CaregiverProfile', { caregiver: cg })}>
-                                <View style={[styles.mapPin, !cg.isOnline && { opacity: 0.75 }]}>
-                                    <Image source={{ uri: cg.avatar || 'https://via.placeholder.com/40' }} style={styles.pinAvatar} />
-                                    <View style={[styles.pinOnlineDot, { backgroundColor: cg.isOnline ? '#22c55e' : '#ef4444' }]} />
+                        {mapMode === 'caregivers' && onlineCaregivers.map(cg => (
+                            <Marker key={cg.id} coordinate={{ latitude: Number(cg.latitude), longitude: Number(cg.longitude) }} onPress={() => setSelectedCaregiver(cg)}>
+                                <View style={{ width: 46, height: 46, borderRadius: 23, borderWidth: 3, borderColor: '#22c55e', overflow: 'hidden', backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 6 }}>
+                                    <Image source={{ uri: cg.avatar || cg.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
+                                </View>
+                            </Marker>
+                        ))}
+                        {mapMode === 'pack' && groupWalkers.filter(u => u.id !== user?.id).map(u => (
+                            <Marker key={u.id} coordinate={{ latitude: Number(u.latitude), longitude: Number(u.longitude) }}>
+                                <View style={{ alignItems: 'center' }}>
+                                    <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 3, borderColor: '#f97316', overflow: 'hidden', backgroundColor: '#FFF' }}>
+                                        <Image source={{ uri: u.avatar || u.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
+                                    </View>
+                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>🐾 Manada</Text>
                                 </View>
                             </Marker>
                         ))}
@@ -160,12 +246,12 @@ export default function HomeScreen({ navigation }) {
                         <TouchableOpacity style={styles.userAvatarBox} onPress={() => navigation.navigate('Profile')}>
                             {userPhoto
                                 ? <Image source={{ uri: userPhoto }} style={styles.userAvatarImg} />
-                                : <Ionicons name="person" size={18} color="#FFF" />
+                                : <Ionicons name={"person"} size={18} color="#FFF" />
                             }
                         </TouchableOpacity>
 
                         <View style={styles.greetingWrap}>
-                            <Text style={[styles.greetHello, { color: theme.text }]} numberOfLines={1}>Hola, {firstName}</Text>
+                            <Text style={[styles.greetHello, { color: theme.text }]} numberOfLines={1}>¡Hola, {firstName}!</Text>
                             <View style={styles.weatherRow}>
                                 <Ionicons name={weatherData.icon} size={13} color="#f59e0b" />
                                 <Text style={styles.weatherText}>{weatherData.temp}°C</Text>
@@ -196,23 +282,28 @@ export default function HomeScreen({ navigation }) {
                 </TouchableOpacity>
 
                 {/* CURVA INFERIOR DEL MAPA */}
-                <View style={[styles.mapCurveBottom, { backgroundColor: theme.background }]} />
-            </View>
+                {panelOpen && <View style={[styles.mapCurveBottom, { backgroundColor: theme.background }]} />}
+            </Animated.View>
 
             {/* SECCIÓN INFERIOR: Dashboard y Cards */}
-            <View style={[styles.bottomSection, { backgroundColor: theme.background }]}>
+            <Animated.View style={[styles.bottomSection, { backgroundColor: theme.background, flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.32] }) }]}>
                 
-                {/* ACTION BAR (Se sale del mapa y "abraza" ambos mundos) */}
-                <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF' }]}>
+                {/* DRAG HANDLE */}
+                <TouchableOpacity onPress={togglePanel} style={{ alignItems: 'center', paddingVertical: 10 }}>
+                    <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border }} />
+                </TouchableOpacity>
+
+                {panelOpen && (
+                  <>
+                {/* ACTION BAR */}
+                <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF', marginTop: 4, position: 'relative', top: 0, left: 16, right: 16 }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
                             <Ionicons name="chatbubbles" size={22} color="#0ea5e9" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>Mensajes</Text>
                     </TouchableOpacity>
-
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
-
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Reservas')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
                             <Ionicons name="calendar" size={22} color="#f59e0b" />
@@ -221,83 +312,69 @@ export default function HomeScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
-                    
-                    <View style={styles.headerDashboard}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Mis Atajos</Text>
-                    </View>
-
-                    {/* BENTO GRID LAYOUT PARA SHORTCUTS */}
-                    <View style={styles.bentoGrid}>
-                        {/* Tarjeta grande: Mascotas */}
+                {/* ROLE-BASED CTA BUTTONS */}
+                <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 12, marginBottom: 12 }}>
+                    {!isCaregiver && (
                         <TouchableOpacity 
-                            style={[styles.bentoCard, styles.bentoLarge, { backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4' }]}
-                            onPress={() => navigation.navigate('Mascotas')}
+                            style={{ flex: 1, backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 }}
+                            onPress={handleStartWalk}
                         >
-                            <View style={[styles.bentoIconBadge, { backgroundColor: '#22c55e' }]}>
-                                <Ionicons name="paw" size={22} color="#FFF" />
-                            </View>
-                            <View style={{ marginTop: 'auto' }}>
-                                <Text style={[styles.bentoTitle, { color: isDarkMode ? '#FFF' : '#166534' }]}>Mascotas</Text>
-                                <Text style={[styles.bentoSub, { color: isDarkMode ? '#94a3b8' : '#22c55e' }]}>
-                                    {!loadingActivity ? `${recentActivity.length} en total` : 'Cargando...'}
-                                </Text>
-                            </View>
-                            <Ionicons name="arrow-forward-outline" size={18} color={isDarkMode ? '#94a3b8' : '#22c55e'} style={styles.bentoArrow} />
+                            <Ionicons name="walk" size={22} color="#FFF" style={{ marginRight: 8 }} />
+                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>Iniciar Paseo</Text>
                         </TouchableOpacity>
+                    )}
+                    {!isCaregiver && (
+                        <TouchableOpacity 
+                            style={{ flex: 1, backgroundColor: isGroupWalking ? '#f97316' : '#fff7ed', paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#f97316', elevation: isGroupWalking ? 4 : 0 }}
+                            onPress={handleToggleGroupWalk}
+                        >
+                            <Text style={{ fontSize: 16, marginRight: 6 }}>🐾</Text>
+                            <Text style={{ color: isGroupWalking ? '#FFF' : '#f97316', fontSize: 13, fontWeight: '800' }}>{isGroupWalking ? 'En Manada' : 'Modo Manada'}</Text>
+                        </TouchableOpacity>
+                    )}
+                    {isCaregiver && (
+                        <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: userData?.isOnline ? '#22c55e' : (isDarkMode ? '#1e293b' : '#f0fdf4'), paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#22c55e', elevation: userData?.isOnline ? 4 : 0 }}
+                            onPress={handleToggleOnline}
+                        >
+                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: userData?.isOnline ? '#FFF' : '#22c55e', marginRight: 8 }} />
+                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 14, fontWeight: '800' }}>{userData?.isOnline ? 'Online ✓' : 'Activar Online'}</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+                  </>
+                )}
 
-                        <View style={styles.bentoCol}>
-                            {/* Tarjeta pequeña: Ajustes */}
-                            <TouchableOpacity 
-                                style={[styles.bentoCard, styles.bentoSmall, { backgroundColor: isDarkMode ? '#334155' : '#eff6ff' }]}
-                                onPress={() => navigation.navigate('Profile')}
-                            >
-                                <View style={[styles.bentoIconBadge, { backgroundColor: '#3b82f6' }]}>
-                                    <Ionicons name="settings" size={20} color="#FFF" />
-                                </View>
-                                <View style={{ marginTop: 10 }}>
-                                    <Text style={[styles.bentoTitle, { color: isDarkMode ? '#FFF' : '#1e3a8a', fontSize: 16 }]}>Ajustes</Text>
-                                </View>
-                            </TouchableOpacity>
 
-                            {/* Tarjeta pequeña: Paseos */}
-                            <TouchableOpacity 
-                                style={[styles.bentoCard, styles.bentoSmall, { backgroundColor: isDarkMode ? '#475569' : '#fdf4ff', marginTop: 15 }]}
-                                onPress={() => navigation.navigate('Mascotas')}
+                {/* MODAL CALLOUT CUIDADOR */}
+                <Modal visible={!!selectedCaregiver} animationType="fade" transparent>
+                    <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setSelectedCaregiver(null)}>
+                        <View style={{ backgroundColor: theme.cardBackground, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 28, paddingBottom: Platform.OS === 'ios' ? 44 : 28 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                                <View style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 3, borderColor: '#22c55e', overflow: 'hidden', marginRight: 16 }}>
+                                    <Image source={{ uri: selectedCaregiver?.avatar || selectedCaregiver?.photoURL || 'https://via.placeholder.com/60' }} style={{ width: '100%', height: '100%' }} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>{selectedCaregiver?.fullName || 'Cuidador'}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                        <Ionicons name="star" size={14} color="#f59e0b" />
+                                        <Text style={{ fontSize: 13, color: theme.textSecondary, marginLeft: 4 }}>{selectedCaregiver?.rating ? Number(selectedCaregiver.rating).toFixed(1) : 'Nuevo'}</Text>
+                                        <View style={{ marginLeft: 10, backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                                            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>🟢 Online</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={{ backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, alignItems: 'center' }}
+                                onPress={() => { setSelectedCaregiver(null); navigation.navigate('CaregiverProfile', { caregiver: selectedCaregiver }); }}
                             >
-                                <View style={[styles.bentoIconBadge, { backgroundColor: '#d946ef' }]}>
-                                    <Ionicons name="walk" size={20} color="#FFF" />
-                                </View>
-                                <View style={{ marginTop: 10 }}>
-                                    <Text style={[styles.bentoTitle, { color: isDarkMode ? '#FFF' : '#701a75', fontSize: 16 }]}>Mis Paseos</Text>
-                                </View>
+                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>Ver Perfil</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
-
-                    {/* ACTIVITY LOG SECTION */}
-                    <View style={{ marginTop: 30, marginBottom: 15 }}>
-                        <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 18 }]}>Registro de Actividad</Text>
-                    </View>
-
-                    {recentActivity.length === 0 && !loadingActivity ? (
-                        <Text style={{ fontStyle: 'italic', color: theme.textSecondary, marginLeft: 2 }}>No hay actividad reciente aún.</Text>
-                    ) : (
-                        recentActivity.map((log) => (
-                            <View key={log.id} style={[styles.logCard, { backgroundColor: isDarkMode ? theme.surface : '#f8fafc' }]}>
-                                <View style={[styles.logIconBox, { backgroundColor: COLORS.primaryBg }]}>
-                                    <Ionicons name={log.icon || 'paw'} size={18} color={COLORS.primary} />
-                                </View>
-                                <View style={styles.logInfo}>
-                                    <Text style={[styles.logTitle, { color: theme.text }]}>{log.title}</Text>
-                                    {log.description ? <Text style={[styles.logSub, { color: theme.textSecondary }]}>{log.description}</Text> : null}
-                                </View>
-                            </View>
-                        ))
-                    )}
-
-                </ScrollView>
-            </View>
+                    </TouchableOpacity>
+                </Modal>
+            </Animated.View>
 
         </View>
     );
