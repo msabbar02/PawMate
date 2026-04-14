@@ -74,8 +74,32 @@
 }
 
 .sidebar-footer {
-    padding: 20px;
+    padding: 12px 20px 20px;
     border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.theme-toggle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+    background-color: var(--surface-hover);
+    color: var(--text-main);
 }
 
 .logout-btn {
@@ -133,10 +157,30 @@
     font-weight: 600;
 }
 
+.topbar-welcome {
+    flex: 1;
+}
+
+.welcome-text {
+    font-size: 15px;
+    color: var(--text-muted);
+}
+
+.welcome-text strong {
+    color: var(--text-main);
+}
+
 .admin-profile {
     display: flex;
     align-items: center;
     gap: 12px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+
+.admin-profile:hover {
+    background-color: var(--surface-hover);
 }
 
 .admin-avatar {
@@ -149,6 +193,13 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
+    overflow: hidden;
+}
+
+.admin-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .admin-name {

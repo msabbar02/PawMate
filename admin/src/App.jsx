@@ -12,17 +12,14 @@ import MessagesPage from './pages/MessagesPage';
 import CommunityPage from './pages/CommunityPage';
 import ReportsPage from './pages/ReportsPage';
 import LogsPage from './pages/LogsPage';
+import ProfilePage from './pages/ProfilePage';
+import AdminsPage from './pages/AdminsPage';
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated } = useContext(AuthContext);
     if (!isAuthenticated) return <Navigate to="/login" />;
     return children;
 };
-
-// Placeholder for other pages
-const Placeholder = ({ title }) => (
-    <div style={{ padding: '20px' }}><h2>{title}</h2><p>Próximamente...</p></div>
-);
 
 function App() {
   return (
@@ -41,6 +38,8 @@ function App() {
         <Route path="community" element={<CommunityPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="logs" element={<LogsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="admins" element={<AdminsPage />} />
       </Route>
     </Routes>
   );

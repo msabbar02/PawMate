@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  --bg-color: #0B0E14; /* Deep premium dark */
+  --bg-color: #0B0E14;
   --surface-color: rgba(22, 27, 34, 0.65);
   --surface-hover: rgba(45, 51, 59, 0.8);
   --border-color: rgba(255, 255, 255, 0.08);
@@ -17,6 +17,17 @@
   --font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   --glass-bg: rgba(20, 25, 33, 0.6);
   --glass-border: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] {
+  --bg-color: #f1f5f9;
+  --surface-color: rgba(255, 255, 255, 0.85);
+  --surface-hover: rgba(226, 232, 240, 0.8);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.06);
 }
 
 * {

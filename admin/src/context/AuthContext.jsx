@@ -5,21 +5,42 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [adminUser, setAdminUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setIsAuthenticated(!!session && session.user?.email === 'adminpawmate@gmail.com');
-            setLoading(false);
-        }).catch((err) => {
-            console.error('Error checking session:', err);
-            setLoading(false);
-        });
+    const fetchAdminProfile = async (authUser) => {
+        if (!authUser) { setAdminUser(null); return null; }
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', authUser.id)
+                .single();
+            if (!error && data && data.role === 'admin') {
+                setAdminUser(data);
+                return data;
+            }
+            return null;
+        } catch { return null; }
+    };
 
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setIsAuthenticated(!!session && session.user?.email === 'adminpawmate@gmail.com');
+    useEffect(() => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (session?.user) {
+                const profile = await fetchAdminProfile(session.user);
+                setIsAuthenticated(!!profile);
+            }
+            setLoading(false);
+        }).catch(() => setLoading(false));
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                const profile = await fetchAdminProfile(session.user);
+                setIsAuthenticated(!!profile);
+            } else {
+                setIsAuthenticated(false);
+                setAdminUser(null);
+            }
             setLoading(false);
         });
         return () => subscription.unsubscribe();
@@ -27,26 +48,47 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         try {
-            if (email !== 'adminpawmate@gmail.com') {
-                throw new Error("Acceso denegado: este email no pertenece a un administrador.");
+            const trimmedEmail = email.trim().toLowerCase();
+            const { data, error } = await supabase.auth.signInWithPassword({ 
+                email: trimmedEmail, 
+                password 
+            });
+            if (error) return { success: false, message: error.message };
+
+            // Check admin role in users table
+            const { data: profile, error: profileError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', data.user.id)
+                .single();
+
+            if (profileError || !profile || profile.role !== 'admin') {
+                await supabase.auth.signOut();
+                return { success: false, message: 'Acceso denegado: no tienes permisos de administrador.' };
             }
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) throw error;
-            return true;
+            setAdminUser(profile);
+            setIsAuthenticated(true);
+            return { success: true };
         } catch (error) {
-            console.error("Error de autenticación:", error);
-            return false;
+            return { success: false, message: error.message || 'Error desconocido' };
         }
     };
 
     const logout = async () => {
         await supabase.auth.signOut();
+        setAdminUser(null);
+        setIsAuthenticated(false);
+    };
+
+    const refreshProfile = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) await fetchAdminProfile(session.user);
     };
 
     if (loading) return null;
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+        <AuthContext.Provider value={{ isAuthenticated, adminUser, login, logout, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     );

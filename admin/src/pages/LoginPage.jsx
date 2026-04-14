@@ -17,11 +17,11 @@ export default function LoginPage() {
         e.preventDefault();
         setError('');
         setIsLoggingIn(true);
-        const success = await login(email, password);
-        if (success) {
+        const result = await login(email, password);
+        if (result.success) {
             navigate('/');
         } else {
-            setError('Credenciales incorrectas o acceso denegado');
+            setError(result.message || 'Credenciales incorrectas o acceso denegado');
         }
         setIsLoggingIn(false);
     };
