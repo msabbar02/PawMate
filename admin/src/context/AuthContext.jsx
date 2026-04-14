@@ -10,13 +10,16 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         // Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setIsAuthenticated(!!session && session.user.email === 'adminpawmate@gmail.com');
+            setIsAuthenticated(!!session && session.user?.email === 'adminpawmate@gmail.com');
+            setLoading(false);
+        }).catch((err) => {
+            console.error('Error checking session:', err);
             setLoading(false);
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setIsAuthenticated(!!session && session.user.email === 'adminpawmate@gmail.com');
+            setIsAuthenticated(!!session && session.user?.email === 'adminpawmate@gmail.com');
             setLoading(false);
         });
         return () => subscription.unsubscribe();
