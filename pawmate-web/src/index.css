@@ -23,6 +23,18 @@
   --shadow-lg: 0 20px 60px rgba(26,122,76,0.20);
 }
 
+[data-theme="dark"] {
+  --ink: #e8f5ee;
+  --slate: #9cb8a8;
+  --fog: #162420;
+  --cloud: #0c1a14;
+  --mist: #1e3328;
+  --mint-light: rgba(52, 211, 153, 0.12);
+  --shadow-sm: 0 2px 12px rgba(0,0,0,0.3);
+  --shadow-md: 0 8px 40px rgba(0,0,0,0.4);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.5);
+}
+
 html { scroll-behavior: smooth; }
 
 body {

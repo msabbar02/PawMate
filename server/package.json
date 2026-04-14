@@ -12,15 +12,15 @@
     "pawmate",
     "api",
     "express",
-    "firebase"
+    "supabase"
   ],
   "author": "Mohamed Sabbar",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "firebase-admin": "^12.0.0",
     "nodemailer": "^6.9.7",
     "stripe": "^20.4.0"
   },

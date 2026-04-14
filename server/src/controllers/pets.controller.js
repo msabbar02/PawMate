@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /**
@@ -7,16 +7,14 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 const getAllPets = async (req, res) => {
     try {
-        const petsSnapshot = await db.collection('pets')
-            .where('userId', '==', req.user.uid)
-            .get();
+        const { data, error } = await supabase
+            .from('pets')
+            .select('*')
+            .eq('userId', req.user.uid);
 
-        const pets = [];
-        petsSnapshot.forEach(doc => {
-            pets.push({ id: doc.id, ...doc.data() });
-        });
+        if (error) throw error;
 
-        return sendSuccess(res, pets, 'Pets retrieved successfully');
+        return sendSuccess(res, data, 'Pets retrieved successfully');
     } catch (error) {
         console.error('Get pets error:', error);
         return sendError(res, 'Error retrieving pets', 500);
@@ -30,20 +28,21 @@ const getAllPets = async (req, res) => {
 const getPetById = async (req, res) => {
     try {
         const { id } = req.params;
-        const petDoc = await db.collection('pets').doc(id).get();
+        const { data, error } = await supabase
+            .from('pets')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (!petDoc.exists) {
+        if (error || !data) {
             return sendError(res, 'Pet not found', 404);
         }
 
-        const petData = petDoc.data();
-
-        // Check if user owns this pet
-        if (petData.userId !== req.user.uid) {
+        if (data.userId !== req.user.uid) {
             return sendError(res, 'Unauthorized', 403);
         }
 
-        return sendSuccess(res, { id: petDoc.id, ...petData }, 'Pet retrieved successfully');
+        return sendSuccess(res, data, 'Pet retrieved successfully');
     } catch (error) {
         console.error('Get pet error:', error);
         return sendError(res, 'Error retrieving pet', 500);
@@ -62,8 +61,15 @@ const createPet = async (req, res) => {
             createdAt: new Date().toISOString(),
         };
 
-        const petRef = await db.collection('pets').add(petData);
-        return sendSuccess(res, { id: petRef.id, ...petData }, 'Pet created successfully', 201);
+        const { data, error } = await supabase
+            .from('pets')
+            .insert(petData)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return sendSuccess(res, data, 'Pet created successfully', 201);
     } catch (error) {
         console.error('Create pet error:', error);
         return sendError(res, 'Error creating pet', 500);
@@ -77,21 +83,27 @@ const createPet = async (req, res) => {
 const updatePet = async (req, res) => {
     try {
         const { id } = req.params;
-        const petDoc = await db.collection('pets').doc(id).get();
 
-        if (!petDoc.exists) {
+        const { data: pet, error: fetchError } = await supabase
+            .from('pets')
+            .select('userId')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !pet) {
             return sendError(res, 'Pet not found', 404);
         }
 
-        // Check if user owns this pet
-        if (petDoc.data().userId !== req.user.uid) {
+        if (pet.userId !== req.user.uid) {
             return sendError(res, 'Unauthorized', 403);
         }
 
-        await db.collection('pets').doc(id).update({
-            ...req.body,
-            updatedAt: new Date().toISOString(),
-        });
+        const { error } = await supabase
+            .from('pets')
+            .update({ ...req.body, updatedAt: new Date().toISOString() })
+            .eq('id', id);
+
+        if (error) throw error;
 
         return sendSuccess(res, null, 'Pet updated successfully');
     } catch (error) {
@@ -107,18 +119,28 @@ const updatePet = async (req, res) => {
 const deletePet = async (req, res) => {
     try {
         const { id } = req.params;
-        const petDoc = await db.collection('pets').doc(id).get();
 
-        if (!petDoc.exists) {
+        const { data: pet, error: fetchError } = await supabase
+            .from('pets')
+            .select('userId')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !pet) {
             return sendError(res, 'Pet not found', 404);
         }
 
-        // Check if user owns this pet
-        if (petDoc.data().userId !== req.user.uid) {
+        if (pet.userId !== req.user.uid) {
             return sendError(res, 'Unauthorized', 403);
         }
 
-        await db.collection('pets').doc(id).delete();
+        const { error } = await supabase
+            .from('pets')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
         return sendSuccess(res, null, 'Pet deleted successfully');
     } catch (error) {
         console.error('Delete pet error:', error);

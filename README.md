@@ -15,11 +15,10 @@ PawMate es un ecosistema digital completo para el cuidado y gestión de mascotas
 ## 🏗️ Estructura del Proyecto
 
 ```
-PawMate0/
+PawMate/
 ├── mobile/          📱 App móvil (React Native + Expo)
-├── web/             🌐 Carpeta original (vacía / legacy)
-├── pawmate-web/     🚀 Landing Page (Vite + React) ← NUEVO
-├── admin/           👨‍💼 Panel de administración
+├── pawmate-web/     🌐 Landing Page (Vite + React)
+├── admin/           👨‍💼 Panel de administración (Vite + React)
 └── server/          🔧 Backend API (Node.js + Express)
 ```
 
@@ -29,35 +28,64 @@ PawMate0/
 
 | Plataforma | Tecnologías |
 |-----------|-------------|
-| **Mobile** | React Native, Expo, Firebase Auth, Firestore |
-| **Landing Web** | Vite, React, Framer Motion, Lucide React |
-| **Admin** | React / Next.js |
-| **Backend** | Node.js, Express, Firebase Admin SDK |
+| **Mobile** | React Native, Expo, Supabase Auth, Supabase DB |
+| **Landing Web** | Vite 8, React 19, Framer Motion, Lucide React |
+| **Admin** | Vite 5, React 18, Supabase, Lucide React |
+| **Backend** | Node.js, Express, Supabase, Brevo (email), Stripe |
+| **Base de datos** | Supabase (PostgreSQL) |
+| **Despliegue** | Vercel (web + admin), Supabase Cloud |
 
 ---
 
 ## 🎯 Funcionalidades Principales
 
 ### 📱 App Móvil
-- ✅ Autenticación (Email/Password, Google)
+- ✅ Autenticación (Email/Password, Google) con Supabase Auth
 - ✅ Perfiles completos de mascotas (fotos, médico, chip)
 - ✅ Seguimiento GPS de paseos con mapa y estadísticas
 - ✅ Paw-Port QR Biométrico de emergencia
 - ✅ Recordatorios de vacunas y citas veterinarias
 - ✅ Comunidad social con feed de fotos
-- ✅ Sistema de cuidadores verificados con reservas
+- ✅ Sistema de cuidadores verificados con reservas y pagos (Stripe)
 - ✅ Dark mode / Light mode
-- ✅ Notificaciones push
+- ✅ Notificaciones push (Expo Push)
+- ✅ Widget del clima en tiempo real
+- ✅ Radar de mascotas cercanas
 
 ### 🌐 Landing Page (pawmate-web/)
-- ✅ Hero con animaciones Framer Motion
-- ✅ Sección de funcionalidades con cards animadas
-- ✅ GPS Tracking showcase
-- ✅ Comunidad showcase
-- ✅ Sección "Cómo Funciona"
-- ✅ Testimonials
-- ✅ CTA con descarga de app
-- ✅ Diseño responsive mobile-first
+- ✅ Hero con animaciones Framer Motion y texto rotativo
+- ✅ Navbar flotante de cristal con blur
+- ✅ Trust band con marquee infinito
+- ✅ 6 feature cards con hover e iconos
+- ✅ Showcase de experiencia premium
+- ✅ Estadísticas animadas con contadores
+- ✅ Testimonios de usuarios
+- ✅ CTA con botones de descarga
+- ✅ Dark mode / Light mode
+- ✅ Diseño responsive (mobile-first)
+
+### 👨‍💼 Panel de Administración (admin/)
+- ✅ Login seguro con Supabase Auth (verificación de rol admin)
+- ✅ Dashboard con estadísticas en tiempo real
+- ✅ Gestión de usuarios (CRUD, filtros, vista premium)
+- ✅ Gestión de mascotas
+- ✅ Gestión de reservas
+- ✅ Moderación de comunidad
+- ✅ Mensajes
+- ✅ Reportes y logs
+- ✅ Perfil de administrador editable (foto, datos)
+- ✅ Gestión de administradores (crear/eliminar)
+- ✅ Dark mode / Light mode
+- ✅ Desplegado en Vercel
+
+### 🔧 Backend API (server/)
+- ✅ API REST con Express
+- ✅ Autenticación con Supabase JWT
+- ✅ CRUD de usuarios, mascotas
+- ✅ Pagos con Stripe (PaymentIntent, reembolsos)
+- ✅ Notificaciones por email con Brevo SMTP
+- ✅ Health check endpoint
+- ✅ Middleware de errores y 404
 
 ---
 
@@ -68,8 +96,15 @@ PawMate0/
 cd pawmate-web
 npm install
 npm run dev
-# → http://localhost:5173
 ```
+
+### Panel de Administración
+```bash
+cd admin
+npm install
+npm run dev
+```
+> Requiere `.env` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`
 
 ### App Móvil
 ```bash
@@ -77,6 +112,14 @@ cd mobile
 npm install
 npx expo start --clear --tunnel
 ```
+
+### Backend
+```bash
+cd server
+npm install
+npm run dev
+```
+> Requiere `.env` con `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `BREVO_SMTP_KEY`, `STRIPE_SECRET_KEY`
 
 ---
 

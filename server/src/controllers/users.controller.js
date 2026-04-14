@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /**
@@ -7,14 +7,13 @@ const { sendSuccess, sendError } = require('../utils/response');
  */
 const getAllUsers = async (req, res) => {
     try {
-        const usersSnapshot = await db.collection('users').get();
-        const users = [];
+        const { data, error } = await supabase
+            .from('users')
+            .select('*');
 
-        usersSnapshot.forEach(doc => {
-            users.push({ id: doc.id, ...doc.data() });
-        });
+        if (error) throw error;
 
-        return sendSuccess(res, users, 'Users retrieved successfully');
+        return sendSuccess(res, data, 'Users retrieved successfully');
     } catch (error) {
         console.error('Get all users error:', error);
         return sendError(res, 'Error retrieving users', 500);
@@ -28,13 +27,17 @@ const getAllUsers = async (req, res) => {
 const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
-        const userDoc = await db.collection('users').doc(id).get();
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (!userDoc.exists) {
+        if (error || !data) {
             return sendError(res, 'User not found', 404);
         }
 
-        return sendSuccess(res, { id: userDoc.id, ...userDoc.data() }, 'User retrieved successfully');
+        return sendSuccess(res, data, 'User retrieved successfully');
     } catch (error) {
         console.error('Get user error:', error);
         return sendError(res, 'Error retrieving user', 500);
@@ -50,12 +53,17 @@ const updateUser = async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        // Only allow user to update their own profile unless admin
         if (req.user.uid !== id && !req.user.isAdmin) {
             return sendError(res, 'Unauthorized', 403);
         }
 
-        await db.collection('users').doc(id).update(updates);
+        const { error } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', id);
+
+        if (error) throw error;
+
         return sendSuccess(res, null, 'User updated successfully');
     } catch (error) {
         console.error('Update user error:', error);
@@ -71,7 +79,13 @@ const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
 
-        await db.collection('users').doc(id).delete();
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
         return sendSuccess(res, null, 'User deleted successfully');
     } catch (error) {
         console.error('Delete user error:', error);

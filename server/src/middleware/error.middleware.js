@@ -6,24 +6,23 @@ const { sendError } = require('../utils/response');
 const errorHandler = (err, req, res, next) => {
     console.error('Error:', err);
 
-    // Default error
     let statusCode = err.statusCode || 500;
     let message = err.message || 'Internal Server Error';
 
-    // Firebase specific errors
+    // Supabase error codes
     if (err.code) {
         switch (err.code) {
-            case 'auth/id-token-expired':
-                statusCode = 401;
-                message = 'Token expired';
-                break;
-            case 'auth/invalid-id-token':
-                statusCode = 401;
-                message = 'Invalid token';
-                break;
-            case 'auth/user-not-found':
+            case 'PGRST116':
                 statusCode = 404;
-                message = 'User not found';
+                message = 'Resource not found';
+                break;
+            case '23505':
+                statusCode = 409;
+                message = 'Duplicate entry';
+                break;
+            case '23503':
+                statusCode = 400;
+                message = 'Referenced resource not found';
                 break;
             default:
                 message = err.message;

@@ -1,4 +1,4 @@
-const { auth, db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /**
@@ -13,8 +13,13 @@ const verifyToken = async (req, res) => {
             return sendError(res, 'Token is required', 400);
         }
 
-        const decodedToken = await auth.verifyIdToken(token);
-        return sendSuccess(res, { uid: decodedToken.uid, email: decodedToken.email }, 'Token verified successfully');
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+
+        if (error || !user) {
+            return sendError(res, 'Invalid token', 401);
+        }
+
+        return sendSuccess(res, { uid: user.id, email: user.email }, 'Token verified successfully');
     } catch (error) {
         console.error('Verify token error:', error);
         return sendError(res, 'Invalid token', 401);
@@ -27,13 +32,17 @@ const verifyToken = async (req, res) => {
  */
 const getProfile = async (req, res) => {
     try {
-        const userDoc = await db.collection('users').doc(req.user.uid).get();
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', req.user.uid)
+            .single();
 
-        if (!userDoc.exists) {
+        if (error || !data) {
             return sendError(res, 'User not found', 404);
         }
 
-        return sendSuccess(res, { uid: req.user.uid, ...userDoc.data() }, 'Profile retrieved successfully');
+        return sendSuccess(res, { uid: req.user.uid, ...data }, 'Profile retrieved successfully');
     } catch (error) {
         console.error('Get profile error:', error);
         return sendError(res, 'Error retrieving profile', 500);

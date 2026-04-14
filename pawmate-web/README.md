@@ -1,16 +1,79 @@
-# React + Vite
+# 🌐 PawMate Landing Page
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Landing page de la plataforma PawMate — diseño premium, moderno y responsive.
 
-Currently, two official plugins are available:
+## 🚀 Tecnologías
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **React 19** + **Vite 8**
+- **Framer Motion** (animaciones fluidas)
+- **Lucide React** (iconos SVG)
+- **react-intersection-observer** (animaciones al scroll)
+- CSS puro con variables y diseño responsive
+- Desplegado en **Vercel**
 
-## React Compiler
+## 📂 Estructura
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+pawmate-web/
+├── src/
+│   ├── App.jsx         # Todos los componentes de la landing page
+│   ├── App.css         # Estilos de los componentes
+│   ├── index.css       # Variables CSS, reset, utilidades
+│   └── main.jsx        # Punto de entrada
+├── public/
+│   ├── premium_hero.png         # Imagen del hero
+│   ├── premium_lifestyle.png    # Imagen del showcase
+│   └── favicon.svg              # Favicon
+├── index.html
+├── vite.config.js
+└── package.json
+```
 
-## Expanding the ESLint configuration
+## 🎯 Secciones
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Navbar** — Flotante con efecto cristal (glassmorphism), menú hamburguesa en móvil
+- **Hero** — Texto con animación de palabras rotativas, métricas, imagen con tarjetas flotantes
+- **Trust Band** — Marquee infinito con highlights de la app
+- **Features** — 6 tarjetas con iconos, hover elevado y descripción
+- **Showcase** — Dos columnas: checklist de beneficios + imagen premium
+- **Stats** — Contadores animados sobre fondo degradado oscuro
+- **Testimonials** — Tarjetas de reseñas con estrellas y avatares
+- **CTA** — Llamada a la acción con botones de descarga (App Store / Google Play)
+- **Footer** — Grid de 4 columnas con links y redes sociales
+- **Dark/Light Mode** — Toggle con persistencia en localStorage
+
+## 🎨 Paleta de Colores
+
+| Variable | Color | Uso |
+|----------|-------|-----|
+| `--forest` | `#1a7a4c` | Color primario |
+| `--forest-deep` | `#145f3b` | Hover primario |
+| `--mint` | `#34d399` | Acentos |
+| `--mint-light` | `#d1fae5` | Badges, fondos suaves |
+| `--ink` | `#0f2419` | Texto principal |
+| `--slate` | `#4b6358` | Texto secundario |
+| `--fog` | `#f0f7f4` | Fondos claros |
+| `--cloud` | `#ffffff` | Fondo base |
+
+## 🔧 Instalación
+
+```bash
+cd pawmate-web
+npm install
+```
+
+## ▶️ Ejecutar
+
+```bash
+npm run dev
+```
+
+## 📦 Build
+
+```bash
+npm run build
+```
+
+---
+
+**Estado**: ✅ Funcional

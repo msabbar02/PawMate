@@ -35,8 +35,8 @@
 
 .stat-card:hover {
     transform: translateY(-6px) scale(1.02);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+    border-color: var(--border-color);
 }
 
 .stat-icon-wrapper {
@@ -151,11 +151,11 @@
     letter-spacing: 0.5px;
 }
 
-.status-badge.pendiente { background-color: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
-.status-badge.aceptada { background-color: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
-.status-badge.activa { background-color: rgba(6, 95, 70, 0.15); color: #34d399; border: 1px solid rgba(6, 95, 70, 0.3); }
-.status-badge.cancelada { background-color: rgba(100, 116, 139, 0.15); color: #cbd5e1; border: 1px solid rgba(100, 116, 139, 0.3); }
-.status-badge.completada { background-color: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+.status-badge.pendiente { background-color: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3); }
+.status-badge.aceptada { background-color: rgba(16, 185, 129, 0.15); color: #047857; border: 1px solid rgba(16, 185, 129, 0.3); }
+.status-badge.activa { background-color: rgba(6, 95, 70, 0.15); color: #065f46; border: 1px solid rgba(6, 95, 70, 0.3); }
+.status-badge.cancelada { background-color: rgba(100, 116, 139, 0.15); color: #475569; border: 1px solid rgba(100, 116, 139, 0.3); }
+.status-badge.completada { background-color: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3); }
 
 /* Loading State */
 .loading-state {

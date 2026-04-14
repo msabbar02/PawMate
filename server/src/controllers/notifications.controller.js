@@ -1,11 +1,10 @@
-const { db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /**
  * Notificar al dueño por email cuando el cuidador acepta o rechaza la reserva.
  * POST /api/notifications/reservation-status
  * Body: { reservationId }
- * La reserva ya debe estar actualizada en Firestore (status: 'accepted' | 'rejected').
  */
 const sendReservationStatusEmail = async (req, res) => {
     try {
@@ -14,13 +13,17 @@ const sendReservationStatusEmail = async (req, res) => {
             return sendError(res, 'reservationId is required', 400);
         }
 
-        const resDoc = await db.collection('reservations').doc(reservationId).get();
-        if (!resDoc.exists) {
+        const { data, error } = await supabase
+            .from('reservations')
+            .select('*')
+            .eq('id', reservationId)
+            .single();
+
+        if (error || !data) {
             return sendError(res, 'Reservation not found', 404);
         }
 
-        const data = resDoc.data();
-        const ownerEmail = data.ownerEmail || data.ownerId; // ownerId no es email; si no hay ownerEmail no podemos enviar
+        const ownerEmail = data.ownerEmail;
         const status = data.status;
         const caregiverName = data.caregiverName || 'El cuidador';
         const petName = data.petName || 'tu mascota';
@@ -30,18 +33,17 @@ const sendReservationStatusEmail = async (req, res) => {
             return sendSuccess(res, { sent: false, reason: 'No owner email' }, 'Reservation updated; email not sent (no address)');
         }
 
-        // Intentar enviar email si está configurado nodemailer
         let sent = false;
         try {
             const nodemailer = require('nodemailer');
             const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST || 'smtp.gmail.com',
-                port: parseInt(process.env.SMTP_PORT || '587', 10),
-                secure: process.env.SMTP_SECURE === 'true',
-                auth: process.env.SMTP_USER ? {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS,
-                } : undefined,
+                host: process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com',
+                port: parseInt(process.env.BREVO_SMTP_PORT || '587', 10),
+                secure: false,
+                auth: {
+                    user: process.env.BREVO_SMTP_USER,
+                    pass: process.env.BREVO_SMTP_PASS,
+                },
             });
 
             const subject = status === 'accepted'
@@ -53,17 +55,17 @@ const sendReservationStatusEmail = async (req, res) => {
                 : `Hola ${ownerName},\n\n${caregiverName} no ha podido aceptar tu solicitud de reserva para ${petName}. Puedes buscar otro cuidador en la app.\n\nGracias por usar PawMate.`;
 
             await transporter.sendMail({
-                from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@pawmate.com',
+                from: process.env.BREVO_FROM_EMAIL || 'noreply@pawmate.com',
                 to: ownerEmail,
                 subject,
                 text,
             });
             sent = true;
         } catch (emailErr) {
-            console.error('Email send error:', emailErr.message);
+            console.error('Brevo email send error:', emailErr.message);
         }
 
-        return sendSuccess(res, { sent }, sent ? 'Email sent to owner' : 'Reservation updated; email not sent (check SMTP config)');
+        return sendSuccess(res, { sent }, sent ? 'Email sent to owner' : 'Reservation updated; email not sent (check Brevo SMTP config)');
     } catch (error) {
         console.error('sendReservationStatusEmail error:', error);
         return sendError(res, 'Error sending notification', 500);
