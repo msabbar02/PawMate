@@ -14,6 +14,7 @@ import ReportsPage from './pages/ReportsPage';
 import LogsPage from './pages/LogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminsPage from './pages/AdminsPage';
+import VerificationsPage from './pages/VerificationsPage';
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated } = useContext(AuthContext);
@@ -40,6 +41,7 @@ function App() {
         <Route path="logs" element={<LogsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admins" element={<AdminsPage />} />
+        <Route path="verifications" element={<VerificationsPage />} />
       </Route>
     </Routes>
   );

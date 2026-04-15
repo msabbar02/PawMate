@@ -411,7 +411,7 @@ const DocUploadItem = ({ label, uri, onPress, required }) => (
 );
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    container: { flex: 1, backgroundColor: COLORS.surface },
     progressBar: { height: 4, backgroundColor: COLORS.border },
     progressFill: { height: 4, backgroundColor: COLORS.primary, borderRadius: 2 },
     stepContainer: { padding: 24, paddingTop: Platform.OS === 'ios' ? 60 : 30 },

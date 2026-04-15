@@ -104,32 +104,28 @@ const MainTabNavigator = () => {
                     else if (route.name === 'Cuidadores') iconName = focused ? 'people' : 'people-outline';
                     else if (route.name === 'Ajustes') iconName = focused ? 'settings' : 'settings-outline';
 
-                    const primaryColor = theme.primary || '#10b981';
+                    const activeColor = '#F5A623';
                     const routeLabel = route.name === 'Reservas' ? 'Reservas' : route.name === 'Mascotas' ? 'Mascotas' : route.name === 'Cuidadores' ? 'Cuidar' : route.name === 'Ajustes' ? 'Ajustes' : 'Inicio';
 
                     if (focused) {
                         return (
-                            <View style={{ alignItems: 'center', justifyContent: 'center', width: 60, height: 70 }}>
+                            <View style={{ alignItems: 'center', justifyContent: 'center', width: 64, height: 64 }}>
                                 <View style={{
-                                    position: 'absolute',
-                                    top: -8, // Lowered even further per request
-                                    width: 50,
-                                    height: 50,
-                                    borderRadius: 25,
-                                    backgroundColor: primaryColor,
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 14,
+                                    backgroundColor: activeColor,
                                     justifyContent: 'center',
                                     alignItems: 'center',
-                                    borderWidth: 4,
-                                    borderColor: theme.background || '#f8fafc',
-                                    shadowColor: primaryColor,
+                                    shadowColor: activeColor,
                                     shadowOffset: { width: 0, height: 4 },
-                                    shadowOpacity: 0.3,
-                                    shadowRadius: 5,
+                                    shadowOpacity: 0.35,
+                                    shadowRadius: 8,
                                     elevation: 6,
                                 }}>
                                     <Ionicons name={iconName} size={22} color="#FFF" />
                                 </View>
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: primaryColor, position: 'absolute', bottom: 8 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: activeColor, marginTop: 4 }}>
                                     {routeLabel}
                                 </Text>
                             </View>
@@ -137,28 +133,35 @@ const MainTabNavigator = () => {
                     }
 
                     return (
-                        <View style={{ alignItems: 'center', justifyContent: 'center', width: 60, height: 70 }}>
-                            <Ionicons name={iconName} size={24} color="#94a3b8" />
+                        <View style={{ alignItems: 'center', justifyContent: 'center', width: 64, height: 64 }}>
+                            <Ionicons name={iconName} size={23} color="rgba(255,255,255,0.45)" />
                             {isLocked && route.name === 'Reservas' && (
-                                <View style={[styles.lockBadge, { position: 'absolute', top: 12, right: 12 }]}>
-                                    <Ionicons name="lock-closed" size={10} color="#fff" />
+                                <View style={[styles.lockBadge, { position: 'absolute', top: 14, right: 14 }]}>
+                                    <Ionicons name="lock-closed" size={9} color="#fff" />
                                 </View>
                             )}
-                            <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: '600' }}>
                                 {routeLabel}
                             </Text>
                         </View>
                     );
                 },
                 tabBarStyle: {
-                    backgroundColor: theme.tabBar || '#ffffff',
-                    height: Platform.OS === 'ios' ? 85 : 65,
+                    backgroundColor: '#1A1A2E',
+                    height: Platform.OS === 'ios' ? 88 : 68,
                     borderTopWidth: 0,
-                    elevation: 10,
+                    elevation: 20,
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -2 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: -4 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 16,
+                    borderTopLeftRadius: 24,
+                    borderTopRightRadius: 24,
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    paddingTop: 6,
                 },
                 headerShown: false,
             })}

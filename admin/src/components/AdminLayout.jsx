@@ -6,7 +6,7 @@ import {
     LayoutDashboard, Users, Dog, CalendarDays, 
     MessageSquare, Globe, AlertTriangle, 
     LogOut, Menu, X, Activity, Sun, Moon,
-    UserCog, ShieldPlus
+    UserCog, ShieldPlus, ShieldCheck
 } from 'lucide-react';
 import './AdminLayout.css';
 
@@ -36,6 +36,7 @@ export default function AdminLayout() {
         { path: '/community', label: 'Comunidad', icon: <Globe size={20} /> },
         { path: '/reports', label: 'Reportes y Reseñas', icon: <AlertTriangle size={20} /> },
         { path: '/logs', label: 'Audit Logs', icon: <Activity size={20} /> },
+        { path: '/verifications', label: 'Verificaciones', icon: <ShieldCheck size={20} /> },
         { path: '/admins', label: 'Administradores', icon: <ShieldPlus size={20} /> },
     ];
 
