@@ -11,11 +11,17 @@ import {
     Keyboard,
     Dimensions,
     ScrollView,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
@@ -140,7 +146,8 @@ export default function SignupScreen({ navigation }) {
                         firstName: formData.fullName.trim().split(' ')[0],
                         lastName: formData.fullName.trim().split(' ').slice(1).join(' ') || '',
                         email: formData.email.toLowerCase().trim(),
-                    }
+                    },
+                    emailRedirectTo: 'https://apppawmate.com/confirm',
                 }
             });
 
@@ -184,6 +191,37 @@ export default function SignupScreen({ navigation }) {
         } catch (error) {
             console.error('Supabase Signup Error:', error.message);
             setErrors({ form: 'Ocurrió un error. Inténtalo de nuevo.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleSignup = async () => {
+        try {
+            setLoading(true);
+            const redirectTo = makeRedirectUri({ native: 'pawmate://' });
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo,
+                    skipBrowserRedirect: true,
+                },
+            });
+            if (error) throw error;
+
+            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+            if (result.type === 'success') {
+                const { params } = QueryParams.getQueryParams(result.url);
+                if (params?.access_token && params?.refresh_token) {
+                    await supabase.auth.setSession({
+                        access_token: params.access_token,
+                        refresh_token: params.refresh_token,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Google signup error:', error);
+            Alert.alert('Error', error.message || 'No se pudo registrar con Google.');
         } finally {
             setLoading(false);
         }
@@ -314,6 +352,24 @@ export default function SignupScreen({ navigation }) {
                                 </TouchableOpacity>
                             </View>
 
+                            <View style={styles.oauthSection}>
+                                <View style={styles.oauthDivider}>
+                                    <View style={styles.line} />
+                                    <Text style={styles.oauthText}>O regístrate con</Text>
+                                    <View style={styles.line} />
+                                </View>
+                                <View style={styles.oauthButtonsRow}>
+                                    <TouchableOpacity style={styles.oauthBtn} onPress={handleGoogleSignup} disabled={loading}>
+                                        <Ionicons name="logo-google" size={20} color="#DB4437" />
+                                        <Text style={styles.oauthBtnText}>Google</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.oauthBtn} disabled>
+                                        <Ionicons name="logo-apple" size={20} color="#000000" />
+                                        <Text style={styles.oauthBtnText}>Apple</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
                         </View>
 
                     </View>
@@ -351,4 +407,11 @@ const styles = StyleSheet.create({
     switchFlow: { flexDirection: 'row', justifyContent: 'center', marginTop: 22, marginBottom: 10 },
     switchText: { color: COLORS.textLight, fontSize: 14 },
     switchLink: { color: COLORS.primary, fontSize: 14, fontWeight: '800' },
+    oauthSection: { marginTop: 22 },
+    oauthDivider: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+    line: { flex: 1, height: 1, backgroundColor: COLORS.border },
+    oauthText: { marginHorizontal: 14, color: COLORS.textLight, fontSize: 13, fontWeight: '600' },
+    oauthButtonsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 14 },
+    oauthBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: COLORS.background, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 14, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+    oauthBtnText: { marginLeft: 8, fontWeight: '700', color: COLORS.secondary, fontSize: 14 },
 });

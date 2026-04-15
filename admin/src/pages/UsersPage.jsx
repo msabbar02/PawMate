@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-import { Search, Edit2, Trash2, X, AlertCircle, Shield, ShieldCheck, Eye, Dog, Globe } from 'lucide-react';
+import { Search, Edit2, Trash2, X, AlertCircle, Shield, ShieldCheck, Eye, Dog } from 'lucide-react';
 import './UsersPage.css';
 
 export default function UsersPage() {
@@ -14,7 +14,6 @@ export default function UsersPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [userPets, setUserPets] = useState([]);
-    const [userPosts, setUserPosts] = useState([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [editForm, setEditForm] = useState({ role: '', verificationStatus: '' });
 
@@ -67,17 +66,9 @@ export default function UsersPage() {
         setIsViewModalOpen(true);
         setLoadingDetails(true);
         setUserPets([]);
-        setUserPosts([]);
         try {
-            const [
-                { data: petsData },
-                { data: postsData }
-            ] = await Promise.all([
-                supabase.from('pets').select('*').eq('ownerId', user.id),
-                supabase.from('posts').select('*').eq('authorUid', user.id)
-            ]);
+            const { data: petsData } = await supabase.from('pets').select('*').eq('ownerId', user.id);
             if (petsData) setUserPets(petsData);
-            if (postsData) setUserPosts(postsData);
         } catch (e) {
             console.error("Error fetching user details", e);
         }
@@ -389,29 +380,6 @@ export default function UsersPage() {
                                             ))}
                                         </div>
                                     ) : <p className="text-muted" style={{marginBottom: '30px', fontSize: '15px'}}>Este usuario no ha registrado ninguna mascota.</p>}
-
-                                    <h3 className="premium-section-title">
-                                        <Globe size={20} color="#3b82f6"/> Actividad en Comunidad ({userPosts.length})
-                                    </h3>
-                                    {userPosts.length > 0 ? (
-                                        <div className="premium-list">
-                                            {userPosts.map(p => (
-                                                <div className="premium-list-item" key={p.id}>
-                                                    <div className="premium-item-icon" style={{background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6'}}>
-                                                        <Globe size={24} />
-                                                    </div>
-                                                    <div className="premium-item-content">
-                                                        <p className="premium-item-desc" style={{color: 'var(--text-main)'}}>"{p.content}"</p>
-                                                        <div style={{marginTop: '10px', display: 'flex', gap: '16px', fontSize: '13px', color: 'var(--text-muted)'}}>
-                                                            <span>❤️ {p.likesCount || 0} Me gusta</span>
-                                                            <span>💬 {p.commentsCount || 0} Comentarios</span>
-                                                            {p.images && p.images.length > 0 && <span style={{color: '#8b5cf6', fontWeight: '500'}}>🖼️ {p.images.length} Imagen(es) adjunta(s)</span>}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : <p className="text-muted" style={{fontSize: '15px'}}>No ha publicado nada en la comunidad todavía.</p>}
                                 </>
                             )}
                         </div>

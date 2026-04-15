@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, TextInput, Switch,
@@ -12,6 +12,7 @@ import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { uploadImageToStorage } from '../utils/storageHelpers';
 import * as Contacts from 'expo-contacts';
+import { useFocusEffect } from '@react-navigation/native';
 
 const APP_VERSION = '1.0.0';
 
@@ -26,7 +27,7 @@ PawMate ("nosotros", "nuestra aplicación") se compromete a proteger tu privacid
 • Datos de mascotas: nombre, especie, raza, información médica que proporciones voluntariamente.
 • Datos de ubicación: coordenadas GPS durante paseos activos (solo cuando la app está en uso).
 • Datos de reservas: fechas, tipo de servicio, precios.
-• Contenido publicado: fotos y descripciones de posts en la comunidad.
+• Contenido de reservas: historial de servicios contratados.
 
 3. USO DE LA INFORMACIÓN
 Utilizamos tu información para:
@@ -107,7 +108,7 @@ export default function SettingsScreen({ navigation }) {
 
     // Stats
     const [petCount, setPetCount]   = useState(0);
-    const [postCount, setPostCount] = useState(0);
+
 
     const ROLE_CONFIG = {
         normal:    { label: 'Usuario',             emoji: '👤', color: '#6B7280' },
@@ -127,15 +128,37 @@ export default function SettingsScreen({ navigation }) {
 
     useEffect(() => {
         if (!user?.id) return;
-        (async () => {
+        const fetchStats = async () => {
             try {
                 const { count: petsCount } = await supabase.from('pets').select('*', { count: 'exact', head: true }).eq('ownerId', user.id);
-                const { count: postsCount } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('authorUid', user.id);
                 setPetCount(petsCount || 0);
-                setPostCount(postsCount || 0);
             } catch { /* ignore */ }
-        })();
+        };
+        fetchStats();
+
+        // Real-time listener for pets changes
+        const channel = supabase
+            .channel('settings_pets_sync')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pets', filter: `ownerId=eq.${user.id}` }, () => {
+                fetchStats();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
     }, [user?.id]);
+
+    // Also re-fetch on screen focus (e.g. coming back from MyPetsScreen)
+    useFocusEffect(
+        useCallback(() => {
+            if (!user?.id) return;
+            (async () => {
+                try {
+                    const { count: petsCount } = await supabase.from('pets').select('*', { count: 'exact', head: true }).eq('ownerId', user.id);
+                    setPetCount(petsCount || 0);
+                } catch { /* ignore */ }
+            })();
+        }, [user?.id])
+    );
 
     // ── Invites ──
     const handleInviteFriend = async () => {
@@ -416,11 +439,6 @@ export default function SettingsScreen({ navigation }) {
                         <View style={s.statItem}>
                             <Text style={[s.statNum, { color: theme.text }]}>{petCount}</Text>
                             <Text style={[s.statLabel, { color: theme.textSecondary }]}>Mascotas</Text>
-                        </View>
-                        <View style={[s.statDivider, { backgroundColor: theme.border }]} />
-                        <View style={s.statItem}>
-                            <Text style={[s.statNum, { color: theme.text }]}>{postCount}</Text>
-                            <Text style={[s.statLabel, { color: theme.textSecondary }]}>Posts</Text>
                         </View>
                         <View style={[s.statDivider, { backgroundColor: theme.border }]} />
                         <View style={s.statItem}>

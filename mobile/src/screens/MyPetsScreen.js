@@ -563,9 +563,17 @@ export default function PawMatePetsCenter() {
         ]);
     };
 
+    // ── Wizard Step State ─────────────────────────
+    const [wizardStep, setWizardStep] = useState(0);
+    const WIZARD_STEPS = isEditing
+        ? ['photo', 'name', 'species', 'breed', 'gender', 'details', 'medical', 'vet']
+        : ['photo', 'name', 'species', 'breed', 'gender', 'details', 'medical', 'vet'];
+    const TOTAL_STEPS = WIZARD_STEPS.length;
+
     const resetForm = () => {
         setFormParams({ ...EMPTY_FORM });
         setIsEditing(false);
+        setWizardStep(0);
     };
 
     const openEditModal = (pet) => {
@@ -589,6 +597,7 @@ export default function PawMatePetsCenter() {
         });
         setSelectedPet(pet);
         setIsEditing(true);
+        setWizardStep(0);
         setIsFormVisible(true);
     };
 
@@ -1195,219 +1204,338 @@ export default function PawMatePetsCenter() {
                 </TouchableOpacity>
             )}
 
-            <Modal visible={isFormVisible} animationType="slide" presentationStyle="formSheet">
-                <KeyboardAvoidingView
-                    style={{ flex: 1, backgroundColor: theme.background }}
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                >
-                    <View style={[styles.formHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                        <Text style={[styles.formTitle, { color: theme.text }]}>
-                            {isEditing ? 'Editar Mascota' : 'Nueva Mascota'}
-                        </Text>
+            <Modal visible={isFormVisible} animationType="slide" presentationStyle="fullScreen">
+                <View style={{ flex: 1, backgroundColor: '#1A1A2E' }}>
+                    {/* Wizard Header */}
+                    <View style={wizStyles.header}>
+                        <TouchableOpacity
+                            style={wizStyles.backBtn}
+                            onPress={() => {
+                                if (wizardStep === 0) { setIsFormVisible(false); resetForm(); }
+                                else setWizardStep(s => s - 1);
+                            }}
+                        >
+                            <Ionicons name="chevron-back" size={24} color="#FFF" />
+                        </TouchableOpacity>
+                        <View style={wizStyles.headerCenter}>
+                            <Text style={wizStyles.brandText}>🐾 PawMate</Text>
+                            <Text style={wizStyles.stepCounter}>{wizardStep + 1}/{TOTAL_STEPS}</Text>
+                        </View>
                         <TouchableOpacity onPress={() => { setIsFormVisible(false); resetForm(); }}>
-                            <X size={24} color={theme.text} />
+                            <X size={22} color="rgba(255,255,255,0.5)" />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={[styles.formBody, { backgroundColor: theme.background }]} showsVerticalScrollIndicator={false}>
+                    {/* Progress Bar */}
+                    <View style={wizStyles.progressBar}>
+                        <View style={[wizStyles.progressFill, { width: `${((wizardStep + 1) / TOTAL_STEPS) * 100}%` }]} />
+                    </View>
 
-                        {/* Foto */}
-                        <TouchableOpacity style={[styles.photoPicker, { backgroundColor: theme.cardBackground, borderColor: theme.border }]} onPress={pickImage}>
-                            {formParams.image ? (
-                                <Image source={{ uri: formParams.image }} style={styles.photoPickerImg} />
-                            ) : (
-                                <View style={{ alignItems: 'center', gap: 6 }}>
-                                    <Text style={{ fontSize: 42 }}>📷</Text>
-                                    <Text style={{ color: COLORS.secondary, fontWeight: '700', fontSize: 13 }}>
-                                        Toca para añadir foto
+                    <KeyboardAvoidingView
+                        style={{ flex: 1 }}
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    >
+                        <ScrollView
+                            contentContainerStyle={wizStyles.stepContent}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            {/* ── STEP 0: PHOTO ── */}
+                            {WIZARD_STEPS[wizardStep] === 'photo' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepEmoji}>📸</Text>
+                                    <Text style={wizStyles.stepTitle}>
+                                        {isEditing ? 'Actualiza la foto' : 'Añade una foto'}
                                     </Text>
+                                    <Text style={wizStyles.stepDesc}>Una foto de tu mascota para reconocerla fácilmente</Text>
+                                    <TouchableOpacity style={wizStyles.photoCircle} onPress={pickImage}>
+                                        {formParams.image ? (
+                                            <Image source={{ uri: formParams.image }} style={wizStyles.photoCircleImg} />
+                                        ) : (
+                                            <View style={wizStyles.photoPlaceholder}>
+                                                <Ionicons name="camera" size={40} color="rgba(255,255,255,0.4)" />
+                                                <Text style={wizStyles.photoPlaceholderText}>Toca para añadir</Text>
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
                                 </View>
                             )}
-                        </TouchableOpacity>
 
-                        {/* ── BÁSICO ── */}
-                        <FormSection label="Datos Básicos" />
+                            {/* ── STEP 1: NAME ── */}
+                            {WIZARD_STEPS[wizardStep] === 'name' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepEmoji}>✏️</Text>
+                                    <Text style={wizStyles.stepTitle}>¿Cómo se llama?</Text>
+                                    <Text style={wizStyles.stepDesc}>Escribe el nombre de tu mascota</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.name}
+                                        onChangeText={t => setFormParams(p => ({ ...p, name: t }))}
+                                        placeholder="Ej. Max, Luna, Coco..."
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        autoFocus
+                                    />
+                                </View>
+                            )}
 
-                        <FormLabel text="Nombre *" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.name}
-                            onChangeText={t => setFormParams(p => ({ ...p, name: t }))}
-                            placeholder="Ej. Max"
-                            placeholderTextColor={theme.textSecondary}
-                        />
+                            {/* ── STEP 2: SPECIES ── */}
+                            {WIZARD_STEPS[wizardStep] === 'species' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepTitle}>¿Cuál es su especie?</Text>
+                                    <Text style={wizStyles.stepDesc}>Selecciona el tipo de animal</Text>
+                                    <View style={wizStyles.speciesGrid}>
+                                        {SPECIES_OPTIONS.map(sp => (
+                                            <TouchableOpacity
+                                                key={sp.value}
+                                                style={[
+                                                    wizStyles.speciesCircle,
+                                                    formParams.species === sp.value && wizStyles.speciesCircleActive
+                                                ]}
+                                                onPress={() => setFormParams(p => ({ ...p, species: sp.value }))}
+                                            >
+                                                <View style={[
+                                                    wizStyles.speciesIconWrap,
+                                                    formParams.species === sp.value && { borderColor: '#F5A623', borderWidth: 3 }
+                                                ]}>
+                                                    <Text style={{ fontSize: 40 }}>{sp.emoji}</Text>
+                                                </View>
+                                                <Text style={[
+                                                    wizStyles.speciesLabel,
+                                                    formParams.species === sp.value && { color: '#F5A623', fontWeight: '800' }
+                                                ]}>{sp.label}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
 
-                        <FormLabel text="Especie" />
-                        <View style={styles.speciesGrid}>
-                            {SPECIES_OPTIONS.map(sp => (
+                            {/* ── STEP 3: BREED ── */}
+                            {WIZARD_STEPS[wizardStep] === 'breed' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepEmoji}>{getSpeciesEmoji(formParams.species)}</Text>
+                                    <Text style={wizStyles.stepTitle}>¿Cuál es su raza?</Text>
+                                    <Text style={wizStyles.stepDesc}>Escribe la raza de tu {getSpeciesLabel(formParams.species).toLowerCase()}</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.breed}
+                                        onChangeText={t => setFormParams(p => ({ ...p, breed: t }))}
+                                        placeholder="Ej. Golden Retriever, Siamés..."
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        autoFocus
+                                    />
+                                </View>
+                            )}
+
+                            {/* ── STEP 4: GENDER ── */}
+                            {WIZARD_STEPS[wizardStep] === 'gender' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepTitle}>¿Cuál es su sexo?</Text>
+                                    <Text style={wizStyles.stepDesc}>Selecciona el sexo de {formParams.name || 'tu mascota'}</Text>
+                                    <View style={wizStyles.genderRow}>
+                                        <TouchableOpacity
+                                            style={[
+                                                wizStyles.genderCircle,
+                                                formParams.gender === 'male' && { borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.15)' }
+                                            ]}
+                                            onPress={() => setFormParams(p => ({ ...p, gender: 'male' }))}
+                                        >
+                                            <Ionicons name="male" size={44} color={formParams.gender === 'male' ? '#3B82F6' : 'rgba(255,255,255,0.4)'} />
+                                            <Text style={[wizStyles.genderLabel, formParams.gender === 'male' && { color: '#3B82F6' }]}>Macho</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                wizStyles.genderCircle,
+                                                formParams.gender === 'female' && { borderColor: '#EC4899', backgroundColor: 'rgba(236,72,153,0.15)' }
+                                            ]}
+                                            onPress={() => setFormParams(p => ({ ...p, gender: 'female' }))}
+                                        >
+                                            <Ionicons name="female" size={44} color={formParams.gender === 'female' ? '#EC4899' : 'rgba(255,255,255,0.4)'} />
+                                            <Text style={[wizStyles.genderLabel, formParams.gender === 'female' && { color: '#EC4899' }]}>Hembra</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setFormParams(p => ({ ...p, gender: '' }))}>
+                                        <Text style={wizStyles.skipText}>No lo sé</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {/* ── STEP 5: DETAILS ── */}
+                            {WIZARD_STEPS[wizardStep] === 'details' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepEmoji}>📋</Text>
+                                    <Text style={wizStyles.stepTitle}>Detalles adicionales</Text>
+                                    <Text style={wizStyles.stepDesc}>Estos datos son opcionales</Text>
+
+                                    <Text style={wizStyles.fieldLabel}>Peso (kg)</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        keyboardType="numeric"
+                                        value={formParams.weight}
+                                        onChangeText={t => setFormParams(p => ({ ...p, weight: t }))}
+                                        placeholder="Ej. 12.5"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>Fecha de Nacimiento</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.birthdate}
+                                        onChangeText={t => setFormParams(p => ({ ...p, birthdate: t }))}
+                                        placeholder="YYYY-MM-DD"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>Color del pelaje</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.color}
+                                        onChangeText={t => setFormParams(p => ({ ...p, color: t }))}
+                                        placeholder="Ej. Dorado con blanco"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <View style={wizStyles.switchRow}>
+                                        <Text style={wizStyles.fieldLabel}>Esterilizado/a</Text>
+                                        <TouchableOpacity
+                                            style={[wizStyles.togglePill, formParams.sterilized && { backgroundColor: '#22C55E' }]}
+                                            onPress={() => setFormParams(p => ({ ...p, sterilized: !p.sterilized }))}
+                                        >
+                                            <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
+                                                {formParams.sterilized ? '✅ Sí' : '❌ No'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* ── STEP 6: MEDICAL ── */}
+                            {WIZARD_STEPS[wizardStep] === 'medical' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepEmoji}>🏥</Text>
+                                    <Text style={wizStyles.stepTitle}>Datos médicos</Text>
+                                    <Text style={wizStyles.stepDesc}>Información importante de salud (opcional)</Text>
+
+                                    <Text style={wizStyles.fieldLabel}>Nº Microchip</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.chipId}
+                                        onChangeText={t => setFormParams(p => ({ ...p, chipId: t }))}
+                                        placeholder="Ej. 941000024583921"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>⚠️ Alergias</Text>
+                                    <TextInput
+                                        style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
+                                        multiline
+                                        value={formParams.allergies}
+                                        onChangeText={t => setFormParams(p => ({ ...p, allergies: t }))}
+                                        placeholder="Ej. Polen, pollo..."
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>💊 Medicamentos actuales</Text>
+                                    <TextInput
+                                        style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
+                                        multiline
+                                        value={formParams.medications}
+                                        onChangeText={t => setFormParams(p => ({ ...p, medications: t }))}
+                                        placeholder="Ej. Apoquel 16mg/día"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>📋 Condiciones médicas</Text>
+                                    <TextInput
+                                        style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
+                                        multiline
+                                        value={formParams.medicalConditions}
+                                        onChangeText={t => setFormParams(p => ({ ...p, medicalConditions: t }))}
+                                        placeholder="Ej. Displasia de cadera..."
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>🛡️ Nº Seguro / Póliza</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.insurance}
+                                        onChangeText={t => setFormParams(p => ({ ...p, insurance: t }))}
+                                        placeholder="Ej. AXA-2024-001234"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+                                </View>
+                            )}
+
+                            {/* ── STEP 7: VET ── */}
+                            {WIZARD_STEPS[wizardStep] === 'vet' && (
+                                <View style={wizStyles.stepContainer}>
+                                    <Text style={wizStyles.stepEmoji}>🩺</Text>
+                                    <Text style={wizStyles.stepTitle}>Veterinario</Text>
+                                    <Text style={wizStyles.stepDesc}>Datos de contacto del veterinario (opcional)</Text>
+
+                                    <Text style={wizStyles.fieldLabel}>Nombre del veterinario</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        value={formParams.vetName}
+                                        onChangeText={t => setFormParams(p => ({ ...p, vetName: t }))}
+                                        placeholder="Ej. Dr. García"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+
+                                    <Text style={wizStyles.fieldLabel}>Teléfono de contacto</Text>
+                                    <TextInput
+                                        style={wizStyles.wizardInput}
+                                        keyboardType="phone-pad"
+                                        value={formParams.vetPhone}
+                                        onChangeText={t => setFormParams(p => ({ ...p, vetPhone: t }))}
+                                        placeholder="Ej. +34 912 345 678"
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        {/* Bottom Action */}
+                        <View style={wizStyles.bottomBar}>
+                            {wizardStep < TOTAL_STEPS - 1 ? (
                                 <TouchableOpacity
-                                    key={sp.value}
-                                    style={[styles.speciesChip, formParams.species === sp.value && styles.speciesChipActive]}
-                                    onPress={() => setFormParams(p => ({ ...p, species: sp.value }))}
+                                    style={wizStyles.nextBtn}
+                                    onPress={() => {
+                                        if (WIZARD_STEPS[wizardStep] === 'name' && !formParams.name.trim()) {
+                                            Alert.alert('Error', 'El nombre es obligatorio');
+                                            return;
+                                        }
+                                        setWizardStep(s => s + 1);
+                                    }}
                                 >
-                                    <Text style={{ fontSize: 24 }}>{sp.emoji}</Text>
-                                    <Text style={[
-                                        styles.speciesChipLabel,
-                                        formParams.species === sp.value && { color: COLORS.primary },
-                                    ]}>
-                                        {sp.label}
+                                    <Text style={wizStyles.nextBtnText}>
+                                        {WIZARD_STEPS[wizardStep] === 'species' ? 'Siguiente: Raza' :
+                                         WIZARD_STEPS[wizardStep] === 'breed' ? 'Siguiente: Sexo' :
+                                         WIZARD_STEPS[wizardStep] === 'gender' ? 'Siguiente: Detalles' :
+                                         WIZARD_STEPS[wizardStep] === 'photo' ? 'Siguiente: Nombre' :
+                                         WIZARD_STEPS[wizardStep] === 'name' ? 'Siguiente: Especie' :
+                                         WIZARD_STEPS[wizardStep] === 'details' ? 'Siguiente: Médico' :
+                                         'Siguiente'}
+                                    </Text>
+                                    <Ionicons name="arrow-forward" size={20} color="#1A1A2E" />
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity style={wizStyles.saveBtn} onPress={handleSavePet}>
+                                    <Text style={wizStyles.saveBtnText}>
+                                        {isEditing ? '✅ Guardar Cambios' : '🐾 Registrar Mascota'}
                                     </Text>
                                 </TouchableOpacity>
-                            ))}
+                            )}
+                            {WIZARD_STEPS[wizardStep] !== 'name' && WIZARD_STEPS[wizardStep] !== 'photo' && wizardStep < TOTAL_STEPS - 1 && (
+                                <TouchableOpacity
+                                    style={wizStyles.skipBtn}
+                                    onPress={() => setWizardStep(s => s + 1)}
+                                >
+                                    <Text style={wizStyles.skipBtnText}>Saltar este paso</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
-
-                        <FormLabel text="Raza" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.breed}
-                            onChangeText={t => setFormParams(p => ({ ...p, breed: t }))}
-                            placeholder="Ej. Golden Retriever"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="Sexo" />
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                            <TouchableOpacity
-                                style={[styles.genderBtn, formParams.gender === 'male' && styles.genderBtnMaleActive]}
-                                onPress={() => setFormParams(p => ({ ...p, gender: 'male' }))}
-                            >
-                                <Text style={[styles.genderBtnText, formParams.gender === 'male' && { color: COLORS.primary }]}>
-                                    ♂ Macho
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.genderBtn, formParams.gender === 'female' && styles.genderBtnFemaleActive]}
-                                onPress={() => setFormParams(p => ({ ...p, gender: 'female' }))}
-                            >
-                                <Text style={[styles.genderBtnText, formParams.gender === 'female' && { color: '#EC4899' }]}>
-                                    ♀ Hembra
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <FormLabel text="Peso (kg)" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            keyboardType="numeric"
-                            value={formParams.weight}
-                            onChangeText={t => setFormParams(p => ({ ...p, weight: t }))}
-                            placeholder="Ej. 12.5"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="Fecha de Nacimiento (YYYY-MM-DD)" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.birthdate}
-                            onChangeText={t => setFormParams(p => ({ ...p, birthdate: t }))}
-                            placeholder="Ej. 2022-05-14"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="Color del pelaje" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.color}
-                            onChangeText={t => setFormParams(p => ({ ...p, color: t }))}
-                            placeholder="Ej. Dorado con blanco"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <View style={styles.switchRow}>
-                            <Text style={[styles.inputLabel, { marginTop: 0, marginBottom: 0 }]}>
-                                Esterilizado/a
-                            </Text>
-                            <TouchableOpacity
-                                style={[styles.toggleBtn, formParams.sterilized && styles.toggleBtnOn]}
-                                onPress={() => setFormParams(p => ({ ...p, sterilized: !p.sterilized }))}
-                            >
-                                <Text style={[styles.toggleBtnText, formParams.sterilized && { color: COLORS.success }]}>
-                                    {formParams.sterilized ? '✅ Sí' : '❌ No'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* ── MÉDICO ── */}
-                        <FormSection label="Datos Médicos" />
-
-                        <FormLabel text="Nº Microchip" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.chipId}
-                            onChangeText={t => setFormParams(p => ({ ...p, chipId: t }))}
-                            placeholder="Ej. 941000024583921"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="⚠️ Alergias" />
-                        <TextInput
-                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            multiline
-                            value={formParams.allergies}
-                            onChangeText={t => setFormParams(p => ({ ...p, allergies: t }))}
-                            placeholder="Ej. Polen, pollo, penicilina..."
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="💊 Medicamentos actuales" />
-                        <TextInput
-                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            multiline
-                            value={formParams.medications}
-                            onChangeText={t => setFormParams(p => ({ ...p, medications: t }))}
-                            placeholder="Ej. Apoquel 16mg/día"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="📋 Condiciones médicas" />
-                        <TextInput
-                            style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            multiline
-                            value={formParams.medicalConditions}
-                            onChangeText={t => setFormParams(p => ({ ...p, medicalConditions: t }))}
-                            placeholder="Ej. Displasia de cadera, diabetes..."
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="🛡️ Nº Seguro / Póliza" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.insurance}
-                            onChangeText={t => setFormParams(p => ({ ...p, insurance: t }))}
-                            placeholder="Ej. AXA-2024-001234"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        {/* ── VETERINARIO ── */}
-                        <FormSection label="Veterinario" />
-
-                        <FormLabel text="Nombre del veterinario" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            value={formParams.vetName}
-                            onChangeText={t => setFormParams(p => ({ ...p, vetName: t }))}
-                            placeholder="Ej. Dr. García"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <FormLabel text="Teléfono de contacto" />
-                        <TextInput
-                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
-                            keyboardType="phone-pad"
-                            value={formParams.vetPhone}
-                            onChangeText={t => setFormParams(p => ({ ...p, vetPhone: t }))}
-                            placeholder="Ej. +34 912 345 678"
-                            placeholderTextColor={theme.textSecondary}
-                        />
-
-                        <TouchableOpacity style={styles.submitBtn} onPress={handleSavePet}>
-                            <Text style={styles.submitText}>
-                                {isEditing ? 'Guardar Cambios' : 'Registrar Mascota'}
-                            </Text>
-                        </TouchableOpacity>
-                        <View style={{ height: 60 }} />
-                    </ScrollView>
-                </KeyboardAvoidingView>
+                    </KeyboardAvoidingView>
+                </View>
             </Modal>
 
             {/* ── MODAL: PAW-PORT QR ─────────────────── */}
@@ -1699,10 +1827,11 @@ const styles = StyleSheet.create({
     },
     editChipText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
     fabBtn: {
-        position: 'absolute', bottom: 20,
-        backgroundColor: COLORS.primary, width: 56, height: 56, borderRadius: 28,
+        position: 'absolute', bottom: 90,
+        backgroundColor: COLORS.primary, width: 60, height: 60, borderRadius: 30,
         justifyContent: 'center', alignItems: 'center',
-        shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5,
+        shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
         zIndex: 100,
     },
 
@@ -2007,4 +2136,137 @@ const styles = StyleSheet.create({
         fontSize: 10, fontWeight: '700', color: COLORS.textLight,
         textAlign: 'center', marginTop: 14, letterSpacing: 0.5,
     },
+});
+
+// ─────────────────────────────────────────────────
+// WIZARD STYLES (Petazy-inspired dark theme)
+// ─────────────────────────────────────────────────
+const wizStyles = StyleSheet.create({
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
+        paddingBottom: 12,
+    },
+    backBtn: {
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    headerCenter: { alignItems: 'center' },
+    brandText: { fontSize: 16, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 },
+    stepCounter: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+    progressBar: {
+        height: 4, backgroundColor: 'rgba(255,255,255,0.1)',
+        marginHorizontal: 24, borderRadius: 2, marginBottom: 10,
+    },
+    progressFill: {
+        height: 4, backgroundColor: '#F5A623', borderRadius: 2,
+    },
+    stepContent: {
+        flexGrow: 1, paddingHorizontal: 28, paddingTop: 20, paddingBottom: 20,
+    },
+    stepContainer: { alignItems: 'center', flex: 1 },
+    stepEmoji: { fontSize: 56, marginBottom: 16 },
+    stepTitle: {
+        fontSize: 26, fontWeight: '900', color: '#FFF',
+        textAlign: 'center', marginBottom: 8, letterSpacing: -0.3,
+    },
+    stepDesc: {
+        fontSize: 15, color: 'rgba(255,255,255,0.5)',
+        textAlign: 'center', marginBottom: 30, lineHeight: 22,
+    },
+    // Photo step
+    photoCircle: {
+        width: 180, height: 180, borderRadius: 90,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 3, borderColor: 'rgba(255,255,255,0.15)',
+        borderStyle: 'dashed',
+        justifyContent: 'center', alignItems: 'center',
+        overflow: 'hidden',
+    },
+    photoCircleImg: { width: 180, height: 180, borderRadius: 90 },
+    photoPlaceholder: { alignItems: 'center', gap: 8 },
+    photoPlaceholderText: { color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 13 },
+    // Input
+    wizardInput: {
+        width: '100%',
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16,
+        fontSize: 17, color: '#FFF', fontWeight: '600',
+    },
+    fieldLabel: {
+        alignSelf: 'flex-start',
+        fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)',
+        textTransform: 'uppercase', letterSpacing: 0.6,
+        marginTop: 18, marginBottom: 8,
+    },
+    // Species
+    speciesGrid: {
+        flexDirection: 'row', flexWrap: 'wrap',
+        justifyContent: 'center', gap: 20,
+    },
+    speciesCircle: { alignItems: 'center', width: (width - 120) / 3 },
+    speciesCircleActive: {},
+    speciesIconWrap: {
+        width: 85, height: 85, borderRadius: 42.5,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+        marginBottom: 8,
+    },
+    speciesLabel: {
+        fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.6)',
+    },
+    // Gender
+    genderRow: {
+        flexDirection: 'row', gap: 24, marginBottom: 20,
+    },
+    genderCircle: {
+        width: 120, height: 120, borderRadius: 60,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    genderLabel: {
+        fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.5)', marginTop: 6,
+    },
+    skipText: {
+        fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.4)',
+        textDecorationLine: 'underline',
+    },
+    // Switch row
+    switchRow: {
+        flexDirection: 'row', alignItems: 'center',
+        justifyContent: 'space-between', width: '100%', marginTop: 18,
+    },
+    togglePill: {
+        paddingHorizontal: 18, paddingVertical: 10,
+        borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    // Bottom bar
+    bottomBar: {
+        paddingHorizontal: 28, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+        paddingTop: 12,
+    },
+    nextBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#F5A623', height: 56, borderRadius: 28,
+        gap: 8,
+        shadowColor: '#F5A623', shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
+    },
+    nextBtnText: { fontSize: 16, fontWeight: '800', color: '#1A1A2E' },
+    saveBtn: {
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#22C55E', height: 56, borderRadius: 28,
+        shadowColor: '#22C55E', shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
+    },
+    saveBtnText: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+    skipBtn: { alignItems: 'center', marginTop: 12 },
+    skipBtnText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
 });

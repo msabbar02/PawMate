@@ -9,7 +9,6 @@ import UsersPage from './pages/UsersPage';
 import PetsPage from './pages/PetsPage';
 import ReservationsPage from './pages/ReservationsPage';
 import MessagesPage from './pages/MessagesPage';
-import CommunityPage from './pages/CommunityPage';
 import ReportsPage from './pages/ReportsPage';
 import LogsPage from './pages/LogsPage';
 import ProfilePage from './pages/ProfilePage';
@@ -36,7 +35,6 @@ function App() {
         <Route path="pets" element={<PetsPage />} />
         <Route path="reservations" element={<ReservationsPage />} />
         <Route path="messages" element={<MessagesPage />} />
-        <Route path="community" element={<CommunityPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="profile" element={<ProfilePage />} />

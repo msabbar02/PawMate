@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { 
     LayoutDashboard, Users, Dog, CalendarDays, 
-    MessageSquare, Globe, AlertTriangle, 
+    MessageSquare, AlertTriangle, 
     LogOut, Menu, X, Activity, Sun, Moon,
     UserCog, ShieldPlus, ShieldCheck
 } from 'lucide-react';
@@ -33,7 +33,6 @@ export default function AdminLayout() {
         { path: '/pets', label: 'Mascotas', icon: <Dog size={20} /> },
         { path: '/reservations', label: 'Reservas', icon: <CalendarDays size={20} /> },
         { path: '/messages', label: 'Mensajes', icon: <MessageSquare size={20} /> },
-        { path: '/community', label: 'Comunidad', icon: <Globe size={20} /> },
         { path: '/reports', label: 'Reportes y Reseñas', icon: <AlertTriangle size={20} /> },
         { path: '/logs', label: 'Audit Logs', icon: <Activity size={20} /> },
         { path: '/verifications', label: 'Verificaciones', icon: <ShieldCheck size={20} /> },

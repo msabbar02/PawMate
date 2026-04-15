@@ -15,8 +15,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
@@ -116,11 +121,46 @@ export default function LoginScreen({ navigation }) {
         }
         setLoading(true);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(formData.email);
+            const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+                redirectTo: 'https://apppawmate.com/reset-password',
+            });
             if (error) throw error;
             Alert.alert('¡Enlace enviado! ✉️', 'Revisa tu correo para cambiar la contraseña.');
         } catch (error) {
             Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        try {
+            setLoading(true);
+            const redirectTo = makeRedirectUri({ native: 'pawmate://' });
+            console.log('Google OAuth redirect URI:', redirectTo);
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo,
+                    skipBrowserRedirect: true,
+                },
+            });
+            if (error) throw error;
+            console.log('OAuth URL:', data.url);
+
+            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+            if (result.type === 'success') {
+                const { params } = QueryParams.getQueryParams(result.url);
+                if (params?.access_token && params?.refresh_token) {
+                    await supabase.auth.setSession({
+                        access_token: params.access_token,
+                        refresh_token: params.refresh_token,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Google login error:', error);
+            Alert.alert('Error', error.message || 'No se pudo iniciar sesión con Google.');
         } finally {
             setLoading(false);
         }
@@ -242,11 +282,11 @@ export default function LoginScreen({ navigation }) {
                                 </View>
 
                                 <View style={styles.oauthButtonsRow}>
-                                    <TouchableOpacity style={styles.oauthBtn}>
+                                    <TouchableOpacity style={styles.oauthBtn} onPress={handleGoogleLogin} disabled={loading}>
                                         <Ionicons name="logo-google" size={20} color="#DB4437" />
                                         <Text style={styles.oauthBtnText}>Google</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.oauthBtn}>
+                                    <TouchableOpacity style={styles.oauthBtn} disabled>
                                         <Ionicons name="logo-apple" size={20} color="#000000" />
                                         <Text style={styles.oauthBtnText}>Apple</Text>
                                     </TouchableOpacity>

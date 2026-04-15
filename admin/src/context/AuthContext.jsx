@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../config/supabase';
 
 export const AuthContext = createContext();
@@ -7,6 +7,7 @@ export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [adminUser, setAdminUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const initDone = useRef(false);
 
     const fetchAdminProfile = async (authUser) => {
         if (!authUser) { setAdminUser(null); return null; }
@@ -25,15 +26,51 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            if (session?.user) {
-                const profile = await fetchAdminProfile(session.user);
-                setIsAuthenticated(!!profile);
-            }
-            setLoading(false);
-        }).catch(() => setLoading(false));
+        let timeout;
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const initAuth = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.warn('Session restore failed:', error.message);
+                    setIsAuthenticated(false);
+                    setLoading(false);
+                    return;
+                }
+                if (session?.user) {
+                    const profile = await fetchAdminProfile(session.user);
+                    setIsAuthenticated(!!profile);
+                } else {
+                    setIsAuthenticated(false);
+                }
+            } catch (err) {
+                console.warn('Auth init error:', err);
+                setIsAuthenticated(false);
+            } finally {
+                initDone.current = true;
+                setLoading(false);
+            }
+        };
+
+        // Safety timeout — never stay on blank screen
+        timeout = setTimeout(() => {
+            if (!initDone.current) {
+                console.warn('Auth init timeout — forcing load');
+                setLoading(false);
+            }
+        }, 5000);
+
+        initAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            // Skip the initial event — handled by initAuth
+            if (!initDone.current) return;
+
+            if (event === 'SIGNED_OUT') {
+                setIsAuthenticated(false);
+                setAdminUser(null);
+                return;
+            }
             if (session?.user) {
                 const profile = await fetchAdminProfile(session.user);
                 setIsAuthenticated(!!profile);
@@ -41,9 +78,12 @@ export const AuthProvider = ({ children }) => {
                 setIsAuthenticated(false);
                 setAdminUser(null);
             }
-            setLoading(false);
         });
-        return () => subscription.unsubscribe();
+
+        return () => {
+            clearTimeout(timeout);
+            subscription.unsubscribe();
+        };
     }, []);
 
     const login = async (email, password) => {
@@ -85,7 +125,29 @@ export const AuthProvider = ({ children }) => {
         if (session?.user) await fetchAdminProfile(session.user);
     };
 
-    if (loading) return null;
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--bg-color, #0B0E14)',
+            }}>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted, #94a3b8)' }}>
+                    <div style={{
+                        width: 40, height: 40, margin: '0 auto 16px',
+                        border: '3px solid rgba(255,255,255,0.1)',
+                        borderTopColor: 'var(--primary-color, #3b82f6)',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                    }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <span>Cargando...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <AuthContext.Provider value={{ isAuthenticated, adminUser, login, logout, refreshProfile }}>

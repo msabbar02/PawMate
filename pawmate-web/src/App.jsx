@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import {
@@ -9,6 +10,8 @@ import {
   Moon, Sun
 } from 'lucide-react';
 import './App.css';
+import ConfirmPage from './pages/ConfirmPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 /* ─── Animation Variants ──────────────────────── */
 const fadeUp = {
@@ -468,8 +471,8 @@ function Footer() {
   );
 }
 
-/* ─── Main App ─────────────────────────────────── */
-export default function App() {
+/* ─── Landing Page ─────────────────────────────── */
+function LandingPage() {
   return (
     <>
       <Navbar />
@@ -482,5 +485,18 @@ export default function App() {
       <CTA />
       <Footer />
     </>
+  );
+}
+
+/* ─── Main App ─────────────────────────────────── */
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/confirm" element={<ConfirmPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

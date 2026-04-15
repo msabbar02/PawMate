@@ -36,12 +36,16 @@ export default function VerificationsPage() {
 
         try {
             const newRole = user.pendingRole || 'owner';
-            await supabase.from('users').update({
+            const { error } = await supabase.from('users').update({
                 verificationStatus: 'approved',
-                verificationApprovedAt: new Date().toISOString(),
                 role: newRole,
-                isVerified: true,
             }).eq('id', user.id);
+
+            if (error) {
+                console.error('Supabase update error:', error);
+                alert(`Error al aprobar: ${error.message}`);
+                return;
+            }
 
             setRequests(prev => prev.map(r =>
                 r.id === user.id ? { ...r, verificationStatus: 'approved', role: newRole } : r
@@ -57,11 +61,15 @@ export default function VerificationsPage() {
         if (reason === null) return;
 
         try {
-            await supabase.from('users').update({
+            const { error } = await supabase.from('users').update({
                 verificationStatus: 'rejected',
-                verificationRejectedAt: new Date().toISOString(),
-                verificationRejectReason: reason,
             }).eq('id', user.id);
+
+            if (error) {
+                console.error('Supabase update error:', error);
+                alert(`Error al rechazar: ${error.message}`);
+                return;
+            }
 
             setRequests(prev => prev.map(r =>
                 r.id === user.id ? { ...r, verificationStatus: 'rejected' } : r
@@ -76,18 +84,22 @@ export default function VerificationsPage() {
         if (!window.confirm(`¿Revertir la verificación de ${user.fullName || user.email} a pendiente?`)) return;
 
         try {
-            await supabase.from('users').update({
+            const { error } = await supabase.from('users').update({
                 verificationStatus: 'pending',
-                verificationApprovedAt: null,
-                verificationRejectedAt: null,
-                verificationRejectReason: null,
             }).eq('id', user.id);
+
+            if (error) {
+                console.error('Supabase update error:', error);
+                alert(`Error al revertir: ${error.message}`);
+                return;
+            }
 
             setRequests(prev => prev.map(r =>
                 r.id === user.id ? { ...r, verificationStatus: 'pending' } : r
             ));
         } catch (err) {
             console.error('Error resetting:', err);
+            alert('Error al revertir la verificación.');
         }
     };
 

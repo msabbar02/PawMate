@@ -76,18 +76,6 @@ export async function uploadPetImage(localUri, storagePath) {
     }
 }
 
-// For COMMUNITY POST images: uploads image only, never modifies user profile.
-export async function uploadPostImage(localUri, storagePath) {
-    if (!localUri) throw new Error('No URI provided');
-    if (localUri.startsWith('http')) return localUri;
-    try {
-        return await _uploadToStorage(localUri, storagePath);
-    } catch (e) {
-        console.error('Post image upload error:', e);
-        throw e;
-    }
-}
-
 // For VERIFICATION DOCS: uploads image only, returns public URL.
 export async function uploadVerificationDoc(localUri, storagePath) {
     if (!localUri) throw new Error('No URI provided');
