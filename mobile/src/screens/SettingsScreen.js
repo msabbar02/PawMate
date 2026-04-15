@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
-import { uploadImageToStorage } from '../utils/storageHelpers';
+import { uploadImageToStorage, uploadReportImage } from '../utils/storageHelpers';
 import * as Contacts from 'expo-contacts';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -80,8 +80,9 @@ export default function SettingsScreen({ navigation }) {
 
     // Report modal
     const [showReportModal, setShowReportModal] = useState(false);
-    const [reportEmail, setReportEmail]         = useState('');
+    const [reportReason, setReportReason]       = useState('');
     const [reportText, setReportText]           = useState('');
+    const [reportImages, setReportImages]       = useState([]);
     const [sendingReport, setSendingReport]     = useState(false);
 
     // Emergency contacts
@@ -122,7 +123,6 @@ export default function SettingsScreen({ navigation }) {
             setPhotoUri(userData.photoURL || null);
             setEmergencyContacts(userData.emergencyContacts || []);
             setNotifsEnabled(userData.notificationsEnabled !== false);
-            setReportEmail(user?.email || '');
         }
     }, [userData]);
 
@@ -225,29 +225,53 @@ export default function SettingsScreen({ navigation }) {
     };
 
     // ── Send report ──
+    const handleAddReportImage = async () => {
+        if (reportImages.length >= 4) return Alert.alert('Límite', 'Máximo 4 imágenes por reporte.');
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'], allowsEditing: false, quality: 0.7,
+        });
+        if (result.canceled) return;
+        setReportImages([...reportImages, result.assets[0].uri]);
+    };
+
+    const handleRemoveReportImage = (index) => {
+        setReportImages(reportImages.filter((_, i) => i !== index));
+    };
+
     const handleSendReport = async () => {
         if (!reportText.trim()) return Alert.alert('Error', 'Describe el problema antes de enviar.');
-        if (!reportEmail.includes('@')) return Alert.alert('Error', 'Introduce un email válido.');
         setSendingReport(true);
         try {
-            // Try inserting into reports table; fall back to mailto if it fails
+            // Upload images if any
+            const imageUrls = [];
+            for (let i = 0; i < reportImages.length; i++) {
+                const uri = reportImages[i];
+                const path = `reports/${user.id}/${Date.now()}_${i}.jpg`;
+                try {
+                    const url = await uploadReportImage(uri, path);
+                    imageUrls.push(url);
+                } catch { /* skip failed uploads */ }
+            }
+
             const { error } = await supabase.from('reports').insert({
                 userId: user?.id || null,
-                email: reportEmail.trim(),
+                reporterName: userData?.fullName || user?.email || 'Anónimo',
+                reporterEmail: user?.email || null,
+                reason: reportReason.trim() || 'Reporte general',
                 message: reportText.trim(),
-                createdAt: new Date().toISOString(),
+                imageUrls,
+                status: 'pending',
+                created_at: new Date().toISOString(),
             });
             if (error) throw error;
             setShowReportModal(false);
             setReportText('');
+            setReportReason('');
+            setReportImages([]);
             Alert.alert('✅ Reporte enviado', 'Gracias por tu feedback. Lo revisaremos pronto.');
-        } catch {
-            // Fallback: open mailto
-            const subject = encodeURIComponent('Reporte de problema - PawMate');
-            const body = encodeURIComponent(`Email: ${reportEmail}\n\n${reportText}`);
-            Linking.openURL(`mailto:soporte@pawmate.app?subject=${subject}&body=${body}`);
-            setShowReportModal(false);
-            setReportText('');
+        } catch (e) {
+            console.error('Report error:', e);
+            Alert.alert('Error', 'No se pudo enviar el reporte. Inténtalo de nuevo.');
         } finally {
             setSendingReport(false);
         }
@@ -1005,7 +1029,7 @@ export default function SettingsScreen({ navigation }) {
             <Modal visible={showReportModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowReportModal(false)}>
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                        <TouchableOpacity onPress={() => { setShowReportModal(false); setReportText(''); }}>
+                        <TouchableOpacity onPress={() => { setShowReportModal(false); setReportText(''); setReportReason(''); setReportImages([]); }}>
                             <Ionicons name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
                         <Text style={[s.modalTitle, { color: theme.text }]}>Enviar Reporte</Text>
@@ -1015,25 +1039,28 @@ export default function SettingsScreen({ navigation }) {
                         <View style={[s.infoBanner, { backgroundColor: '#FFF1F2' }]}>
                             <Ionicons name="flag-outline" size={18} color="#E11D48" />
                             <Text style={[s.infoBannerText, { color: '#E11D48' }]}>
-                                Tu reporte nos ayuda a mejorar PawMate. Lo revisaremos lo antes posible.
+                                Tu reporte nos ayuda a mejorar PawMate. Puedes adjuntar capturas o fotos.
                             </Text>
                         </View>
 
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>TU EMAIL</Text>
-                        <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                            <Ionicons name="mail-outline" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
-                            <TextInput
-                                style={[s.passwordInput, { color: theme.text }]}
-                                value={reportEmail}
-                                onChangeText={setReportEmail}
-                                placeholder="tu@email.com"
-                                placeholderTextColor={theme.textSecondary}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>MOTIVO DEL REPORTE</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                            {['Bug / Error', 'Contenido inapropiado', 'Problema con usuario', 'Sugerencia', 'Otro'].map((reason) => (
+                                <TouchableOpacity
+                                    key={reason}
+                                    style={{
+                                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                                        backgroundColor: reportReason === reason ? theme.primary : theme.cardBackground,
+                                        borderWidth: 1, borderColor: reportReason === reason ? theme.primary : theme.border,
+                                    }}
+                                    onPress={() => setReportReason(reason)}
+                                >
+                                    <Text style={{ color: reportReason === reason ? '#FFF' : theme.text, fontSize: 13, fontWeight: '600' }}>{reason}</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
 
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>DESCRIBE EL PROBLEMA</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>DESCRIBE EL PROBLEMA</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border, alignItems: 'flex-start', paddingVertical: 14, minHeight: 130 }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text, textAlignVertical: 'top', minHeight: 100 }]}
@@ -1047,6 +1074,33 @@ export default function SettingsScreen({ navigation }) {
                         </View>
                         <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 6 }}>
                             {reportText.length} / 500 caracteres
+                        </Text>
+
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>FOTOS / CAPTURAS (OPCIONAL)</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+                            {reportImages.map((uri, i) => (
+                                <View key={i} style={{ position: 'relative' }}>
+                                    <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                                    <TouchableOpacity
+                                        style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#EF4444', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}
+                                        onPress={() => handleRemoveReportImage(i)}
+                                    >
+                                        <Ionicons name="close" size={14} color="#FFF" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                            {reportImages.length < 4 && (
+                                <TouchableOpacity
+                                    style={{ width: 80, height: 80, borderRadius: 12, borderWidth: 2, borderColor: theme.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: theme.cardBackground }}
+                                    onPress={handleAddReportImage}
+                                >
+                                    <Ionicons name="camera-outline" size={24} color={theme.textSecondary} />
+                                    <Text style={{ fontSize: 10, color: theme.textSecondary, marginTop: 2 }}>Añadir</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={{ color: theme.textSecondary, fontSize: 11 }}>
+                            Máximo 4 imágenes
                         </Text>
 
                         <TouchableOpacity

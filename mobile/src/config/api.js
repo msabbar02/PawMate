@@ -17,3 +17,31 @@ export const notifyReservationStatus = async (reservationId) => {
         return false;
     }
 };
+
+export const sendWelcomeEmail = async (email, fullName) => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/notifications/welcome-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, fullName }),
+        });
+        return res.ok;
+    } catch (e) {
+        console.warn('Welcome email:', e.message);
+        return false;
+    }
+};
+
+export const sendWelcomeEmail = async (email, fullName) => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/notifications/welcome-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, fullName }),
+        });
+        return res.ok;
+    } catch (e) {
+        console.warn('Welcome email:', e.message);
+        return false;
+    }
+};

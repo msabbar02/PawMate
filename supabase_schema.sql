@@ -155,6 +155,43 @@ CREATE TABLE IF NOT EXISTS public.recent_activity (
   created_at timestamp with time zone DEFAULT now()
 );
 
+-- 9. Tabla: reports
+CREATE TABLE IF NOT EXISTS public.reports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  "reporterName" text,
+  "reporterEmail" text,
+  reason text,
+  message text,
+  "imageUrls" text[] DEFAULT '{}',
+  status text DEFAULT 'pending', -- 'pending', 'resolved'
+  "adminNotes" text,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- 10. Tabla: system_logs
+CREATE TABLE IF NOT EXISTS public.system_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" text,
+  "userEmail" text,
+  "actionType" text,
+  entity text,
+  details text,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- 11. Tabla: reviews
+CREATE TABLE IF NOT EXISTS public.reviews (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "reviewerId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  "reviewerName" text,
+  "revieweeId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  "revieweeName" text,
+  rating integer,
+  comment text,
+  created_at timestamp with time zone DEFAULT now()
+);
+
 -- ==========================================
 -- REALTIME
 -- ==========================================
@@ -177,7 +214,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE
   public.messages, 
   public.reservations,
   public.notifications,
-  public.recent_activity;
+  public.recent_activity,
+  public.reports;
 
 -- ==========================================
 -- TRIGGER DE AUTENTICACION
@@ -206,10 +244,16 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 ALTER TABLE public.pets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.walks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recent_activity ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "pets_accessAll" ON public.pets FOR ALL USING (true);
 CREATE POLICY "walks_accessAll" ON public.walks FOR ALL USING (true);
 CREATE POLICY "activity_accessAll" ON public.recent_activity FOR ALL USING (true);
+CREATE POLICY "reports_accessAll" ON public.reports FOR ALL USING (true);
+CREATE POLICY "system_logs_accessAll" ON public.system_logs FOR ALL USING (true);
+CREATE POLICY "reviews_accessAll" ON public.reviews FOR ALL USING (true);
 
 -- ==========================================
 -- MIGRATION: REALTIME MAP MODULES (execute in Supabase SQL Editor)

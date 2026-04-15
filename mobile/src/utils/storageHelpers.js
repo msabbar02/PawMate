@@ -88,6 +88,18 @@ export async function uploadVerificationDoc(localUri, storagePath) {
     }
 }
 
+// For REPORT images: uploads image only, returns public URL.
+export async function uploadReportImage(localUri, storagePath) {
+    if (!localUri) throw new Error('No URI provided');
+    if (localUri.startsWith('http')) return localUri;
+    try {
+        return await _uploadToStorage(localUri, storagePath);
+    } catch (e) {
+        console.error('Report image upload error:', e);
+        throw e;
+    }
+}
+
 // Legacy alias — kept for backward compat
 export async function saveAvatarToFirestore(localUri, userId) {
     if (!localUri) return null;
