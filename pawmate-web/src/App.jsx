@@ -147,6 +147,7 @@ function Hero() {
   return (
     <section className="hero" id="hero">
       <div className="hero-bg-grid" />
+      <div className="hero-paw-pattern" />
       <div className="hero-glow hero-glow-1" />
       <div className="hero-glow hero-glow-2" />
 
@@ -218,7 +219,7 @@ function Hero() {
               <motion.div className="hero-float-card hero-float-bottom"
                 animate={{ y: [0, 8, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
               >
-                <div className="float-icon">💚</div>
+                <div className="float-icon">🧡</div>
                 <div><div className="float-title">Salud al día</div><div className="float-sub">Vacunas · Peso · Alergias</div></div>
               </motion.div>
             </motion.div>
@@ -257,12 +258,12 @@ function TrustBand() {
 
 /* ─── Features ─────────────────────────────────── */
 const features = [
-  { icon: <Navigation2 size={26} />, title: 'GPS Tracking', desc: 'Registra cada paseo con precisión milimétrica. Rutas, distancia y calorías en tiempo real.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
-  { icon: <Heart size={26} />, title: 'Historial Médico', desc: 'Peso, vacunas, alergias, cirugías y contactos veterinarios sincronizados en la nube.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-  { icon: <QrCode size={26} />, title: 'Paw-Port QR', desc: 'Un QR único con todo el historial de tu mascota. Escaneable en urgencias veterinarias.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-  { icon: <Bell size={26} />, title: 'Recordatorios', desc: 'Notificaciones push inteligentes para vacunas, medicación y citas veterinarias.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-  { icon: <Shield size={26} />, title: 'Cuidadores Verificados', desc: 'Red de paseadores y cuidadores certificados con verificación KYC y reseñas reales.', color: '#1a7a4c', bg: 'rgba(26, 122, 76, 0.1)' },
-  { icon: <Users size={26} />, title: 'Comunidad', desc: 'Conecta con otros dueños, comparte experiencias y encuentra compañeros de paseo.', color: '#0891b2', bg: 'rgba(8, 145, 178, 0.1)' },
+  { icon: <Navigation2 size={26} />, title: 'GPS Tracking', desc: 'Registra cada paseo con precisión milimétrica. Rutas, distancia y calorías en tiempo real.', color: '#F5A623', bg: 'rgba(245, 166, 35, 0.1)' },
+  { icon: <Heart size={26} />, title: 'Historial Médico', desc: 'Peso, vacunas, alergias, cirugías y contactos veterinarios sincronizados en la nube.', color: '#FF6B35', bg: 'rgba(255, 107, 53, 0.1)' },
+  { icon: <QrCode size={26} />, title: 'Paw-Port QR', desc: 'Un QR único con todo el historial de tu mascota. Escaneable en urgencias veterinarias.', color: '#1A1A2E', bg: 'rgba(26, 26, 46, 0.08)' },
+  { icon: <Bell size={26} />, title: 'Recordatorios', desc: 'Notificaciones push inteligentes para vacunas, medicación y citas veterinarias.', color: '#E8941E', bg: 'rgba(232, 148, 30, 0.1)' },
+  { icon: <Shield size={26} />, title: 'Cuidadores Verificados', desc: 'Red de paseadores y cuidadores certificados con verificación KYC y reseñas reales.', color: '#F5A623', bg: 'rgba(245, 166, 35, 0.1)' },
+  { icon: <Users size={26} />, title: 'Comunidad', desc: 'Conecta con otros dueños, comparte experiencias y encuentra compañeros de paseo.', color: '#FF6B35', bg: 'rgba(255, 107, 53, 0.1)' },
 ];
 
 function Features() {
@@ -460,7 +461,7 @@ function Footer() {
         </div>
         <div className="footer-bottom">
           <span>© 2026 PawMate · Desarrollado por <strong>Mohamed Sabbar</strong></span>
-          <span className="footer-made">Hecho con 💚 para las mascotas</span>
+          <span className="footer-made">Hecho con 🧡 para las mascotas</span>
         </div>
       </div>
     </footer>
