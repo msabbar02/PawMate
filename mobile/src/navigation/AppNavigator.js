@@ -15,6 +15,9 @@ import MyPetsScreen from '../screens/MyPetsScreen';
 import BookingScreen from '../screens/BookingScreen';
 import CaregiversScreen from '../screens/CaregiversScreen';
 import CaregiverProfileScreen from '../screens/CaregiverProfileScreen';
+import CreateBookingScreen from '../screens/CreateBookingScreen';
+import ChatScreen from '../screens/ChatScreen';
+import CaregiverSetupScreen from '../screens/CaregiverSetupScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import VerifyOwnerScreen from '../screens/VerifyOwnerScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -234,6 +237,21 @@ export default function AppNavigator() {
                             name="Messages" 
                             component={MessagesScreen} 
                             options={{ headerShown: false }} 
+                        />
+                        <Stack.Screen
+                            name="CreateBooking"
+                            component={CreateBookingScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name="Chat"
+                            component={ChatScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name="CaregiverSetup"
+                            component={CaregiverSetupScreen}
+                            options={{ headerShown: false }}
                         />
                         <Stack.Screen
                             name="Verify"

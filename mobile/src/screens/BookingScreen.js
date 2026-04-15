@@ -14,7 +14,7 @@ import { supabase } from '../config/supabase';
 import { createNotification, generateUniqueId } from '../utils/notificationHelpers';
 import { useSafeStripe } from '../config/stripe';
 
-const SERVER_URL = 'http://localhost:3000';
+const SERVER_URL = 'https://api.apppawmate.com';
 
 // ─────────────────────────────────────────────────
 // STATUS CONFIG
@@ -74,10 +74,10 @@ export default function BookingScreen() {
     useEffect(() => {
         if (!user?.id) { setLoading(false); return; }
         const isCaregiver = userData?.role === 'caregiver';
-        const field = isCaregiver ? 'caregiverUid' : 'ownerUid';
+        const field = isCaregiver ? 'caregiverId' : 'ownerId';
         
         const fetchReservations = async () => {
-            const { data } = await supabase.from('reservations').select('*').eq(field, user.id).order('createdAt', { ascending: false });
+            const { data } = await supabase.from('reservations').select('*').eq(field, user.id).order('created_at', { ascending: false });
             if (data) {
                 setReservations(data);
                 setConversations(data.filter(r => r.status !== 'cancelada'));
@@ -99,7 +99,7 @@ export default function BookingScreen() {
     useEffect(() => {
         if (!activeConversation) return;
         const fetchMessages = async () => {
-             const { data } = await supabase.from('messages').select('*').eq('conversationId', activeConversation.id).order('createdAt', { ascending: true });
+             const { data } = await supabase.from('messages').select('*').eq('conversationId', activeConversation.id).order('created_at', { ascending: true });
              if (data) setMessages(data);
         };
         fetchMessages();
@@ -118,7 +118,7 @@ export default function BookingScreen() {
         const maxLimit = serviceType === 'walking' ? MAX_WALK : MAX_HOTEL;
         const { count } = await supabase.from('reservations')
             .select('*', { count: 'exact', head: true })
-            .eq('caregiverUid', caregiverId)
+            .eq('caregiverId', caregiverId)
             .eq('status', 'aceptada')
             .eq('serviceType', serviceType);
         return (count || 0) < maxLimit;
@@ -139,7 +139,7 @@ export default function BookingScreen() {
             await supabase.from('reservations').update({
                 status: 'aceptada'
             }).eq('id', reservation.id);
-            await createNotification(reservation.ownerUid, {
+            await createNotification(reservation.ownerId, {
                 type: 'booking_confirmed',
                 bookingId: reservation.id,
                 title: '¡Reserva aceptada! 🎉',
@@ -200,7 +200,7 @@ export default function BookingScreen() {
             await supabase.from('reservations').update({
                 status: 'activa', qrCode
             }).eq('id', reservation.id);
-            await createNotification(reservation.caregiverUid, {
+            await createNotification(reservation.caregiverId, {
                 type: 'booking_active',
                 bookingId: reservation.id,
                 title: '📱 Reserva activa — escanea el QR',
@@ -227,7 +227,7 @@ export default function BookingScreen() {
                         await supabase.from('reservations').update({
                             status: 'completada'
                         }).eq('id', reservation.id);
-                        await createNotification(reservation.ownerUid, {
+                        await createNotification(reservation.ownerId, {
                             type: 'booking_completed',
                             bookingId: reservation.id,
                             title: '✅ Servicio completado',
@@ -251,7 +251,7 @@ export default function BookingScreen() {
         try {
             const { data, error } = await supabase.from('reservations')
                 .select('*')
-                .eq('caregiverUid', user.id)
+                .eq('caregiverId', user.id)
                 .eq('qrCode', qrData)
                 .eq('status', 'activa')
                 .limit(1);
@@ -311,22 +311,22 @@ export default function BookingScreen() {
         setSubmittingReview(true);
         try {
             await supabase.from('reviews').insert({
-                reviewerUid: user.id,
+                reviewerId: user.id,
                 reviewerName: userData?.fullName || 'Usuario',
-                caregiverUid: reviewTarget.caregiverUid,
+                revieweeId: reviewTarget.caregiverId,
                 caregiverName: reviewTarget.caregiverName,
                 bookingId: reviewTarget.id,
                 rating: reviewRating,
                 comment: reviewText.trim(),
             });
-            const { data: cgData } = await supabase.from('users').select('reviewCount, rating').eq('id', reviewTarget.caregiverUid).single();
+            const { data: cgData } = await supabase.from('users').select('reviewCount, rating').eq('id', reviewTarget.caregiverId).single();
             if (cgData) {
                 const count = (cgData.reviewCount || 0) + 1;
                 const avgRating = ((cgData.rating || 0) * (count - 1) + reviewRating) / count;
                 await supabase.from('users').update({
                     rating: Math.round(avgRating * 10) / 10,
                     reviewCount: count,
-                }).eq('id', reviewTarget.caregiverUid);
+                }).eq('id', reviewTarget.caregiverId);
             }
             await supabase.from('reservations').update({ reviewedByOwner: true }).eq('id', reviewTarget.id);
             setIsReviewModalVisible(false);
@@ -449,9 +449,9 @@ export default function BookingScreen() {
             <View style={[s.messageWrap, isMe ? s.bubbleRight : s.bubbleLeft]}>
                 <View style={[s.bubble, isMe ? s.bubbleMine : [s.bubbleOther, { backgroundColor: theme.cardBackground }]]}>
                     <Text style={[s.bubbleText, { color: isMe ? '#FFF' : theme.text }]}>{item.text}</Text>
-                    {item.createdAt && (
+                    {item.created_at && (
                         <Text style={[s.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>
-                            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                     )}
                 </View>

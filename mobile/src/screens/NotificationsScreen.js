@@ -9,7 +9,6 @@ import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
-import { acceptFriendRequest, rejectFriendRequest } from '../utils/friendHelpers';
 
 // Relative time helper
 function relativeTime(ts) {
@@ -168,33 +167,7 @@ export default function NotificationsScreen({ navigation }) {
 
     const isCaregiver = userData?.role === 'caregiver';
 
-    // ── ACCEPT/REJECT FRIEND REQUEST ────────────────
-    const handleAcceptFriend = async (notif) => {
-        try {
-            await acceptFriendRequest(
-                notif.requestId || notif.id,
-                notif.fromUid,
-                notif.fromName || 'Usuario',
-                notif.fromPhotoURL,
-                userData
-            );
-            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
-            Alert.alert('¡Amigo añadido! 🎉', 'Ahora podréis ver los posts del otro.');
-            if (activeNotif?.id === notif.id) setActiveNotif(null);
-        } catch (e) {
-            Alert.alert('Error', 'No se pudo aceptar la solicitud.');
-        }
-    };
 
-    const handleRejectFriend = async (notif) => {
-        try {
-            await rejectFriendRequest(notif.requestId || notif.id);
-            await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
-            if (activeNotif?.id === notif.id) setActiveNotif(null);
-        } catch {
-            Alert.alert('Error', 'No se pudo rechazar la solicitud.');
-        }
-    };
 
     const renderBookingActions = (notif) => {
         if (notif.type !== 'booking_request' || !isCaregiver) return null;
@@ -211,20 +184,7 @@ export default function NotificationsScreen({ navigation }) {
         );
     };
 
-    const renderFriendActions = (notif) => {
-        if (notif.type !== 'friend_request') return null;
-        return (
-            <View style={styles.bookingActions}>
-                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptFriend(notif)}>
-                    <Ionicons name="checkmark" size={15} color="#FFF" />
-                    <Text style={styles.acceptBtnText}>Aceptar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectFriend(notif)}>
-                    <Text style={styles.rejectBtnText}>Rechazar</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    };
+
 
     // ── DETAIL VIEW ───────────────────────────────
     if (activeNotif) {
@@ -249,7 +209,6 @@ export default function NotificationsScreen({ navigation }) {
                         <Text style={[styles.detailBody, { color: theme.text }]}>{activeNotif.body}</Text>
                     </View>
                     {renderBookingActions(activeNotif)}
-                    {renderFriendActions(activeNotif)}
                 </ScrollView>
             </View>
         );

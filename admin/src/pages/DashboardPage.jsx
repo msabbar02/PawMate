@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-import { Users, Dog, CalendarDays, Globe, AlertTriangle } from 'lucide-react';
+import { Users, Dog, CalendarDays, AlertTriangle } from 'lucide-react';
 import './DashboardPage.css';
 
 export default function DashboardPage() {
@@ -8,7 +8,6 @@ export default function DashboardPage() {
         users: 0,
         pets: 0,
         reservations: 0,
-        posts: 0,
         reports: 0
     });
     const [recentActivity, setRecentActivity] = useState([]);
@@ -22,23 +21,20 @@ export default function DashboardPage() {
                     { count: usersCount }, 
                     { count: petsCount }, 
                     { count: resCount }, 
-                    { count: postsCount }, 
                     { count: repCount },
                     { data: recent }
                 ] = await Promise.all([
                     supabase.from('users').select('*', { count: 'exact', head: true }),
                     supabase.from('pets').select('*', { count: 'exact', head: true }),
                     supabase.from('reservations').select('*', { count: 'exact', head: true }),
-                    supabase.from('posts').select('*', { count: 'exact', head: true }),
                     supabase.from('reports').select('*', { count: 'exact', head: true }),
-                    supabase.from('reservations').select('*').order('createdAt', { ascending: false }).limit(5)
+                    supabase.from('reservations').select('*').order('created_at', { ascending: false }).limit(5)
                 ]);
 
                 setStats({
                     users: usersCount || 0,
                     pets: petsCount || 0,
                     reservations: resCount || 0,
-                    posts: postsCount || 0,
                     reports: repCount || 0
                 });
 
@@ -57,7 +53,6 @@ export default function DashboardPage() {
         { title: 'Total Usuarios', value: stats.users, icon: <Users size={24} />, color: 'var(--primary-color)', bg: 'rgba(59, 130, 246, 0.2)' },
         { title: 'Mascotas', value: stats.pets, icon: <Dog size={24} />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
         { title: 'Reservas Totales', value: stats.reservations, icon: <CalendarDays size={24} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.2)' },
-        { title: 'Publicaciones', value: stats.posts, icon: <Globe size={24} />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)' },
         { title: 'Reportes', value: stats.reports, icon: <AlertTriangle size={24} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)' }
     ];
 

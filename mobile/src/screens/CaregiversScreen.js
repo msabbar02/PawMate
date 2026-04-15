@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
     StyleSheet, View, Text, FlatList, Image, TouchableOpacity,
-    ActivityIndicator, TextInput, Platform
+    ActivityIndicator, TextInput, Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -10,25 +10,24 @@ import { COLORS } from '../constants/colors';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 
+const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel', daycare: '☀️ Guardería', grooming: '✂️ Peluquería', training: '🏋️ Entreno' };
+
 export default function CaregiversScreen({ navigation }) {
     const { theme, isDarkMode } = useContext(ThemeContext);
-    const { user } = useContext(AuthContext);
+    const { user, userData } = useContext(AuthContext);
     
     const [caregivers, setCaregivers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    useEffect(() => {
-        fetchCaregivers();
-    }, []);
-
-    const fetchCaregivers = async () => {
+    const fetchCaregivers = useCallback(async () => {
         try {
-            setLoading(true);
             const { data, error } = await supabase
                 .from('users')
                 .select('*')
-                .eq('role', 'caregiver');
+                .eq('role', 'caregiver')
+                .neq('id', user?.id || '');
                 
             if (error) throw error;
             setCaregivers(data || []);
@@ -36,69 +35,140 @@ export default function CaregiversScreen({ navigation }) {
             console.error('Error fetching caregivers:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
-    };
+    }, [user?.id]);
+
+    useEffect(() => { fetchCaregivers(); }, [fetchCaregivers]);
+
+    const onRefresh = () => { setRefreshing(true); fetchCaregivers(); };
 
     const filteredCaregivers = caregivers.filter(cg =>
-        (cg.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (cg.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (cg.firstName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (cg.city?.toLowerCase() || '').includes(searchQuery.toLowerCase())
     );
 
-    const renderCaregiver = ({ item }) => (
-        <TouchableOpacity 
-            style={[styles.card, { backgroundColor: theme.cardBackground }]}
-            onPress={() => navigation.navigate('CaregiverProfile', { caregiver: item })}
-            activeOpacity={0.8}
-        >
-            <View style={styles.cardContent}>
-                <View style={styles.avatarWrap}>
-                    <Image source={{ uri: item.avatar || 'https://via.placeholder.com/100' }} style={styles.avatar} />
-                    <View style={[styles.onlineBadge, { backgroundColor: item.isOnline ? '#22c55e' : '#9CA3AF' }]} />
-                </View>
+    const handleMessage = async (caregiver) => {
+        try {
+            // Find or create conversation
+            const { data: existing } = await supabase
+                .from('conversations')
+                .select('*')
+                .eq('ownerId', user.id)
+                .eq('caregiverId', caregiver.id)
+                .limit(1);
 
-                <View style={styles.infoCol}>
-                    <View style={styles.nameRow}>
-                        <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name || item.fullName || 'Cuidador'}</Text>
-                        {item.isVerified && (
-                            <View style={styles.verifiedTag}>
-                                <Ionicons name="shield-checkmark" size={12} color="#F5A623" />
+            let conversation = existing?.[0];
+            if (!conversation) {
+                const { data: newConvo, error } = await supabase.from('conversations').insert({
+                    ownerId: user.id,
+                    caregiverId: caregiver.id,
+                    ownerName: userData?.fullName || 'Dueño',
+                    caregiverName: caregiver.fullName || 'Cuidador',
+                    ownerAvatar: userData?.avatar || null,
+                    caregiverAvatar: caregiver.avatar || null,
+                }).select().single();
+                if (error) throw error;
+                conversation = newConvo;
+            }
+            navigation.navigate('Chat', { conversation, otherUser: caregiver });
+        } catch (e) {
+            console.error('Error creating conversation:', e);
+        }
+    };
+
+    const renderCaregiver = ({ item }) => {
+        const hasPrice = item.price && item.price > 0;
+        const services = item.serviceTypes || [];
+
+        return (
+            <TouchableOpacity 
+                style={[styles.card, { backgroundColor: theme.cardBackground }]}
+                onPress={() => navigation.navigate('CaregiverProfile', { caregiverId: item.id })}
+                activeOpacity={0.8}
+            >
+                <View style={styles.cardContent}>
+                    <View style={styles.avatarWrap}>
+                        {item.avatar ? (
+                            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                        ) : (
+                            <View style={[styles.avatar, { backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' }]}>
+                                <Text style={{ fontSize: 28 }}>{(item.fullName || 'C').charAt(0)}</Text>
+                            </View>
+                        )}
+                        <View style={[styles.onlineBadge, { backgroundColor: item.isOnline ? '#22c55e' : '#9CA3AF' }]} />
+                    </View>
+
+                    <View style={styles.infoCol}>
+                        <View style={styles.nameRow}>
+                            <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
+                                {item.fullName || item.firstName || 'Cuidador'}
+                            </Text>
+                            {item.verificationStatus === 'verified' && (
+                                <View style={styles.verifiedTag}>
+                                    <Ionicons name="shield-checkmark" size={12} color="#F5A623" />
+                                </View>
+                            )}
+                        </View>
+                        
+                        {(item.rating > 0 || item.reviewCount > 0) && (
+                            <View style={styles.ratingRow}>
+                                <Ionicons name="star" size={14} color="#F5A623" />
+                                <Text style={[styles.ratingText, { color: theme.text }]}>{item.rating?.toFixed(1) || '0.0'}</Text>
+                                <Text style={styles.reviewText}>({item.reviewCount || 0} reseñas)</Text>
+                            </View>
+                        )}
+
+                        {item.experience ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                                <Ionicons name="time-outline" size={12} color={theme.textSecondary} />
+                                <Text style={[styles.cityText, { color: theme.textSecondary }]}>{item.experience}</Text>
+                            </View>
+                        ) : null}
+
+                        <Text style={[styles.cityText, { color: theme.textSecondary }]} numberOfLines={1}>
+                            <Ionicons name="location-outline" size={12} /> {item.city || 'Sin ubicación'}
+                        </Text>
+
+                        {hasPrice && (
+                            <View style={styles.priceRow}>
+                                <Text style={styles.priceText}>{item.price}€</Text>
+                                <Text style={[styles.priceUnit, { color: theme.textSecondary }]}>/hora</Text>
                             </View>
                         )}
                     </View>
-                    
-                    <View style={styles.ratingRow}>
-                        <Ionicons name="star" size={14} color="#F5A623" />
-                        <Text style={[styles.ratingText, { color: theme.text }]}>{item.rating || '5.0'}</Text>
-                        <Text style={styles.reviewText}>({item.reviews || 0} reseñas)</Text>
-                    </View>
-
-                    <Text style={[styles.cityText, { color: theme.textSecondary }]} numberOfLines={1}>
-                        <Ionicons name="location-outline" size={12} /> {item.city || 'Sin ubicación'}
-                    </Text>
-
-                    <View style={styles.priceRow}>
-                        <Text style={styles.priceText}>{item.price || 15}€</Text>
-                        <Text style={[styles.priceUnit, { color: theme.textSecondary }]}>/hora</Text>
-                    </View>
                 </View>
-            </View>
 
-            <View style={[styles.cardActions, { borderTopColor: theme.border }]}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
-                    <Ionicons name="chatbubble-outline" size={17} color={theme.textSecondary} />
-                    <Text style={[styles.actionText, { color: theme.textSecondary }]}>Mensaje</Text>
-                </TouchableOpacity>
+                {/* Services chips */}
+                {services.length > 0 && (
+                    <View style={styles.servicesRow}>
+                        {services.slice(0, 3).map(s => (
+                            <View key={s} style={[styles.serviceChip, { backgroundColor: COLORS.primaryBg }]}>
+                                <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: '700' }}>
+                                    {SERVICE_LABELS[s] || s}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
 
-                <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
+                <View style={[styles.cardActions, { borderTopColor: theme.border }]}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleMessage(item)}>
+                        <Ionicons name="chatbubble-outline" size={17} color={theme.textSecondary} />
+                        <Text style={[styles.actionText, { color: theme.textSecondary }]}>Mensaje</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Reservas')}>
-                    <Ionicons name="calendar-outline" size={17} color={COLORS.primary} />
-                    <Text style={[styles.actionText, { color: COLORS.primary, fontWeight: '800' }]}>Reservar</Text>
-                </TouchableOpacity>
-            </View>
-        </TouchableOpacity>
-    );
+                    <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
+
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CaregiverProfile', { caregiverId: item.id })}>
+                        <Ionicons name="calendar-outline" size={17} color={COLORS.primary} />
+                        <Text style={[styles.actionText, { color: COLORS.primary, fontWeight: '800' }]}>Reservar</Text>
+                    </TouchableOpacity>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -106,14 +176,14 @@ export default function CaregiversScreen({ navigation }) {
 
             {/* Header & Search */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>Cuidadores Certificados</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Cuidadores</Text>
                 <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Encuentra al mejor cuidador para tu mascota</Text>
 
                 <View style={[styles.searchBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
                     <Ionicons name="search" size={20} color={theme.textSecondary} style={{ marginLeft: 15 }} />
                     <TextInput
                         style={[styles.searchInput, { color: theme.text }]}
-                        placeholder="Buscar por nombre, o ciudad..."
+                        placeholder="Buscar por nombre o ciudad..."
                         placeholderTextColor={COLORS.textLight}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -133,9 +203,10 @@ export default function CaregiversScreen({ navigation }) {
                     renderItem={renderCaregiver}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                     ListEmptyComponent={
                         <View style={styles.emptyBox}>
-                            <Ionicons name="search-outline" size={60} color={theme.textLight} />
+                            <Ionicons name="search-outline" size={60} color={COLORS.textLight} />
                             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No se encontraron cuidadores.</Text>
                         </View>
                     }
@@ -166,10 +237,12 @@ const styles = StyleSheet.create({
     ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
     ratingText: { marginLeft: 4, fontSize: 14, fontWeight: '700' },
     reviewText: { marginLeft: 4, fontSize: 12, color: COLORS.textLight },
-    cityText: { fontSize: 13, marginBottom: 6 },
-    priceRow: { flexDirection: 'row', alignItems: 'baseline' },
+    cityText: { fontSize: 13, marginBottom: 4 },
+    priceRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
     priceText: { fontSize: 20, fontWeight: '800', color: COLORS.primary },
     priceUnit: { fontSize: 13, fontWeight: '600', marginLeft: 2 },
+    servicesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 18, paddingBottom: 12 },
+    serviceChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
     cardActions: { flexDirection: 'row', borderTopWidth: 1, alignItems: 'center' },
     actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, gap: 6 },
     actionDivider: { width: 1, height: 20 },

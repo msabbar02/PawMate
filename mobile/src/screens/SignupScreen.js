@@ -16,8 +16,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 
@@ -199,7 +197,7 @@ export default function SignupScreen({ navigation }) {
     const handleGoogleSignup = async () => {
         try {
             setLoading(true);
-            const redirectTo = makeRedirectUri({ native: 'pawmate://' });
+            const redirectTo = 'pawmate://signup';
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -209,14 +207,27 @@ export default function SignupScreen({ navigation }) {
             });
             if (error) throw error;
 
-            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-            if (result.type === 'success') {
-                const { params } = QueryParams.getQueryParams(result.url);
-                if (params?.access_token && params?.refresh_token) {
-                    await supabase.auth.setSession({
-                        access_token: params.access_token,
-                        refresh_token: params.refresh_token,
-                    });
+            const result = await WebBrowser.openAuthSessionAsync(data.url, 'pawmate://');
+            if (result.type === 'success' && result.url) {
+                const url = result.url;
+                const codeMatch = url.match(/[?&]code=([^&#]+)/);
+                if (codeMatch) {
+                    const code = decodeURIComponent(codeMatch[1]);
+                    const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+                    if (sessionError) throw sessionError;
+                } else {
+                    let params = {};
+                    const hashIndex = url.indexOf('#');
+                    if (hashIndex !== -1) {
+                        const fragment = url.substring(hashIndex + 1);
+                        params = Object.fromEntries(new URLSearchParams(fragment));
+                    }
+                    if (params.access_token && params.refresh_token) {
+                        await supabase.auth.setSession({
+                            access_token: params.access_token,
+                            refresh_token: params.refresh_token,
+                        });
+                    }
                 }
             }
         } catch (error) {

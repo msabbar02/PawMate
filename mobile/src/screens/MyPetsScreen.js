@@ -505,29 +505,37 @@ export default function PawMatePetsCenter() {
             };
 
             if (isEditing && selectedPet) {
-                await supabase.from('pets').update(dataToSave).eq('id', selectedPet.id);
-                await logActivity(user?.id, 'Mascota Actualizada', `Perfil de ${dataToSave.name} editado con éxito`, 'pet', 'create-outline');
-                await logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_UPDATED', 'Pets', { petName: dataToSave.name });
+                const { error } = await supabase.from('pets').update(dataToSave).eq('id', selectedPet.id);
+                if (error) throw error;
             } else {
-                await supabase.from('pets').insert({
+                const { error } = await supabase.from('pets').insert({
                     ...dataToSave,
                     ownerId: user?.id,
                     activity: { km: 0 },
                     vaccines: [],
                     reminders: [],
                 });
-                await logActivity(user?.id, 'Nueva Mascota', `Damos la bienvenida a ${dataToSave.name} 🐾`, 'pet', 'paw');
-                await logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_CREATED', 'Pets', { petName: dataToSave.name });
+                if (error) throw error;
             }
+
+            // Re-fetch immediately so the pet shows up right away
+            const { data } = await supabase.from('pets').select('*').eq('ownerId', user?.id);
+            if (data) setPets(data);
+
             setIsFormVisible(false);
             resetForm();
+
+            // Log activity in background (don't block UI)
+            if (isEditing) {
+                logActivity(user?.id, 'Mascota Actualizada', `Perfil de ${dataToSave.name} editado con éxito`, 'pet', 'create-outline').catch(() => {});
+                logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_UPDATED', 'Pets', { petName: dataToSave.name }).catch(() => {});
+            } else {
+                logActivity(user?.id, 'Nueva Mascota', `Damos la bienvenida a ${dataToSave.name} 🐾`, 'pet', 'paw').catch(() => {});
+                logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_CREATED', 'Pets', { petName: dataToSave.name }).catch(() => {});
+            }
         } catch (e) {
             console.error('handleSavePet error:', e);
             Alert.alert('Error', 'No se pudo guardar la mascota');
-        } finally {
-            // Force re-fetch since Realtime might not be hooked up correctly on the DB
-            const { data } = await supabase.from('pets').select('*').eq('ownerId', user?.id || '');
-            if (data) setPets(data);
         }
     };
 
