@@ -2,7 +2,7 @@
 // En Android emulador usa http://10.0.2.2:3000 en lugar de localhost.
 export const API_BASE_URL = typeof __DEV__ !== 'undefined' && __DEV__
     ? 'http://localhost:3000'
-    : 'https://tu-api-pawmate.com';
+    : 'https://api.apppawmate.com';
 
 export const notifyReservationStatus = async (reservationId) => {
     try {
