@@ -30,7 +30,7 @@ function emailLayout({ icon, title, subtitle, gradient, body }) {
       ${body}
     </div>
     <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:24px;">
-      &copy; ${new Date().getFullYear()} PawMate &middot; apppawmate.com
+      &copy; ${new Date().getFullYear()} PawMate &middot; pawmate.com
     </p>
   </div>
 </body>
@@ -92,14 +92,14 @@ const sendWelcomeEmail = async (req, res) => {
         Para acceder a todas las funciones, verifica tu cuenta en la sección de Ajustes de la app.
       </p>
       <p style="color:#64748b;font-size:14px;margin:0;">
-        ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@apppawmate.com" style="color:#6366f1;">soporte@apppawmate.com</a>
+        ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@pawmate.com" style="color:#6366f1;">soporte@pawmate.com</a>
       </p>`,
             });
 
-            const text = `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\nAhora puedes encontrar cuidadores, agendar reservas y mucho más.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? soporte@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`;
+            const text = `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\nAhora puedes encontrar cuidadores, agendar reservas y mucho más.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? soporte@pawmate.com\n\n© ${new Date().getFullYear()} PawMate`;
 
             await transporter.sendMail({
-                from: `"PawMate | Bienvenida" <hola@apppawmate.com>`,
+                from: `"PawMate | Bienvenida" <hola@pawmate.com>`,
                 to: email,
                 subject: `¡Bienvenido a PawMate, ${name}! 🐾`,
                 text,
@@ -195,7 +195,7 @@ const handleAuthEmail = async (req, res) => {
             });
 
             await transporter.sendMail({
-                from: '"PawMate | Bienvenida" <hola@apppawmate.com>',
+                from: '"PawMate | Bienvenida" <hola@pawmate.com>',
                 to: user.email,
                 subject: `¡Confirma tu cuenta en PawMate, ${userName}! 🐾`,
                 html,
@@ -224,7 +224,7 @@ const handleAuthEmail = async (req, res) => {
             });
 
             await transporter.sendMail({
-                from: '"PawMate" <hola@apppawmate.com>',
+                from: '"PawMate" <hola@pawmate.com>',
                 to: user.email,
                 subject: 'Tu enlace de acceso a PawMate 🔗',
                 html,
@@ -257,7 +257,7 @@ const handleAuthEmail = async (req, res) => {
 
             // Send to the current email
             await transporter.sendMail({
-                from: '"PawMate Seguridad" <team@apppawmate.com>',
+                from: '"PawMate Seguridad" <team@pawmate.com>',
                 to: user.email,
                 subject: 'Confirma tu cambio de email · PawMate 🔒',
                 html,
@@ -286,7 +286,7 @@ const handleAuthEmail = async (req, res) => {
                 });
 
                 await transporter.sendMail({
-                    from: '"PawMate Seguridad" <team@apppawmate.com>',
+                    from: '"PawMate Seguridad" <team@pawmate.com>',
                     to: user.new_email || user.email_change_send_to || user.email,
                     subject: 'Confirma tu nuevo email · PawMate 🔒',
                     html: htmlNew,
@@ -319,7 +319,7 @@ const handleAuthEmail = async (req, res) => {
             });
 
             await transporter.sendMail({
-                from: '"PawMate Soporte Técnico" <team@apppawmate.com>',
+                from: '"PawMate Soporte Técnico" <team@pawmate.com>',
                 to: user.email,
                 subject: 'Restablecer tu contraseña · PawMate 🔑',
                 html,
@@ -342,7 +342,7 @@ const handleAuthEmail = async (req, res) => {
             });
 
             await transporter.sendMail({
-                from: '"PawMate" <hola@apppawmate.com>',
+                from: '"PawMate" <hola@pawmate.com>',
                 to: user.email,
                 subject: 'Acción requerida · PawMate',
                 html,
