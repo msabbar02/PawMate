@@ -42,7 +42,7 @@ export default function NotificationsScreen({ navigation }) {
                 .from('notifications')
                 .select('*')
                 .eq('userId', user.id)
-                .order('createdAt', { ascending: false });
+                .order('created_at', { ascending: false });
             if (data) setNotifications(data);
             setLoading(false);
         };
@@ -101,17 +101,22 @@ export default function NotificationsScreen({ navigation }) {
 
     // ── ACCEPT BOOKING (Caregiver) ─────────────────
     const handleAcceptBooking = async (notif) => {
-        const { bookingId, bookingData } = notif;
+        const bookingId = notif.data?.bookingId;
         if (!bookingId) return;
         try {
+            // Fetch reservation to get real data
+            const { data: reservation } = await supabase
+                .from('reservations').select('*').eq('id', bookingId).single();
+            if (!reservation) { Alert.alert('Error', 'Reserva no encontrada.'); return; }
+
             // Capacity check
-            const serviceType = bookingData?.serviceType || 'walking';
+            const serviceType = reservation.serviceType || 'walking';
             const MAX = serviceType === 'walking' ? 5 : 3;
             
             const { count } = await supabase
                 .from('reservations')
                 .select('*', { count: 'exact', head: true })
-                .eq('caregiverUid', user?.id)
+                .eq('caregiverId', user?.id)
                 .eq('status', 'aceptada')
                 .eq('serviceType', serviceType);
 
@@ -122,17 +127,16 @@ export default function NotificationsScreen({ navigation }) {
 
             await supabase.from('reservations').update({
                 status: 'aceptada',
-                confirmedAt: new Date().toISOString(),
             }).eq('id', bookingId);
             
-            await createNotification(bookingData?.ownerUid, {
+            await createNotification(reservation.ownerId, {
                 type: 'booking_confirmed',
                 bookingId,
                 title: '¡Reserva aceptada! 🎉',
                 body: `${userData?.fullName || 'El cuidador'} aceptó tu reserva. ¡Completa el pago para confirmar!`,
                 icon: 'checkmark-circle-outline',
-                iconBg: COLORS.successLight,
-                iconColor: COLORS.success,
+                iconBg: '#DCFCE7',
+                iconColor: '#16A34A',
             });
             await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             Alert.alert('¡Reserva aceptada! 🎉', 'El dueño recibirá una notificación.');
@@ -144,20 +148,26 @@ export default function NotificationsScreen({ navigation }) {
 
     // ── REJECT BOOKING (Caregiver) ─────────────────
     const handleRejectBooking = async (notif) => {
-        const { bookingId, bookingData } = notif;
+        const bookingId = notif.data?.bookingId;
         if (!bookingId) return;
         try {
+            // Fetch reservation to get ownerId
+            const { data: reservation } = await supabase
+                .from('reservations').select('ownerId, startDate').eq('id', bookingId).single();
+
             await supabase.from('reservations').update({ status: 'cancelada' }).eq('id', bookingId);
             
-            await createNotification(bookingData?.ownerUid, {
-                type: 'booking_rejected',
-                bookingId,
-                title: 'Reserva rechazada',
-                body: `${userData?.fullName || 'El cuidador'} no pudo aceptar tu reserva para ${bookingData?.startDate || ''}.`,
-                icon: 'close-circle-outline',
-                iconBg: COLORS.dangerLight,
-                iconColor: COLORS.danger,
-            });
+            if (reservation?.ownerId) {
+                await createNotification(reservation.ownerId, {
+                    type: 'booking_rejected',
+                    bookingId,
+                    title: 'Reserva rechazada',
+                    body: `${userData?.fullName || 'El cuidador'} no pudo aceptar tu reserva para ${reservation.startDate || ''}.`,
+                    icon: 'close-circle-outline',
+                    iconBg: '#FEE2E2',
+                    iconColor: '#EF4444',
+                });
+            }
             await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch {
@@ -166,6 +176,17 @@ export default function NotificationsScreen({ navigation }) {
     };
 
     const isCaregiver = userData?.role === 'caregiver';
+
+    // ── FRIEND REQUESTS ────────────────────────────
+    const handleAcceptFriend = async (notif) => {
+        // Friend requests not currently supported
+        await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+        if (activeNotif?.id === notif.id) setActiveNotif(null);
+    };
+    const handleRejectFriend = async (notif) => {
+        await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+        if (activeNotif?.id === notif.id) setActiveNotif(null);
+    };
 
 
 
@@ -204,7 +225,7 @@ export default function NotificationsScreen({ navigation }) {
                         <Ionicons name={activeNotif.icon || 'notifications-outline'} size={38} color={activeNotif.iconColor || COLORS.primary} />
                     </View>
                     <Text style={[styles.detailTitle, { color: theme.text }]}>{activeNotif.title}</Text>
-                    <Text style={[styles.detailTime, { color: theme.textSecondary }]}>{relativeTime(activeNotif.createdAt)}</Text>
+                    <Text style={[styles.detailTime, { color: theme.textSecondary }]}>{relativeTime(activeNotif.created_at)}</Text>
                     <View style={[styles.detailBodyCard, { backgroundColor: theme.cardBackground }]}>
                         <Text style={[styles.detailBody, { color: theme.text }]}>{activeNotif.body}</Text>
                     </View>
@@ -295,7 +316,7 @@ export default function NotificationsScreen({ navigation }) {
                                     >
                                         {item.title}
                                     </Text>
-                                    <Text style={[styles.notifTime, { color: theme.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
+                                    <Text style={[styles.notifTime, { color: theme.textSecondary }]}>{relativeTime(item.created_at)}</Text>
                                 </View>
                                 <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
 

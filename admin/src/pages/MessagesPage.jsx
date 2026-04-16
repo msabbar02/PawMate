@@ -20,27 +20,17 @@ export default function MessagesPage() {
     const fetchThreads = async () => {
         setLoading(true);
         try {
-            // In Supabase we fetch active reservations to get thread IDs
-            const { data: reservations } = await supabase.from('reservations').select('*').order('createdAt', { ascending: false });
-            if (!reservations) return;
+            // Fetch conversations (where messages are linked)
+            const { data: convos } = await supabase.from('conversations').select('*').order('lastMessageAt', { ascending: false });
+            if (!convos) { setLoading(false); return; }
             
-            const threadsData = await Promise.all(reservations.map(async (res) => {
-                let lastMessage = 'Sin mensajes visibles';
-                try {
-                    const { data: threadSnap } = await supabase.from('messages').select('text').eq('conversationId', res.id).order('createdAt', { ascending: false }).limit(1);
-                    if (threadSnap && threadSnap.length > 0) {
-                        lastMessage = threadSnap[0].text || 'Mensaje multimedia/sistema';
-                    }
-                } catch (e) {}
-
-                return {
-                    id: res.id,
-                    lastMessage,
-                    ownerName: res.ownerName || 'Usuario 1',
-                    caregiverName: res.caregiverName || 'Usuario 2',
-                    status: res.status || 'Desconocido',
-                    serviceType: res.serviceType || 'Desconocido'
-                };
+            const threadsData = convos.map(convo => ({
+                id: convo.id,
+                lastMessage: convo.lastMessage || 'Sin mensajes visibles',
+                ownerName: convo.ownerName || 'Usuario 1',
+                caregiverName: convo.caregiverName || 'Usuario 2',
+                status: 'activa',
+                serviceType: 'Conversación'
             }));
             
             setThreads(threadsData);
@@ -55,7 +45,7 @@ export default function MessagesPage() {
         setSelectedThread(thread);
         setLoadingMessages(true);
         try {
-            const { data: msgs } = await supabase.from('messages').select('*').eq('conversationId', thread.id).order('createdAt', { ascending: true });
+            const { data: msgs } = await supabase.from('messages').select('*').eq('conversationId', thread.id).order('created_at', { ascending: true });
             if (msgs) setMessages(msgs);
         } catch (error) {
             console.error("Error fetching messages:", error);
@@ -183,7 +173,7 @@ export default function MessagesPage() {
                                                 {!isSystem && <div style={{ fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600, marginBottom: '4px' }}>{msg.senderName || 'Usuario'}</div>}
                                                 <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>{msg.text}</div>
                                                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'right' }}>
-                                                    {msg.createdAt ? new Date(msg.createdAt).toLocaleString('es-ES') : ''}
+                                                    {msg.created_at ? new Date(msg.created_at).toLocaleString('es-ES') : ''}
                                                 </div>
                                             </div>
                                         );

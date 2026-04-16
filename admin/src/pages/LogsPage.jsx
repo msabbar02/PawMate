@@ -18,7 +18,7 @@ export default function LogsPage() {
             const { data, error } = await supabase
                 .from('system_logs')
                 .select('*')
-                .order('createdAt', { ascending: false })
+                .order('created_at', { ascending: false })
                 .limit(100);
 
             if (error) throw error;
@@ -90,7 +90,7 @@ export default function LogsPage() {
                                 filteredLogs.map(log => (
                                     <tr key={log.id || Math.random()}>
                                         <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                                            {log.createdAt ? new Date(log.createdAt).toLocaleString('es-ES') : '-'}
+                                            {log.created_at ? new Date(log.created_at).toLocaleString('es-ES') : '-'}
                                         </td>
                                         <td>
                                             <div className="user-info">

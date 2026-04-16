@@ -36,6 +36,8 @@ export const useSafeStripe = () => {
     } catch (e) {
         // Return mock functions when Stripe is not available
         return {
+            initPaymentSheet: async () => ({ error: { message: 'Stripe no disponible en Expo Go.' } }),
+            presentPaymentSheet: async () => ({ error: { code: 'Canceled', message: 'Stripe no disponible en Expo Go.' } }),
             confirmPlatformPayPayment: async () => ({ error: { message: 'Stripe no disponible en Expo Go. Usa un build de desarrollo.' } }),
             isPlatformPaySupported: async () => false,
         };

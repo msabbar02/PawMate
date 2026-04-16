@@ -100,7 +100,7 @@ export default function DashboardPage() {
                                             <p className="activity-text">
                                                 <strong>{activity.ownerName || 'Usuario'}</strong> ha reservado {activity.serviceType === 'walking' ? 'un paseo' : 'estancia'} con <strong>{activity.caregiverName || 'cuidador'}</strong>
                                             </p>
-                                            <span className="activity-meta">Estado: <span className={`status-badge ${activity.status || 'pendiente'}`}>{activity.status || 'pendiente'}</span> · {new Date(activity.createdAt).toLocaleDateString('es-ES')}</span>
+                                            <span className="activity-meta">Estado: <span className={`status-badge ${activity.status || 'pendiente'}`}>{activity.status || 'pendiente'}</span> · {new Date(activity.created_at).toLocaleDateString('es-ES')}</span>
                                         </div>
                                     </div>
                                 );

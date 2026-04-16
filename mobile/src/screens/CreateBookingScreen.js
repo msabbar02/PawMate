@@ -87,7 +87,7 @@ export default function CreateBookingScreen({ route, navigation }) {
             const petNames = myPets.filter(p => selectedPets.includes(p.id)).map(p => p.name);
             const totalPrice = calculatePrice();
 
-            const { error } = await supabase.from('reservations').insert({
+            const { data: insertedRes, error } = await supabase.from('reservations').insert({
                 ownerId: user.id,
                 caregiverId: caregiver.id,
                 ownerName: userData?.fullName || 'Dueño',
@@ -100,13 +100,24 @@ export default function CreateBookingScreen({ route, navigation }) {
                 petIds: selectedPets,
                 notes: notes.trim(),
                 status: 'pendiente',
-            });
+            }).select().single();
 
             if (error) throw error;
 
-            // Notify the caregiver
+            // Create conversation between owner & caregiver if it doesn't exist
+            await supabase.from('conversations').upsert({
+                ownerId: user.id,
+                caregiverId: caregiver.id,
+                ownerName: userData?.fullName || 'Dueño',
+                caregiverName: caregiver.fullName || 'Cuidador',
+                ownerAvatar: userData?.photoURL || userData?.avatar || null,
+                caregiverAvatar: caregiver.photoURL || caregiver.avatar || null,
+            }, { onConflict: 'ownerId,caregiverId' });
+
+            // Notify the caregiver (bookingId goes into data jsonb)
             await createNotification(caregiver.id, {
                 type: 'booking_request',
+                bookingId: insertedRes?.id,
                 title: '📅 Nueva solicitud de reserva',
                 body: `${userData?.fullName || 'Un dueño'} quiere reservar ${SERVICE_TYPES.find(s => s.value === serviceType)?.label || serviceType}`,
                 icon: 'calendar-outline',

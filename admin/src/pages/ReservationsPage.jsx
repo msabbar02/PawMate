@@ -22,7 +22,7 @@ export default function ReservationsPage() {
     const fetchReservations = async () => {
         setLoading(true);
         try {
-            const { data: resData } = await supabase.from('reservations').select('*').order('createdAt', { ascending: false });
+            const { data: resData } = await supabase.from('reservations').select('*').order('created_at', { ascending: false });
             if (resData) setReservations(resData);
         } catch (error) {
             console.error("Error fetching reservations:", error);
@@ -126,7 +126,7 @@ export default function ReservationsPage() {
                                 </tr>
                             ) : (
                                 filtered.map(res => {
-                                    const created = res.createdAt ? new Date(res.createdAt).toLocaleDateString('es-ES') : '';
+                                    const created = res.created_at ? new Date(res.created_at).toLocaleDateString('es-ES') : '';
                                     return (
                                         <tr key={res.id}>
                                             <td>

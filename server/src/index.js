@@ -32,5 +32,3 @@ if (process.env.VERCEL !== '1') {
 
 // Export for Vercel serverless
 module.exports = app;
-
-module.exports = app;

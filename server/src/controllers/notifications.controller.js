@@ -23,10 +23,17 @@ const sendReservationStatusEmail = async (req, res) => {
             return sendError(res, 'Reservation not found', 404);
         }
 
-        const ownerEmail = data.ownerEmail;
+        // Look up the owner's email from the users table
+        const { data: ownerData } = await supabase
+            .from('users')
+            .select('email')
+            .eq('id', data.ownerId)
+            .single();
+
+        const ownerEmail = ownerData?.email;
         const status = data.status;
         const caregiverName = data.caregiverName || 'El cuidador';
-        const petName = data.petName || 'tu mascota';
+        const petName = (data.petNames && data.petNames.length > 0) ? data.petNames.join(', ') : 'tu mascota';
         const ownerName = data.ownerName || 'Cliente';
 
         if (!ownerEmail || !ownerEmail.includes('@')) {
@@ -37,12 +44,12 @@ const sendReservationStatusEmail = async (req, res) => {
         try {
             const nodemailer = require('nodemailer');
             const transporter = nodemailer.createTransport({
-                host: process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com',
-                port: parseInt(process.env.BREVO_SMTP_PORT || '587', 10),
+                host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+                port: parseInt(process.env.SMTP_PORT || '587', 10),
                 secure: false,
                 auth: {
-                    user: process.env.BREVO_SMTP_USER,
-                    pass: process.env.BREVO_SMTP_PASS,
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS,
                 },
             });
 
@@ -55,7 +62,7 @@ const sendReservationStatusEmail = async (req, res) => {
                 : `Hola ${ownerName},\n\n${caregiverName} no ha podido aceptar tu solicitud de reserva para ${petName}. Puedes buscar otro cuidador en la app.\n\nGracias por usar PawMate.`;
 
             await transporter.sendMail({
-                from: process.env.BREVO_FROM_EMAIL || 'noreply@pawmate.com',
+                from: process.env.SMTP_FROM || 'hola@apppawmate.com',
                 to: ownerEmail,
                 subject,
                 text,

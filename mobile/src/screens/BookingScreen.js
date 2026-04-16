@@ -119,7 +119,7 @@ export default function BookingScreen() {
         const { count } = await supabase.from('reservations')
             .select('*', { count: 'exact', head: true })
             .eq('caregiverId', caregiverId)
-            .eq('status', 'aceptada')
+            .in('status', ['aceptada', 'activa'])
             .eq('serviceType', serviceType);
         return (count || 0) < maxLimit;
     };
@@ -159,10 +159,15 @@ export default function BookingScreen() {
         if (price <= 0) { Alert.alert('Error', 'El precio de la reserva no es válido.'); return; }
 
         try {
-            const response = await fetch(`${SERVER_URL}/api/payment-intent`, {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            const response = await fetch(`${SERVER_URL}/api/payments/payment-intent`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: price, currency: 'eur' }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ amount: price, currency: 'eur', reservationId: reservation.id }),
             });
             const { clientSecret, success } = await response.json();
 
@@ -198,7 +203,7 @@ export default function BookingScreen() {
         try {
             const qrCode = generateUniqueId();
             await supabase.from('reservations').update({
-                status: 'activa', qrCode
+                status: 'activa', qrCode, paymentStatus: 'paid'
             }).eq('id', reservation.id);
             await createNotification(reservation.caregiverId, {
                 type: 'booking_active',
@@ -314,8 +319,7 @@ export default function BookingScreen() {
                 reviewerId: user.id,
                 reviewerName: userData?.fullName || 'Usuario',
                 revieweeId: reviewTarget.caregiverId,
-                caregiverName: reviewTarget.caregiverName,
-                bookingId: reviewTarget.id,
+                revieweeName: reviewTarget.caregiverName,
                 rating: reviewRating,
                 comment: reviewText.trim(),
             });
@@ -339,19 +343,71 @@ export default function BookingScreen() {
     };
 
     // ─────────────────────────────────────────────────
+    // OPEN CHAT (find or create conversation)
+    // ─────────────────────────────────────────────────
+    const openChat = async (reservation) => {
+        const ownId = reservation.ownerId;
+        const cgId = reservation.caregiverId;
+        try {
+            let { data: existing } = await supabase
+                .from('conversations')
+                .select('*')
+                .eq('ownerId', ownId)
+                .eq('caregiverId', cgId)
+                .limit(1);
+
+            let convo;
+            if (existing && existing.length > 0) {
+                convo = existing[0];
+            } else {
+                const { data: newConvo } = await supabase
+                    .from('conversations')
+                    .insert({
+                        ownerId: ownId,
+                        caregiverId: cgId,
+                        ownerName: reservation.ownerName,
+                        caregiverName: reservation.caregiverName,
+                    })
+                    .select()
+                    .single();
+                convo = newConvo;
+            }
+            if (convo) {
+                // Attach reservation info for display
+                convo._serviceType = reservation.serviceType;
+                convo._startDate = reservation.startDate;
+                setActiveConversation(convo);
+                setIsChatVisible(true);
+            }
+        } catch (e) {
+            console.error('Error opening chat:', e);
+            Alert.alert('Error', 'No se pudo abrir el chat.');
+        }
+    };
+
+    // ─────────────────────────────────────────────────
     // SEND MESSAGE
     // ─────────────────────────────────────────────────
     const sendMessage = async () => {
         if (!messageInput.trim() || !activeConversation || !user?.id) return;
         const text = messageInput.trim();
+        const receiverId = userData?.role === 'caregiver'
+            ? activeConversation.ownerId
+            : activeConversation.caregiverId;
         try {
             await supabase.from('messages').insert({
                 conversationId: activeConversation.id,
                 senderId: user.id,
+                receiverId,
                 senderName: userData?.fullName || 'Usuario',
                 text,
                 read: false,
             });
+            // Update conversation's lastMessage
+            await supabase.from('conversations').update({
+                lastMessage: text,
+                lastMessageAt: new Date().toISOString(),
+            }).eq('id', activeConversation.id);
             setMessageInput('');
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         } catch { Alert.alert('Error', 'No se pudo enviar el mensaje.'); }
@@ -419,7 +475,7 @@ export default function BookingScreen() {
                     {!isCancelled && (
                         <TouchableOpacity
                             style={[s.quickBtn, { backgroundColor: theme.primaryBg }]}
-                            onPress={() => { setActiveConversation(res); setIsChatVisible(true); }}
+                            onPress={() => openChat(res)}
                         >
                             <Ionicons name="chatbubble-outline" size={14} color={theme.primary} />
                             <Text style={[s.quickBtnText, { color: theme.primary }]}>Chat</Text>
@@ -548,7 +604,7 @@ export default function BookingScreen() {
                         return (
                             <TouchableOpacity
                                 style={[s.convoRow, { backgroundColor: theme.cardBackground }]}
-                                onPress={() => { setActiveConversation(res); setIsChatVisible(true); }}
+                                onPress={() => openChat(res)}
                             >
                                 <View style={[s.convoAvatar, { backgroundColor: theme.primaryBg }]}>
                                     <Ionicons name="person" size={22} color={theme.primary} />
@@ -648,8 +704,7 @@ export default function BookingScreen() {
                                             style={[s.actionBtn, { backgroundColor: theme.primaryBg }]}
                                             onPress={() => {
                                                 setDetailRes(null);
-                                                setActiveConversation(detailRes);
-                                                setIsChatVisible(true);
+                                                openChat(detailRes);
                                             }}
                                         >
                                             <Ionicons name="chatbubble-outline" size={18} color={theme.primary} />
@@ -892,8 +947,8 @@ export default function BookingScreen() {
                                     : activeConversation?.caregiverName}
                             </Text>
                             <Text style={[s.chatSubtitle, { color: theme.textSecondary }]}>
-                                {SERVICE_TYPES.find(s => s.value === activeConversation?.serviceType)?.label}
-                                {' · '}{activeConversation?.startDate}
+                                {SERVICE_TYPES.find(s => s.value === activeConversation?._serviceType)?.label}
+                                {activeConversation?._startDate ? ` · ${activeConversation._startDate}` : ''}
                             </Text>
                         </View>
                     </View>

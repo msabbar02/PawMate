@@ -2,13 +2,15 @@ const stripe = process.env.STRIPE_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_SECRET_KEY)
     : null;
 
+const { supabase } = require('../config/supabase');
+
 const createPaymentIntent = async (req, res, next) => {
     try {
         if (!stripe) {
             return res.status(503).json({ success: false, message: 'Payment service not configured' });
         }
 
-        const { amount, currency = 'eur' } = req.body;
+        const { amount, currency = 'eur', reservationId } = req.body;
 
         if (!amount) {
             return res.status(400).json({ success: false, message: 'Amount is required' });
@@ -21,7 +23,15 @@ const createPaymentIntent = async (req, res, next) => {
             automatic_payment_methods: {
                 enabled: true,
             },
+            metadata: reservationId ? { reservationId } : undefined,
         });
+
+        // Update reservation paymentStatus if reservationId provided
+        if (reservationId) {
+            await supabase.from('reservations')
+                .update({ paymentStatus: 'processing' })
+                .eq('id', reservationId);
+        }
 
         res.json({
             success: true,

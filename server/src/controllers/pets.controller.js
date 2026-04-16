@@ -10,7 +10,7 @@ const getAllPets = async (req, res) => {
         const { data, error } = await supabase
             .from('pets')
             .select('*')
-            .eq('userId', req.user.uid);
+            .eq('ownerId', req.user.uid);
 
         if (error) throw error;
 
@@ -38,7 +38,7 @@ const getPetById = async (req, res) => {
             return sendError(res, 'Pet not found', 404);
         }
 
-        if (data.userId !== req.user.uid) {
+        if (data.ownerId !== req.user.uid) {
             return sendError(res, 'Unauthorized', 403);
         }
 
@@ -57,8 +57,7 @@ const createPet = async (req, res) => {
     try {
         const petData = {
             ...req.body,
-            userId: req.user.uid,
-            createdAt: new Date().toISOString(),
+            ownerId: req.user.uid,
         };
 
         const { data, error } = await supabase
@@ -86,7 +85,7 @@ const updatePet = async (req, res) => {
 
         const { data: pet, error: fetchError } = await supabase
             .from('pets')
-            .select('userId')
+            .select('ownerId')
             .eq('id', id)
             .single();
 
@@ -94,13 +93,13 @@ const updatePet = async (req, res) => {
             return sendError(res, 'Pet not found', 404);
         }
 
-        if (pet.userId !== req.user.uid) {
+        if (pet.ownerId !== req.user.uid) {
             return sendError(res, 'Unauthorized', 403);
         }
 
         const { error } = await supabase
             .from('pets')
-            .update({ ...req.body, updatedAt: new Date().toISOString() })
+            .update(req.body)
             .eq('id', id);
 
         if (error) throw error;
@@ -122,7 +121,7 @@ const deletePet = async (req, res) => {
 
         const { data: pet, error: fetchError } = await supabase
             .from('pets')
-            .select('userId')
+            .select('ownerId')
             .eq('id', id)
             .single();
 
@@ -130,7 +129,7 @@ const deletePet = async (req, res) => {
             return sendError(res, 'Pet not found', 404);
         }
 
-        if (pet.userId !== req.user.uid) {
+        if (pet.ownerId !== req.user.uid) {
             return sendError(res, 'Unauthorized', 403);
         }
 
