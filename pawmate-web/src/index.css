@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Syne:wght@700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brand: #F5A623;
+  --brand-deep: #E8941E;
+  --brand-light: #FFBE5C;
+  --accent: #FF6B35;
+  --accent-light: #FFF3E0;
+  --navy: #1A1A2E;
+  --navy-deep: #12121F;
+  --ink: #1A1A2E;
+  --slate: #6B7280;
+  --fog: #F7F7FA;
+  --cloud: #ffffff;
+  --mist: #E5E7EB;
+  --danger: #e53935;
+  --gold: #F5A623;
+  --ocean: #0891b2;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 32px;
+  --shadow-sm: 0 2px 12px rgba(245,166,35,0.08);
+  --shadow-md: 0 8px 40px rgba(245,166,35,0.14);
+  --shadow-lg: 0 20px 60px rgba(245,166,35,0.20);
+}
+
+[data-theme="dark"] {
+  --ink: #F0F0F5;
+  --slate: #9CA3AF;
+  --fog: #16162A;
+  --cloud: #0F0F1A;
+  --mist: #2A2A40;
+  --accent-light: rgba(245,166,35,0.12);
+  --shadow-sm: 0 2px 12px rgba(0,0,0,0.3);
+  --shadow-md: 0 8px 40px rgba(0,0,0,0.4);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--cloud);
+  color: var(--ink);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: 'Syne', sans-serif; }
+
+a { text-decoration: none; color: inherit; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--fog); }
+::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 99px; }
+
+/* Utility */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  color: white;
+  padding: 14px 30px;
+  border-radius: 99px;
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 20px rgba(245,166,35,0.35);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(245,166,35,0.5);
+}
+
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent;
+  color: var(--brand);
+  padding: 13px 30px;
+  border-radius: 99px;
+  font-weight: 700;
+  font-size: 15px;
+  border: 2px solid var(--brand);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.btn-outline:hover {
+  background: var(--brand);
+  color: white;
+  transform: translateY(-2px);
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent-light);
+  color: var(--brand);
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.section-tag {
+  display: inline-block;
+  background: var(--accent-light);
+  color: var(--brand);
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}

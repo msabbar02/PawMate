@@ -1,0 +1,435 @@
+.verifications-page {
+    padding: 0;
+}
+
+.verifications-page .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.verifications-page .page-header h1 {
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.verifications-page .stat-pills {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.verifications-page .stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.stat-pill.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.stat-pill.approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.stat-pill.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.verifications-page .filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.verifications-page .filter-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.verifications-page .filter-btn:hover {
+    border-color: #F5A623;
+    color: #F5A623;
+}
+
+.verifications-page .filter-btn.active {
+    background: #F5A623;
+    color: #fff;
+    border-color: #F5A623;
+}
+
+.verifications-page .verifications-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+}
+
+.verification-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.verification-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+.verification-card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.verification-card .user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: #F5A623;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.verification-card .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.verification-card .user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.verification-card .user-info h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.verification-card .user-info .email {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.verification-card .role-badge {
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.role-badge.owner {
+    background: #FFF3E0;
+    color: #E8951A;
+}
+
+.role-badge.caregiver {
+    background: #E0F2FE;
+    color: #0284C7;
+}
+
+.verification-card .status-badge {
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.verification-card .docs-preview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 16px 20px;
+}
+
+.verification-card .docs-preview.has-cert {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.doc-thumb {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    aspect-ratio: 3/4;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.doc-thumb:hover {
+    transform: scale(1.03);
+}
+
+.doc-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.doc-thumb .doc-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.doc-thumb .no-doc {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-align: center;
+    padding: 8px;
+}
+
+.verification-card .card-meta {
+    padding: 0 20px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.verification-card .meta-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    background: var(--bg);
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+
+.verification-card .card-actions {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.verification-card .card-actions button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.verification-card .card-actions button:active {
+    transform: scale(0.97);
+}
+
+.verification-card .card-actions .approve-btn {
+    background: #22c55e;
+    color: #fff;
+}
+
+.verification-card .card-actions .approve-btn:hover {
+    opacity: 0.9;
+}
+
+.verification-card .card-actions .reject-btn {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.verification-card .card-actions .reject-btn:hover {
+    background: #fecaca;
+}
+
+.verification-card .card-actions .undo-btn {
+    background: var(--bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+/* ── Image Preview Modal ─────────────── */
+.image-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    animation: fadeIn 0.2s;
+}
+
+.image-preview-overlay img {
+    max-width: 90vw;
+    max-height: 85vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.image-preview-overlay .close-preview {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.image-preview-overlay .close-preview:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.image-preview-overlay .preview-label {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* ── Empty State ─────────────────────── */
+.verifications-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.verifications-empty svg {
+    margin-bottom: 16px;
+    opacity: 0.4;
+}
+
+.verifications-empty h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.verifications-empty p {
+    font-size: 0.9rem;
+}
+
+/* ── Loading ─────────────────────────── */
+.verifications-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    gap: 14px;
+    color: var(--text-secondary);
+}
+
+.verifications-loading .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: #F5A623;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ── Responsive ──────────────────────── */
+@media (max-width: 768px) {
+    .verifications-page .verifications-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .verifications-page .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
