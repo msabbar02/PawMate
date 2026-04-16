@@ -41,7 +41,7 @@ function getNextBadge(completedCount) {
 const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel', daycare: '☀️ Guardería', grooming: '✂️ Peluquería', training: '🏋️ Entreno' };
 
 export default function CaregiverDashboardScreen({ navigation }) {
-    const { user, userData, refreshUserData } = useContext(AuthContext);
+    const { user, userData, refreshUserData, updateUserOptimistic } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
 
     const [stats, setStats] = useState({ completed: 0, active: 0, pending: 0, earnings: 0 });
@@ -86,7 +86,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
     // Realtime updates
     useEffect(() => {
         if (!user?.id) return;
-        const channel = supabase.channel('cg_dashboard')
+        const channel = supabase.channel(`cg_dashboard_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations', filter: `caregiverId=eq.${user.id}` }, () => fetchData())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
@@ -140,8 +140,8 @@ export default function CaregiverDashboardScreen({ navigation }) {
     const handleToggleOnline = async () => {
         const newVal = !userData?.isOnline;
         try {
-            // Optimistic UI update
-            if (refreshUserData) refreshUserData();
+            // Optimistic UI update — change locally immediately
+            updateUserOptimistic({ isOnline: newVal });
             const update = { isOnline: newVal };
             if (newVal) {
                 const { status } = await Location.requestForegroundPermissionsAsync();
@@ -153,10 +153,9 @@ export default function CaregiverDashboardScreen({ navigation }) {
             }
             const { error } = await supabase.from('users').update(update).eq('id', user.id);
             if (error) throw error;
-            if (refreshUserData) refreshUserData();
         } catch (e) {
             // Revert on error
-            if (refreshUserData) refreshUserData();
+            updateUserOptimistic({ isOnline: !newVal });
             Alert.alert('Error', 'No se pudo cambiar el estado online.');
         }
     };
@@ -332,39 +331,6 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         </View>
                         <Text style={[s.actionBtnText, { color: theme.text }]}>Emergencia</Text>
                     </TouchableOpacity>
-                </View>
-
-                {/* ── PHOTO GALLERY ── */}
-                <View style={[s.section, { backgroundColor: theme.cardBackground }]}>
-                    <View style={s.sectionHeader}>
-                        <Ionicons name="images-outline" size={20} color={COLORS.primary} />
-                        <Text style={[s.sectionTitle, { color: theme.text }]}>Mi Galería</Text>
-                        <Text style={{ color: theme.textSecondary, fontSize: 12, marginLeft: 'auto' }}>{photos.length}/6</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                        {photos.map((uri, i) => (
-                            <TouchableOpacity key={i} onLongPress={() => handleRemovePhoto(i)} style={{ width: '30%', aspectRatio: 1 }}>
-                                <Image source={{ uri }} style={{ width: '100%', height: '100%', borderRadius: 14 }} />
-                            </TouchableOpacity>
-                        ))}
-                        {photos.length < 6 && (
-                            <TouchableOpacity
-                                style={{ width: '30%', aspectRatio: 1, borderRadius: 14, borderWidth: 2, borderColor: theme.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}
-                                onPress={handleAddPhoto}
-                                disabled={uploadingPhoto}
-                            >
-                                {uploadingPhoto ? (
-                                    <ActivityIndicator size="small" color={COLORS.primary} />
-                                ) : (
-                                    <>
-                                        <Ionicons name="add-circle-outline" size={28} color={COLORS.primary} />
-                                        <Text style={{ color: COLORS.primary, fontSize: 10, fontWeight: '700', marginTop: 4 }}>Añadir</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                    <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 8 }}>Mantén pulsado para eliminar</Text>
                 </View>
 
                 {/* ── ACTIVE RESERVATIONS ── */}

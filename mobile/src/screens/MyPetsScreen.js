@@ -108,7 +108,7 @@ const EMPTY_FORM = {
     name: '', species: 'dog', breed: '', weight: '',
     gender: 'male', birthdate: '', color: '', sterilized: false,
     chipId: '', allergies: '', medications: '', medicalConditions: '',
-    insurance: '', vetName: '', vetPhone: '', image: null,
+    insurance: '', vetName: '', vetPhone: '', image: null, images: [],
 };
 
 // ═══════════════════════════════════════════════════
@@ -173,7 +173,7 @@ export default function PawMatePetsCenter() {
         fetchPets();
 
         const channel = supabase
-            .channel('pets_changes')
+            .channel(`pets_changes_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'pets', filter: `ownerId=eq.${user.id}` }, () => {
                 fetchPets();
             })
@@ -199,7 +199,7 @@ export default function PawMatePetsCenter() {
         fetchWalks();
 
         const channel = supabase
-            .channel('walks_changes')
+            .channel(`walks_changes_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'walks', filter: `petId=eq.${selectedPet.id}` }, () => {
                 fetchWalks();
             })
@@ -379,9 +379,14 @@ export default function PawMatePetsCenter() {
     // WALK CONTROL
     // ─────────────────────────────────────────────────
     const startWalk = async () => {
+        if (userData?.isWalking) {
+            Alert.alert('Paseo activo', 'Ya tienes un paseo en curso. Termínalo antes de iniciar otro.');
+            return;
+        }
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return Alert.alert('Error', 'Permiso GPS denegado');
         setWalkRoute([]); setWalkDistance(0); setWalkTimer(0); setIsWalking(true);
+        await supabase.from('users').update({ isWalking: true, walkingPetId: selectedPet?.id }).eq('id', user.id);
         timerRef.current = setInterval(() => setWalkTimer(t => t + 1), 1000);
         locationSub.current = await Location.watchPositionAsync(
             { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
@@ -403,6 +408,7 @@ export default function PawMatePetsCenter() {
         locationSub.current = null;
         clearInterval(timerRef.current);
         setIsWalking(false);
+        await supabase.from('users').update({ isWalking: false, walkingPetId: null }).eq('id', user.id);
 
         const totalKm = parseFloat(walkDistance.toFixed(2));
         const weight = parseFloat(selectedPet?.weight) || 0;
@@ -473,14 +479,22 @@ export default function PawMatePetsCenter() {
     const handleSavePet = async () => {
         if (!formParams.name.trim()) return Alert.alert('Error', 'El nombre es obligatorio');
         try {
-            let imageUrl = formParams.image;
-            // Upload image to Supabase Storage using dedicated pet upload function
-            if (formParams.image && !formParams.image.startsWith('http') && !formParams.image.startsWith('data:')) {
-                const uid = user?.id;
-                const timestamp = Date.now();
-                const path = `pets/${uid}/${timestamp}.jpg`;
-                imageUrl = await uploadPetImage(formParams.image, path);
+            // Upload all images
+            const uploadedImages = [];
+            const allImages = formParams.images || (formParams.image ? [formParams.image] : []);
+            for (const img of allImages) {
+                if (img.startsWith('http') || img.startsWith('data:')) {
+                    uploadedImages.push(img);
+                } else {
+                    const uid = user?.id;
+                    const timestamp = Date.now();
+                    const idx = uploadedImages.length;
+                    const path = `pets/${uid}/${timestamp}_${idx}.jpg`;
+                    const url = await uploadPetImage(img, path);
+                    uploadedImages.push(url);
+                }
             }
+            const mainImage = uploadedImages[0] || formParams.image;
 
             // Build data object with only valid schema columns
             const dataToSave = {
@@ -500,18 +514,20 @@ export default function PawMatePetsCenter() {
                 insurance: formParams.insurance || null,
                 vetName: formParams.vetName || null,
                 vetPhone: formParams.vetPhone || null,
-                image: imageUrl,
-                photoURL: imageUrl,
+                image: mainImage,
+                photoURL: mainImage,
             };
 
             if (isEditing && selectedPet) {
+                const prevActivity = selectedPet.activity || {};
+                dataToSave.activity = { ...prevActivity, images: uploadedImages };
                 const { error } = await supabase.from('pets').update(dataToSave).eq('id', selectedPet.id);
                 if (error) throw error;
             } else {
                 const { error } = await supabase.from('pets').insert({
                     ...dataToSave,
                     ownerId: user?.id,
-                    activity: { km: 0 },
+                    activity: { km: 0, images: uploadedImages },
                     vaccines: [],
                     reminders: [],
                 });
@@ -602,6 +618,7 @@ export default function PawMatePetsCenter() {
             vetName: pet.vetName || '',
             vetPhone: pet.vetPhone || '',
             image: pet.image || null,
+            images: pet.activity?.images || (pet.image ? [pet.image] : []),
         });
         setSelectedPet(pet);
         setIsEditing(true);
@@ -612,9 +629,26 @@ export default function PawMatePetsCenter() {
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
-            allowsEditing: true, aspect: [1, 1], quality: 0.6,
+            allowsMultipleSelection: true,
+            selectionLimit: 5,
+            quality: 0.6,
         });
-        if (!result.canceled) setFormParams(p => ({ ...p, image: result.assets[0].uri }));
+        if (!result.canceled && result.assets?.length > 0) {
+            const newUris = result.assets.map(a => a.uri);
+            setFormParams(p => {
+                const existing = p.images || [];
+                const combined = [...existing, ...newUris].slice(0, 5);
+                return { ...p, images: combined, image: combined[0] || p.image };
+            });
+        }
+    };
+
+    const removeImage = (index) => {
+        setFormParams(p => {
+            const updated = [...(p.images || [])];
+            updated.splice(index, 1);
+            return { ...p, images: updated, image: updated[0] || null };
+        });
     };
 
     // ─────────────────────────────────────────────────
@@ -1253,19 +1287,27 @@ export default function PawMatePetsCenter() {
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>📸</Text>
                                     <Text style={wizStyles.stepTitle}>
-                                        {isEditing ? 'Actualiza la foto' : 'Añade una foto'}
+                                        {isEditing ? 'Actualiza las fotos' : 'Añade fotos'}
                                     </Text>
-                                    <Text style={wizStyles.stepDesc}>Una foto de tu mascota para reconocerla fácilmente</Text>
-                                    <TouchableOpacity style={wizStyles.photoCircle} onPress={pickImage}>
-                                        {formParams.image ? (
-                                            <Image source={{ uri: formParams.image }} style={wizStyles.photoCircleImg} />
-                                        ) : (
-                                            <View style={wizStyles.photoPlaceholder}>
-                                                <Ionicons name="camera" size={40} color="rgba(255,255,255,0.4)" />
-                                                <Text style={wizStyles.photoPlaceholderText}>Toca para añadir</Text>
-                                            </View>
+                                    <Text style={wizStyles.stepDesc}>Puedes añadir hasta 5 fotos de tu mascota</Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 20 }}>
+                                        {(formParams.images || []).map((uri, i) => (
+                                            <TouchableOpacity key={i} onPress={() => removeImage(i)} style={{ position: 'relative' }}>
+                                                <Image source={{ uri }} style={{ width: 90, height: 90, borderRadius: 16 }} />
+                                                <View style={{ position: 'absolute', top: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center' }}>
+                                                    <Ionicons name="close" size={14} color="#FFF" />
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))}
+                                        {(formParams.images || []).length < 5 && (
+                                            <TouchableOpacity style={[wizStyles.photoCircle, { width: 90, height: 90, borderRadius: 16 }]} onPress={pickImage}>
+                                                <View style={[wizStyles.photoPlaceholder, { width: 90, height: 90, borderRadius: 16 }]}>
+                                                    <Ionicons name="add-circle" size={32} color="rgba(255,255,255,0.5)" />
+                                                    <Text style={[wizStyles.photoPlaceholderText, { fontSize: 10 }]}>Añadir</Text>
+                                                </View>
+                                            </TouchableOpacity>
                                         )}
-                                    </TouchableOpacity>
+                                    </View>
                                 </View>
                             )}
 

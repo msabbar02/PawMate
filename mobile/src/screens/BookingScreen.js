@@ -13,7 +13,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { createNotification, generateUniqueId } from '../utils/notificationHelpers';
-import { useSafeStripe } from '../config/stripe';
+import { useSafeStripe, SafePlatformPay } from '../config/stripe';
 
 const SERVER_URL = 'https://api.apppawmate.com';
 
@@ -41,7 +41,7 @@ const MAX_HOTEL = 3;
 export default function BookingScreen() {
     const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
-    const { initPaymentSheet, presentPaymentSheet } = useSafeStripe();
+    const { initPaymentSheet, presentPaymentSheet, confirmPlatformPayPayment, isPlatformPaySupported } = useSafeStripe();
 
     const [activeTab, setActiveTab]           = useState('reservations');
     const [reservations, setReservations]     = useState([]);
@@ -81,8 +81,26 @@ export default function BookingScreen() {
         const fetchReservations = async () => {
             const { data } = await supabase.from('reservations').select('*').eq(field, user.id).order('created_at', { ascending: false });
             if (data) {
-                setReservations(data);
-                setConversations(data.filter(r => r.status !== 'cancelada'));
+                // Enrich with latest avatars from users table
+                const otherIds = [...new Set(data.map(r => isCaregiver ? r.ownerId : r.caregiverId).filter(Boolean))];
+                let avatarMap = {};
+                if (otherIds.length > 0) {
+                    const { data: users } = await supabase.from('users').select('id,avatar,photoURL').in('id', otherIds);
+                    if (users) {
+                        users.forEach(u => { avatarMap[u.id] = u.avatar || u.photoURL || null; });
+                    }
+                }
+                const enriched = data.map(r => {
+                    const otherId = isCaregiver ? r.ownerId : r.caregiverId;
+                    const freshAvatar = avatarMap[otherId] || null;
+                    if (isCaregiver) {
+                        return { ...r, ownerAvatar: freshAvatar || r.ownerAvatar };
+                    } else {
+                        return { ...r, caregiverAvatar: freshAvatar || r.caregiverAvatar };
+                    }
+                });
+                setReservations(enriched);
+                setConversations(enriched.filter(r => r.status !== 'cancelada'));
             }
             setLoading(false);
         };
@@ -169,6 +187,10 @@ export default function BookingScreen() {
         if (price <= 0) { Alert.alert('Error', 'El precio de la reserva no es válido.'); return; }
 
         try {
+            // Check if Google Pay / Apple Pay is available
+            const platformPayAvailable = await isPlatformPaySupported();
+
+            // Get payment intent from server
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
             const response = await fetch(`${SERVER_URL}/api/payments/payment-intent`, {
@@ -189,18 +211,47 @@ export default function BookingScreen() {
                 return;
             }
 
-            const { error: initError } = await initPaymentSheet({
-                paymentIntentClientSecret: clientSecret,
-                merchantDisplayName: 'PawMate', style: 'automatic',
-            });
-            if (initError) { Alert.alert('Error de pago', initError.message); return; }
+            if (platformPayAvailable) {
+                // Use Google Pay / Apple Pay
+                const { error } = await confirmPlatformPayPayment(clientSecret, {
+                    googlePay: {
+                        testEnv: true,
+                        merchantName: 'PawMate',
+                        merchantCountryCode: 'ES',
+                        currencyCode: 'EUR',
+                        billingAddressConfig: {
+                            format: SafePlatformPay.BillingAddressFormat?.Min ?? 0,
+                        },
+                    },
+                    applePay: {
+                        cartItems: [
+                            {
+                                label: 'PawMate - Reserva',
+                                amount: price.toFixed(2),
+                                paymentType: SafePlatformPay.PaymentType?.Immediate ?? 0,
+                            },
+                        ],
+                        merchantCountryCode: 'ES',
+                        currencyCode: 'EUR',
+                    },
+                });
 
-            const { error: payError } = await presentPaymentSheet();
-            if (payError) {
-                if (payError.code !== 'Canceled') Alert.alert('Pago fallido', payError.message);
-                return;
+                if (error) {
+                    if (error.code !== 'Canceled') Alert.alert('Pago fallido', error.message);
+                    return;
+                }
+                await confirmPayment(reservation);
+            } else {
+                // Fallback: device doesn't support Google Pay / Apple Pay
+                Alert.alert(
+                    'Método de pago no disponible',
+                    `Este dispositivo no soporta ${Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}. ¿Simular pago de €${price.toFixed(2)}?`,
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { text: 'Simular', onPress: () => confirmPayment(reservation) },
+                    ]
+                );
             }
-            await confirmPayment(reservation);
         } catch {
             Alert.alert('⚠️ Sin conexión', `¿Simular pago de €${price.toFixed(2)}?`, [
                 { text: 'Cancelar', style: 'cancel' },
@@ -702,7 +753,7 @@ export default function BookingScreen() {
                             </Text>
                         </TouchableOpacity>
                     )}
-                    {isCancelled && (
+                    {(isCancelled || res.status === 'completada') && (
                         <TouchableOpacity
                             style={[s.quickBtn, { backgroundColor: '#FEE2E2' }]}
                             onPress={() => handleDeleteReservation(res.id)}
@@ -941,8 +992,8 @@ export default function BookingScreen() {
                                     </> : null}
                                 </View>
 
-                                {/* CANCELLED: only show delete */}
-                                {isCancelled && (
+                                {/* CANCELLED or COMPLETED: show delete */}
+                                {(isCancelled || detailRes.status === 'completada') && (
                                     <TouchableOpacity
                                         style={[s.actionBtn, { backgroundColor: '#FEE2E2', marginTop: 20 }]}
                                         onPress={() => handleDeleteReservation(detailRes.id)}
@@ -1024,8 +1075,10 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: '#16A34A' }]}
                                                 onPress={() => handlePayment(detailRes)}
                                             >
-                                                <Ionicons name="card-outline" size={18} color="#FFF" />
-                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Pagar y obtener QR</Text>
+                                                <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'logo-google'} size={18} color="#FFF" />
+                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>
+                                                    {Platform.OS === 'ios' ? 'Pagar con Apple Pay' : 'Pagar con Google Pay'}
+                                                </Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -1202,7 +1255,7 @@ export default function BookingScreen() {
                 MODAL: CHAT
             ════════════════════════════════════════ */}
             <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
-                <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.chatHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setIsChatVisible(false)}>

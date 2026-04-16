@@ -38,7 +38,7 @@ export default function MessagesScreen({ navigation }) {
 
         if (!user?.id) return;
         const field = isCaregiver ? 'caregiverId' : 'ownerId';
-        const channel = supabase.channel('convos_list')
+        const channel = supabase.channel(`convos_list_${Date.now()}`)
             .on('postgres_changes', {
                 event: '*', schema: 'public', table: 'conversations',
                 filter: `${field}=eq.${user.id}`,

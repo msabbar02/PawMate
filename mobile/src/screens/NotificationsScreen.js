@@ -51,7 +51,7 @@ export default function NotificationsScreen({ navigation }) {
         fetchNotifications();
 
         const channel = supabase
-            .channel('notifications_changes')
+            .channel(`notifications_changes_${user.id}_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `userId=eq.${user.id}` }, () => {
                 fetchNotifications();
             })
@@ -94,10 +94,41 @@ export default function NotificationsScreen({ navigation }) {
     };
 
     const openNotif = async (notif) => {
-        setActiveNotif(notif);
+        // Mark as read
         if (!notif.read && user?.id) {
             await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
         }
+
+        // Navigate based on notification type
+        const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data || '{}') : (notif.data || {});
+
+        if (notif.type === 'new_message' && notifData.conversationId) {
+            // Navigate directly to the conversation
+            try {
+                const { data: convo } = await supabase
+                    .from('conversations').select('*').eq('id', notifData.conversationId).single();
+                if (convo) {
+                    const otherUserId = isCaregiver ? convo.ownerId : convo.caregiverId;
+                    const otherName = isCaregiver ? convo.ownerName : convo.caregiverName;
+                    const otherAvatar = isCaregiver ? convo.ownerAvatar : convo.caregiverAvatar;
+                    navigation.navigate('Chat', {
+                        conversation: convo,
+                        otherUser: { id: otherUserId, fullName: otherName, avatar: otherAvatar },
+                    });
+                    return;
+                }
+            } catch { /* fall through to detail */ }
+        }
+
+        if (['booking_request', 'booking_confirmed', 'booking_active', 'booking_cancelled',
+             'booking_completed', 'booking_rejected', 'checkin_confirmed',
+             'walk_started', 'walk_ended'].includes(notif.type)) {
+            navigation.navigate('MainTabs', { screen: 'Reservas' });
+            return;
+        }
+
+        // Default: show detail view
+        setActiveNotif(notif);
     };
 
     // ── ACCEPT BOOKING (Caregiver) ─────────────────
@@ -194,18 +225,7 @@ export default function NotificationsScreen({ navigation }) {
 
 
     const renderBookingActions = (notif) => {
-        if (notif.type !== 'booking_request' || !isCaregiver) return null;
-        return (
-            <View style={styles.bookingActions}>
-                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptBooking(notif)}>
-                    <Ionicons name="checkmark" size={15} color="#FFF" />
-                    <Text style={styles.acceptBtnText}>Aceptar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectBooking(notif)}>
-                    <Text style={styles.rejectBtnText}>Rechazar</Text>
-                </TouchableOpacity>
-            </View>
-        );
+        return null;
     };
 
 
@@ -341,17 +361,7 @@ export default function NotificationsScreen({ navigation }) {
                                 </View>
                                 <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
 
-                                {item.type === 'booking_request' && isCaregiver && (
-                                    <View style={styles.bookingActions}>
-                                        <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptBooking(item)}>
-                                            <Ionicons name="checkmark" size={13} color="#FFF" />
-                                            <Text style={styles.acceptBtnText}>Aceptar</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectBooking(item)}>
-                                            <Text style={styles.rejectBtnText}>Rechazar</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
+                                {item.type === 'booking_request' && isCaregiver && null}
 
                                 {/* Friend request inline actions */}
                                 {item.type === 'friend_request' && (

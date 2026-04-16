@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity,
-    Image, ActivityIndicator, Platform, Modal, Animated
+    Image, ActivityIndicator, Platform, Modal, Animated,
+    FlatList, Alert,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +12,7 @@ import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
+import { logActivity, logSystemAction } from '../utils/logger';
 
 const DARK_MAP_STYLE = [
     { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
@@ -26,6 +28,21 @@ const DARK_MAP_STYLE = [
     { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ];
+
+const haversineKm = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const formatDuration = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+};
 
 export default function HomeScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
@@ -43,6 +60,17 @@ export default function HomeScreen({ navigation }) {
     const [selectedCaregiver, setSelectedCaregiver] = useState(null);
     const [mapMode, setMapMode] = useState('caregivers'); // 'caregivers' | 'pack'
     const realtimeRefs = useRef([]);
+
+    // Walk from Home state
+    const [myDogs, setMyDogs] = useState([]);
+    const [showDogPicker, setShowDogPicker] = useState(false);
+    const [isWalking, setIsWalking] = useState(false);
+    const [walkingPet, setWalkingPet] = useState(null);
+    const [walkRoute, setWalkRoute] = useState([]);
+    const [walkDistance, setWalkDistance] = useState(0);
+    const [walkTimer, setWalkTimer] = useState(0);
+    const locationSub = useRef(null);
+    const timerRef = useRef(null);
 
     const mapRef = useRef(null);
 
@@ -68,7 +96,6 @@ export default function HomeScreen({ navigation }) {
             fetchOnlineCaregivers();
             fetchGroupWalkers();
         })();
-        return () => { realtimeRefs.current.forEach(c => supabase.removeChannel(c)); };
     }, []);
 
     const fetchOnlineCaregivers = async () => {
@@ -93,7 +120,8 @@ export default function HomeScreen({ navigation }) {
 
     // Realtime channels
     useEffect(() => {
-        const cgChannel = supabase.channel('caregivers-online')
+        const ts = Date.now();
+        const cgChannel = supabase.channel(`caregivers-online-${ts}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, ({ new: row }) => {
                 if (row.role !== 'caregiver') return;
                 setOnlineCaregivers(prev => {
@@ -106,7 +134,7 @@ export default function HomeScreen({ navigation }) {
                 });
             }).subscribe();
 
-        const packChannel = supabase.channel('group-walkers')
+        const packChannel = supabase.channel(`group-walkers-${ts}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, ({ new: row }) => {
                 setGroupWalkers(prev => {
                     if (row.isGroupWalking && row.latitude) {
@@ -148,7 +176,7 @@ export default function HomeScreen({ navigation }) {
         };
         fetchUnread();
         
-        const channel = supabase.channel('home_unread_notifs')
+        const channel = supabase.channel(`home_unread_notifs_${user.id}_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `userId=eq.${user.id}` }, fetchUnread)
             .subscribe();
             
@@ -192,7 +220,87 @@ export default function HomeScreen({ navigation }) {
     const isCaregiver = userData?.role === 'caregiver';
 
     const handleStartWalk = () => {
-        navigation.navigate('Mascotas');
+        if (isWalking || userData?.isWalking) {
+            Alert.alert('Paseo activo', 'Ya tienes un paseo en curso. Termínalo antes de iniciar otro.');
+            return;
+        }
+        // Fetch dogs and show picker
+        (async () => {
+            if (!user?.id) return;
+            const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).eq('species', 'dog');
+            const dogs = data || [];
+            if (dogs.length === 0) {
+                Alert.alert('Sin perros', 'Primero registra un perro en Mis Mascotas.');
+                return;
+            }
+            setMyDogs(dogs);
+            setShowDogPicker(true);
+        })();
+    };
+
+    const startWalkWithPet = async (pet) => {
+        setShowDogPicker(false);
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Error', 'Permiso GPS denegado');
+            return;
+        }
+        setWalkingPet(pet);
+        setWalkRoute([]);
+        setWalkDistance(0);
+        setWalkTimer(0);
+        setIsWalking(true);
+        await supabase.from('users').update({ isWalking: true, walkingPetId: pet.id }).eq('id', user.id);
+        timerRef.current = setInterval(() => setWalkTimer(t => t + 1), 1000);
+        locationSub.current = await Location.watchPositionAsync(
+            { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
+            ({ coords: { latitude, longitude } }) => {
+                setWalkRoute(prev => {
+                    const next = [...prev, { latitude, longitude }];
+                    if (prev.length > 0) {
+                        const last = prev[prev.length - 1];
+                        setWalkDistance(d => d + haversineKm(last.latitude, last.longitude, latitude, longitude));
+                    }
+                    return next;
+                });
+            }
+        );
+    };
+
+    const stopWalk = async () => {
+        locationSub.current?.remove();
+        locationSub.current = null;
+        clearInterval(timerRef.current);
+        setIsWalking(false);
+        await supabase.from('users').update({ isWalking: false, walkingPetId: null }).eq('id', user.id);
+
+        const totalKm = parseFloat(walkDistance.toFixed(2));
+        const weight = parseFloat(walkingPet?.weight) || 0;
+        const calories = Math.round(weight * totalKm * 0.6);
+
+        try {
+            await supabase.from('walks').insert({
+                petId: walkingPet.id,
+                route: walkRoute,
+                totalKm,
+                calories,
+                durationSeconds: walkTimer,
+                startTime: new Date(Date.now() - walkTimer * 1000).toISOString(),
+                endTime: new Date().toISOString(),
+            });
+
+            const newTotal = (walkingPet.activity?.km || 0) + totalKm;
+            const newActivity = { ...(walkingPet.activity || {}), km: newTotal };
+            await supabase.from('pets').update({ activity: newActivity }).eq('id', walkingPet.id);
+
+            logActivity(user?.id, 'Paseo Completado', `${totalKm} km con ${walkingPet?.name}`, 'walk', 'walk').catch(() => {});
+            logSystemAction(user?.id, userData?.email || 'Desconocido', 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: walkingPet?.name }).catch(() => {});
+
+            Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas con ${walkingPet?.name}`);
+        } catch (e) {
+            Alert.alert('Error', 'No se pudo guardar el paseo');
+        }
+        setWalkingPet(null);
     };
 
     const firstName = userData?.fullName?.split(' ')[0] || userData?.email?.split('@')[0] || 'amigo';
@@ -234,6 +342,9 @@ export default function HomeScreen({ navigation }) {
                                 </View>
                             </Marker>
                         ))}
+                        {isWalking && walkRoute.length > 1 && (
+                            <Polyline coordinates={walkRoute} strokeColor="#FF6B35" strokeWidth={4} />
+                        )}
                     </MapView>
                 ) : (
                     <View style={[styles.map, styles.mapLoading, { backgroundColor: isDarkMode ? '#1d2c4d' : '#f8fafc' }]}>
@@ -316,7 +427,7 @@ export default function HomeScreen({ navigation }) {
 
                 {/* ROLE-BASED CTA BUTTONS */}
                 <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 12, marginBottom: 12 }}>
-                    {!isCaregiver && (
+                    {!isCaregiver && !isWalking && (
                         <TouchableOpacity 
                             style={{ flex: 1, backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 }}
                             onPress={handleStartWalk}
@@ -324,6 +435,22 @@ export default function HomeScreen({ navigation }) {
                             <Ionicons name="walk" size={22} color="#FFF" style={{ marginRight: 8 }} />
                             <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>Iniciar Paseo</Text>
                         </TouchableOpacity>
+                    )}
+                    {!isCaregiver && isWalking && (
+                        <View style={{ flex: 1, backgroundColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 4 }}>
+                            <View>
+                                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>🏃 {walkingPet?.name}</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' }}>
+                                    {walkDistance.toFixed(2)} km · {formatDuration(walkTimer)}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={{ backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}
+                                onPress={stopWalk}
+                            >
+                                <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>■ Terminar</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                     {!isCaregiver && (
                         <TouchableOpacity 
@@ -373,6 +500,43 @@ export default function HomeScreen({ navigation }) {
                             >
                                 <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>Ver Perfil</Text>
                             </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+
+                {/* DOG PICKER MODAL for walk */}
+                <Modal visible={showDogPicker} animationType="fade" transparent>
+                    <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setShowDogPicker(false)}>
+                        <View style={{ backgroundColor: theme.cardBackground, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 28, maxHeight: '60%' }}>
+                            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.text, marginBottom: 6 }}>🐕 Elige tu perro</Text>
+                            <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 16 }}>¿Con quién vas a pasear?</Text>
+                            <FlatList
+                                data={myDogs}
+                                keyExtractor={item => item.id}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: 16, padding: 14, marginBottom: 10 }}
+                                        onPress={() => startWalkWithPet(item)}
+                                        activeOpacity={0.8}
+                                    >
+                                        {item.image ? (
+                                            <Image source={{ uri: item.image }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                                        ) : (
+                                            <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 24 }}>🐕</Text>
+                                            </View>
+                                        )}
+                                        <View style={{ flex: 1, marginLeft: 14 }}>
+                                            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>{item.name}</Text>
+                                            <Text style={{ fontSize: 13, color: theme.textSecondary }}>{item.breed || 'Perro'}{item.weight ? ` · ${item.weight} kg` : ''}</Text>
+                                        </View>
+                                        <Ionicons name="play-circle" size={28} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                )}
+                                ListEmptyComponent={
+                                    <Text style={{ textAlign: 'center', color: theme.textSecondary, marginTop: 20 }}>No tienes perros registrados</Text>
+                                }
+                            />
                         </View>
                     </TouchableOpacity>
                 </Modal>

@@ -139,7 +139,7 @@ export default function SettingsScreen({ navigation }) {
 
         // Real-time listener for pets changes
         const channel = supabase
-            .channel('settings_pets_sync')
+            .channel(`settings_pets_sync_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'pets', filter: `ownerId=eq.${user.id}` }, () => {
                 fetchStats();
             })

@@ -17,12 +17,11 @@ const createPaymentIntent = async (req, res, next) => {
         }
 
         // Create a PaymentIntent with the order amount and currency
+        // Only allow Google Pay and Apple Pay (wallet-based payment methods)
         const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(amount * 100), // Stripe expects amounts in cents
             currency: currency,
-            automatic_payment_methods: {
-                enabled: true,
-            },
+            payment_method_types: ['card'],
             metadata: reservationId ? { reservationId } : undefined,
         });
 

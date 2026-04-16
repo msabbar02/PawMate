@@ -119,22 +119,22 @@ export const AuthProvider = ({ children }) => {
                 // Clean previous channels
                 cleanupChannels();
 
-                // ── Channel 1: User profile realtime (ban detection + avatar sync) ──
+                // ── Channel 1: User profile realtime (ban detection + data sync) ──
                 const userChannel = supabase
                     .channel(`rt:user:${uid}`)
                     .on('postgres_changes', {
                         event: '*', schema: 'public', table: 'users',
                         filter: `id=eq.${uid}`
                     }, async (payload) => {
-                        if (payload.new) {
-                            // Ban mirror: admin bans → instant logout
-                            if (payload.new.is_banned) {
-                                Alert.alert('Cuenta suspendida', 'Tu cuenta ha sido suspendida por un administrador.');
-                                await supabase.auth.signOut();
-                                return;
-                            }
-                            setUserData(payload.new);
+                        // Ban check from payload (small field, always delivered)
+                        if (payload.new?.is_banned) {
+                            Alert.alert('Cuenta suspendida', 'Tu cuenta ha sido suspendida por un administrador.');
+                            await supabase.auth.signOut();
+                            return;
                         }
+                        // Refresh from DB instead of using payload (payload may be truncated with large fields like galleryPhotos)
+                        const { data: freshData } = await supabase.from('users').select('*').eq('id', uid).single();
+                        if (freshData) setUserData(freshData);
                     })
                     .subscribe();
                 channelsRef.current.push(userChannel);

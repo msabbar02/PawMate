@@ -162,21 +162,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                 </View>
             )}
 
-            {/* Gallery photos */}
-            {(caregiver.galleryPhotos?.length > 0) && (
-                <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Galería</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                        {caregiver.galleryPhotos.map((uri, i) => (
-                            <Image
-                                key={i}
-                                source={{ uri }}
-                                style={{ width: '30%', aspectRatio: 1, borderRadius: 14 }}
-                            />
-                        ))}
-                    </View>
-                </View>
-            )}
+
         </>
     );
 

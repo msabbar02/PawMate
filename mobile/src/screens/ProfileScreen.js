@@ -67,6 +67,14 @@ export default function ProfileScreen({ navigation }) {
         rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null
     );
 
+    // Keep photo in sync with userData (covers caregiver mode refresh)
+    useEffect(() => {
+        const fresh = userData?.avatar || userData?.photoURL || null;
+        if (fresh && (fresh.startsWith('https://') || fresh.startsWith('data:'))) {
+            setPhotoUri(fresh);
+        }
+    }, [userData?.avatar, userData?.photoURL]);
+
     // Birth date
     const [birthDate,    setBirthDate]    = useState(
         userData?.birthDate ? new Date(userData.birthDate?.seconds ? userData.birthDate.seconds * 1000 : userData.birthDate) : new Date(1990, 0, 1)

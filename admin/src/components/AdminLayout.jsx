@@ -24,10 +24,24 @@ export default function AdminLayout() {
             .channel('admin:heartbeat')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {})
             .subscribe((status) => {
-                setRealtimeConnected(status === 'SUBSCRIBED');
+                if (status === 'SUBSCRIBED') {
+                    setRealtimeConnected(true);
+                } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    setRealtimeConnected(false);
+                }
             });
 
-        return () => { supabase.removeChannel(channel); };
+        // Fallback: check connection state periodically
+        const interval = setInterval(() => {
+            const channels = supabase.getChannels();
+            const heartbeat = channels.find(c => c.topic === 'realtime:admin:heartbeat');
+            setRealtimeConnected(heartbeat?.state === 'joined');
+        }, 10000);
+
+        return () => {
+            clearInterval(interval);
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const handleLogout = () => {
