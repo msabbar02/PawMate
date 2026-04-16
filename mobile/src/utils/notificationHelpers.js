@@ -1,6 +1,30 @@
 import { supabase } from '../config/supabase';
 
 /**
+ * Sends an Expo push notification to a device.
+ * Requires the user to have registered an expoPushToken.
+ */
+async function sendPushNotification(userId, title, body) {
+    try {
+        const { data: userData } = await supabase.from('users').select('expoPushToken').eq('id', userId).single();
+        if (!userData?.expoPushToken) return;
+
+        await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                to: userData.expoPushToken,
+                sound: 'default',
+                title,
+                body,
+            }),
+        });
+    } catch (e) {
+        console.warn('sendPushNotification failed:', e.message);
+    }
+}
+
+/**
  * Creates a notification record for a specific user.
  * Table: notifications
  *
@@ -20,6 +44,9 @@ export async function createNotification(userId, payload) {
             data: Object.keys(extra).length > 0 ? extra : {},
             read: false,
         });
+
+        // Also fire a push notification to the user's device
+        sendPushNotification(userId, title, body);
     } catch (e) {
         console.warn('createNotification failed:', e.message);
     }

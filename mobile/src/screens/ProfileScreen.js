@@ -213,7 +213,9 @@ export default function ProfileScreen({ navigation }) {
                 saveLocation,
             }).eq('id', user.id);
             await refreshUserData();
-            Alert.alert('✅ Guardado', 'Tu perfil ha sido actualizado.');
+            Alert.alert('✅ Guardado', 'Tu perfil ha sido actualizado.', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+            ]);
         } catch (e) {
             Alert.alert('Error', 'No se pudo guardar. Inténtalo de nuevo.');
         } finally {
@@ -319,30 +321,86 @@ export default function ProfileScreen({ navigation }) {
                     ))}
                 </View>
 
-                {/* ── PROFILE COMPLETION BAR ── */}
-                {completionPercent < 100 && (
-                    <View style={[styles.section, { paddingTop: 14 }]}>
-                        <View style={[styles.completionCard, { backgroundColor: theme.cardBackground }]}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                <Text style={[styles.completionTitle, { color: theme.text }]}>
-                                    Completa tu perfil
-                                </Text>
-                                <Text style={[styles.completionPercent, { color: COLORS.primary }]}>
-                                    {completionPercent}%
-                                </Text>
+                {/* ── CAREGIVER BADGE (only for caregivers) ── */}
+                {userData?.role === 'caregiver' && (() => {
+                    const TIERS = [
+                        { min: 0,  label: 'Bronce',   emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
+                        { min: 5,  label: 'Plata',    emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
+                        { min: 20, label: 'Oro',      emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                    ];
+                    const completed = userData?.completedServices || 0;
+                    let badge = TIERS[0];
+                    for (const t of TIERS) { if (completed >= t.min) badge = t; }
+                    const next = TIERS.find(t => completed < t.min);
+                    const pct = next ? ((completed - badge.min) / (next.min - badge.min)) * 100 : 100;
+
+                    return (
+                        <View style={[styles.section, { paddingTop: 14 }]}>
+                            <View style={[styles.completionCard, { backgroundColor: theme.cardBackground }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                    <Text style={{ fontSize: 24 }}>{badge.emoji}</Text>
+                                    <Text style={[styles.completionTitle, { color: badge.color }]}>Cuidador {badge.label}</Text>
+                                    <Text style={{ color: theme.textSecondary, fontSize: 13, marginLeft: 'auto' }}>{completed} servicios</Text>
+                                </View>
+                                {next ? (
+                                    <>
+                                        <View style={styles.completionTrack}>
+                                            <View style={[styles.completionFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: badge.color }]} />
+                                        </View>
+                                        <Text style={[styles.completionHint, { color: theme.textSecondary }]}>
+                                            {next.min - completed} servicios más para {next.emoji} {next.label}
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <Text style={[styles.completionHint, { color: badge.color, fontWeight: '800' }]}>🏆 ¡Nivel máximo alcanzado!</Text>
+                                )}
                             </View>
-                            <View style={styles.completionTrack}>
-                                <View style={[styles.completionFill, { width: `${completionPercent}%` }]} />
-                            </View>
-                            <Text style={[styles.completionHint, { color: theme.textSecondary }]}>
-                                {!photoUri ? '📷 Añade una foto de perfil' :
-                                 !phone.trim() ? '📞 Añade tu teléfono' :
-                                 !city.trim() ? '📍 Añade tu ciudad' :
-                                 '✨ ¡Ya casi está!'}
-                            </Text>
                         </View>
-                    </View>
-                )}
+                    );
+                })()}
+
+                {/* ── PROFILE COMPLETION ── */}
+                {completionPercent < 100 && (() => {
+                    const steps = [
+                        { done: !!photoUri,      icon: 'camera-outline',  label: 'Foto de perfil' },
+                        { done: !!phone.trim(),  icon: 'call-outline',    label: 'Teléfono' },
+                        { done: !!city.trim(),   icon: 'location-outline',label: 'Ciudad' },
+                        { done: !!firstName.trim(), icon: 'person-outline', label: 'Nombre' },
+                    ];
+                    const doneCount = steps.filter(s => s.done).length;
+                    return (
+                        <View style={[styles.section, { paddingTop: 14 }]}>
+                            <View style={[styles.completionCard, { backgroundColor: theme.cardBackground }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' }}>
+                                            <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
+                                        </View>
+                                        <Text style={[styles.completionTitle, { color: theme.text }]}>Completa tu perfil</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: COLORS.primaryBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.primary }}>{doneCount}/{steps.length}</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.completionTrack}>
+                                    <View style={[styles.completionFill, { width: `${completionPercent}%` }]} />
+                                </View>
+                                <View style={{ marginTop: 12, gap: 8 }}>
+                                    {steps.map((step, i) => (
+                                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: step.done ? '#dcfce7' : (isDarkMode ? '#1e293b' : '#f1f5f9'), justifyContent: 'center', alignItems: 'center' }}>
+                                                <Ionicons name={step.done ? 'checkmark' : step.icon} size={14} color={step.done ? '#16a34a' : theme.textSecondary} />
+                                            </View>
+                                            <Text style={{ fontSize: 14, fontWeight: '600', color: step.done ? '#16a34a' : theme.textSecondary, textDecorationLine: step.done ? 'line-through' : 'none' }}>
+                                                {step.label}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        </View>
+                    );
+                })()}
 
                 {/* ── PERSONAL DATA ── */}
                 <View style={styles.section}>

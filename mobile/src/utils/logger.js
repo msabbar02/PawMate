@@ -42,7 +42,6 @@ export const logSystemAction = async (userId, userEmail, actionType, entity, det
                 actionType: actionType,
                 entity: entity,
                 details: typeof details === 'string' ? details : JSON.stringify(details),
-                createdAt: new Date().toISOString()
             }
         ]);
 

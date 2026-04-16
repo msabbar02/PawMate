@@ -1,12 +1,13 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { supabase } from '../config/supabase';
 import { 
     LayoutDashboard, Users, Dog, CalendarDays, 
     MessageSquare, AlertTriangle, 
     LogOut, Menu, X, Activity, Sun, Moon,
-    UserCog, ShieldPlus, ShieldCheck
+    UserCog, ShieldPlus, ShieldCheck, Wifi, WifiOff
 } from 'lucide-react';
 import './AdminLayout.css';
 
@@ -15,6 +16,19 @@ export default function AdminLayout() {
     const { theme, toggleTheme } = useContext(ThemeContext);
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [realtimeConnected, setRealtimeConnected] = useState(false);
+
+    // ── Realtime connection heartbeat ──
+    useEffect(() => {
+        const channel = supabase
+            .channel('admin:heartbeat')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {})
+            .subscribe((status) => {
+                setRealtimeConnected(status === 'SUBSCRIBED');
+            });
+
+        return () => { supabase.removeChannel(channel); };
+    }, []);
 
     const handleLogout = () => {
         logout();
@@ -84,6 +98,10 @@ export default function AdminLayout() {
                     </button>
                     <div className="topbar-welcome">
                         <span className="welcome-text">Hola, <strong>{displayName}</strong></span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 12, fontSize: 11, color: realtimeConnected ? '#22c55e' : '#ef4444', fontWeight: 600 }} title={realtimeConnected ? 'Realtime conectado' : 'Realtime desconectado'}>
+                            {realtimeConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+                            {realtimeConnected ? 'Live' : 'Offline'}
+                        </span>
                     </div>
                     <div className="admin-profile" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }} title="Mi Perfil">
                         <div className="admin-avatar">

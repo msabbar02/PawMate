@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../config/supabase';
-import { Search, Edit2, Trash2, X, AlertCircle, Shield, ShieldCheck, Eye, Dog } from 'lucide-react';
+import { Search, Edit2, Trash2, X, AlertCircle, Shield, ShieldCheck, Eye, Dog, Ban } from 'lucide-react';
 import './UsersPage.css';
 
 export default function UsersPage() {
@@ -17,12 +17,7 @@ export default function UsersPage() {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [editForm, setEditForm] = useState({ role: '', verificationStatus: '' });
 
-    useEffect(() => {
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
-        setLoading(true);
+    const fetchUsers = useCallback(async () => {
         try {
             const { data: usersData, error } = await supabase.from('users').select('*');
             if (!error && usersData) {
@@ -32,6 +27,38 @@ export default function UsersPage() {
             console.error("Error fetching users:", error);
         } finally {
             setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUsers();
+
+        // ── Realtime: auto-refresh users on any change ──
+        const channel = supabase
+            .channel('admin:users')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setUsers(prev => [...prev, payload.new]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setUsers(prev => prev.map(u => u.id === payload.new.id ? payload.new : u));
+                } else if (payload.eventType === 'DELETE') {
+                    setUsers(prev => prev.filter(u => u.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchUsers]);
+
+    const handleBanUser = async (userId, currentlyBanned) => {
+        const action = currentlyBanned ? 'desbanear' : 'banear';
+        if (!window.confirm(`¿Seguro que deseas ${action} a este usuario?`)) return;
+        try {
+            await supabase.from('users').update({ is_banned: !currentlyBanned }).eq('id', userId);
+            setUsers(users.map(u => u.id === userId ? { ...u, is_banned: !currentlyBanned } : u));
+        } catch (error) {
+            console.error("Error banning user:", error);
+            alert("Error al actualizar el estado del usuario");
         }
     };
 
@@ -155,18 +182,24 @@ export default function UsersPage() {
                                 </tr>
                             ) : (
                                 filteredUsers.map(user => (
-                                    <tr key={user.id}>
+                                    <tr key={user.id} style={user.is_banned ? { opacity: 0.5, background: 'rgba(239,68,68,0.05)' } : {}}>
                                         <td>
                                             <div className="user-cell">
-                                                <div className="user-avatar">
+                                                <div className="user-avatar" style={{ position: 'relative' }}>
                                                     {user.photoURL ? (
                                                         <img src={user.photoURL} alt="avatar" />
                                                     ) : (
                                                         <span>{user.fullName?.charAt(0) || 'U'}</span>
                                                     )}
+                                                    {user.isOnline && (
+                                                        <span style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e', border: '2px solid var(--bg-color, #0B0E14)' }} title="Online" />
+                                                    )}
                                                 </div>
                                                 <div className="user-info">
-                                                    <span className="user-name">{user.fullName || 'Sin nombre'}</span>
+                                                    <span className="user-name">
+                                                        {user.fullName || 'Sin nombre'}
+                                                        {user.is_banned && <span style={{ color: '#ef4444', fontSize: 11, marginLeft: 6 }}>(BANEADO)</span>}
+                                                    </span>
                                                     <span className="user-id">ID: {user.id.substring(0,8)}...</span>
                                                 </div>
                                             </div>
@@ -209,6 +242,16 @@ export default function UsersPage() {
                                                 <button className="action-btn delete" onClick={() => handleDeleteUser(user.id)} title="Eliminar usuario">
                                                     <Trash2 size={18} />
                                                 </button>
+                                                {user.role !== 'admin' && (
+                                                    <button 
+                                                        className="action-btn" 
+                                                        onClick={() => handleBanUser(user.id, user.is_banned)} 
+                                                        title={user.is_banned ? 'Desbanear' : 'Banear'}
+                                                        style={{ color: user.is_banned ? '#22c55e' : '#ef4444' }}
+                                                    >
+                                                        <Ban size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

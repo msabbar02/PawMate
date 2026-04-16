@@ -1,83 +1,198 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
+import { Alert, AppState } from 'react-native';
 import { supabase } from '../config/supabase';
 import { registerForPushNotifications } from '../utils/pushNotifications';
 import { logSystemAction } from '../utils/logger';
 import { sendWelcomeEmail } from '../config/api';
 
 export const AuthContext = createContext({
-    user: null, // The Supabase user object
-    userData: null, // Additional user data from Postgres
-    isLoading: true, // Loading state
-    refreshUserData: async () => {}, // Force manual refresh of user data
+    user: null,
+    userData: null,
+    isLoading: true,
+    refreshUserData: async () => {},
+    updateUserOptimistic: () => {},
+    unreadMessages: 0,
+    pendingBookings: 0,
 });
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [unreadMessages, setUnreadMessages] = useState(0);
+    const [pendingBookings, setPendingBookings] = useState(0);
 
-    const refreshUserData = async () => {
-        if (!user) return;
+    // Track all channels for cleanup
+    const channelsRef = useRef([]);
+    const presenceIntervalRef = useRef(null);
+    const userDataRef = useRef(null);
+
+    // Keep ref in sync for use in callbacks
+    useEffect(() => { userDataRef.current = userData; }, [userData]);
+
+    const updateUserOptimistic = (partial) => {
+        setUserData(prev => prev ? { ...prev, ...partial } : prev);
+    };
+
+    const refreshUserData = useCallback(async () => {
+        const currentUser = user;
+        if (!currentUser) return;
         const { data, error } = await supabase
             .from('users')
             .select('*')
-            .eq('id', user.id)
+            .eq('id', currentUser.id)
             .single();
         if (data && !error) {
             setUserData(data);
         }
+    }, [user]);
+
+    // ── Presence: update last_seen ──────────────
+    const startPresence = (userId) => {
+        // Update last_seen on login (don't force isOnline — caregivers control it manually)
+        supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+
+        // Heartbeat every 60s — only last_seen
+        presenceIntervalRef.current = setInterval(() => {
+            supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+        }, 60000);
+
+        // AppState listener: only update last_seen, don't override manual online toggle
+        const appStateListener = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active') {
+                supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+            }
+        });
+
+        return appStateListener;
+    };
+
+    const stopPresence = (userId) => {
+        if (presenceIntervalRef.current) {
+            clearInterval(presenceIntervalRef.current);
+            presenceIntervalRef.current = null;
+        }
+        if (userId) {
+            supabase.from('users').update({ isOnline: false, last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+        }
+    };
+
+    // ── Cleanup all realtime channels ───────────────────────
+    const cleanupChannels = () => {
+        channelsRef.current.forEach(ch => {
+            try { supabase.removeChannel(ch); } catch {}
+        });
+        channelsRef.current = [];
     };
 
     useEffect(() => {
-        let subscriptionChannel = null;
+        let appStateListener = null;
 
         const handleAuthChange = async (session) => {
             if (session?.user) {
                 setUser(session.user);
-                
-                // Fetch initial user data
-                const fetchUserData = async () => {
-                    const { data, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('id', session.user.id)
-                        .single();
-                        
-                    if (data && !error) {
-                        setUserData(data);
-                        registerForPushNotifications().catch(() => {});
-                    } else {
-                        console.log("No such user document or error:", error);
-                        setUserData(null);
-                    }
-                    setIsLoading(false);
-                };
-                
-                await fetchUserData();
+                const uid = session.user.id;
 
-                // Subscribe to real-time changes on this user's row
-                subscriptionChannel = supabase
-                    .channel('public:users')
-                    .on('postgres_changes', { 
-                        event: '*', 
-                        schema: 'public', 
-                        table: 'users',
-                        filter: `id=eq.${session.user.id}`
-                    }, (payload) => {
+                // Fetch initial user data
+                const { data: profile, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', uid)
+                    .single();
+
+                if (profile && !error) {
+                    // ── Ban check on login ──
+                    if (profile.is_banned) {
+                        Alert.alert('Cuenta suspendida', 'Tu cuenta ha sido suspendida por un administrador.');
+                        await supabase.auth.signOut();
+                        return;
+                    }
+                    setUserData(profile);
+                    registerForPushNotifications().catch(() => {});
+                } else {
+                    setUserData(null);
+                    setIsLoading(false);
+                    return;
+                }
+                setIsLoading(false);
+
+                // Clean previous channels
+                cleanupChannels();
+
+                // ── Channel 1: User profile realtime (ban detection + avatar sync) ──
+                const userChannel = supabase
+                    .channel(`rt:user:${uid}`)
+                    .on('postgres_changes', {
+                        event: '*', schema: 'public', table: 'users',
+                        filter: `id=eq.${uid}`
+                    }, async (payload) => {
                         if (payload.new) {
+                            // Ban mirror: admin bans → instant logout
+                            if (payload.new.is_banned) {
+                                Alert.alert('Cuenta suspendida', 'Tu cuenta ha sido suspendida por un administrador.');
+                                await supabase.auth.signOut();
+                                return;
+                            }
                             setUserData(payload.new);
                         }
                     })
                     .subscribe();
+                channelsRef.current.push(userChannel);
+
+                // ── Channel 2: Unread messages ──
+                const fetchUnread = async () => {
+                    const { count } = await supabase
+                        .from('messages')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('receiverId', uid)
+                        .eq('read', false);
+                    setUnreadMessages(count || 0);
+                };
+                fetchUnread();
+
+                const msgChannel = supabase
+                    .channel(`rt:messages:${uid}`)
+                    .on('postgres_changes', {
+                        event: '*', schema: 'public', table: 'messages',
+                        filter: `receiverId=eq.${uid}`
+                    }, fetchUnread)
+                    .subscribe();
+                channelsRef.current.push(msgChannel);
+
+                // ── Channel 3: Pending bookings ──
+                const fetchPending = async () => {
+                    const role = userDataRef.current?.role || profile?.role;
+                    const field = role === 'caregiver' ? 'caregiverId' : 'ownerId';
+                    const { count } = await supabase
+                        .from('reservations')
+                        .select('*', { count: 'exact', head: true })
+                        .eq(field, uid)
+                        .eq('status', 'pendiente');
+                    setPendingBookings(count || 0);
+                };
+                fetchPending();
+
+                const bookChannel = supabase
+                    .channel(`rt:bookings:${uid}`)
+                    .on('postgres_changes', {
+                        event: '*', schema: 'public', table: 'reservations'
+                    }, fetchPending)
+                    .subscribe();
+                channelsRef.current.push(bookChannel);
+
+                // ── Start presence heartbeat ──
+                appStateListener = startPresence(uid);
 
             } else {
+                // Signed out
+                const prevUid = user?.id;
+                stopPresence(prevUid);
+                cleanupChannels();
                 setUser(null);
                 setUserData(null);
+                setUnreadMessages(0);
+                setPendingBookings(0);
                 setIsLoading(false);
-                if (subscriptionChannel) {
-                    supabase.removeChannel(subscriptionChannel);
-                    subscriptionChannel = null;
-                }
             }
         };
 
@@ -86,14 +201,11 @@ export const AuthProvider = ({ children }) => {
             handleAuthChange(session);
         });
 
-        // Listen for changes
+        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
             handleAuthChange(session);
             if (_evt === 'SIGNED_IN' && session?.user) {
                 logSystemAction(session.user.id, session.user.email, 'USER_LOGIN', 'Auth', { event: _evt });
-                
-                // Welcome email is now handled by the Supabase Auth Hook (auth-email endpoint)
-                // so we no longer need to send it separately here.
             } else if (_evt === 'SIGNED_OUT') {
                 logSystemAction(user?.id || 'Sistema', user?.email || 'Sistema', 'USER_LOGOUT', 'Auth', { event: _evt });
             }
@@ -101,14 +213,14 @@ export const AuthProvider = ({ children }) => {
 
         return () => {
             subscription.unsubscribe();
-            if (subscriptionChannel) {
-                supabase.removeChannel(subscriptionChannel);
-            }
+            cleanupChannels();
+            stopPresence(user?.id);
+            if (appStateListener) appStateListener.remove();
         };
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData }}>
+        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData, updateUserOptimistic, unreadMessages, pendingBookings }}>
             {children}
         </AuthContext.Provider>
     );

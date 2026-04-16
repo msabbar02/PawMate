@@ -39,6 +39,7 @@ export default function CaregiverSetupScreen({ navigation }) {
     const [serviceRadius, setServiceRadius] = useState(String(userData?.serviceRadius || '5'));
     const [maxWalks, setMaxWalks] = useState(String(userData?.maxConcurrentWalks || '5'));
     const [maxHotel, setMaxHotel] = useState(String(userData?.maxConcurrentHotel || '3'));
+    const [iban, setIban] = useState(userData?.iban || '');
 
     const [selectedServices, setSelectedServices] = useState(userData?.serviceTypes || []);
     const [acceptedSpecies, setAcceptedSpecies] = useState(userData?.acceptedSpecies || []);
@@ -55,6 +56,7 @@ export default function CaregiverSetupScreen({ navigation }) {
             setServiceRadius(String(userData.serviceRadius || '5'));
             setMaxWalks(String(userData.maxConcurrentWalks || '5'));
             setMaxHotel(String(userData.maxConcurrentHotel || '3'));
+            setIban(userData.iban || '');
             setSelectedServices(userData.serviceTypes || []);
             setAcceptedSpecies(userData.acceptedSpecies || []);
             if (userData.schedule && Object.keys(userData.schedule).length > 0) {
@@ -103,6 +105,10 @@ export default function CaregiverSetupScreen({ navigation }) {
             Alert.alert('Error', 'Selecciona al menos un tipo de mascota.');
             return;
         }
+        if (!iban.trim()) {
+            Alert.alert('Error', 'Introduce tu IBAN para recibir pagos.');
+            return;
+        }
 
         setSaving(true);
         try {
@@ -116,6 +122,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                 serviceTypes: selectedServices,
                 acceptedSpecies,
                 schedule,
+                iban: iban.trim(),
             }).eq('id', user.id);
 
             if (error) throw error;
@@ -223,6 +230,26 @@ export default function CaregiverSetupScreen({ navigation }) {
                             />
                         </View>
                     </View>
+                </View>
+
+                {/* IBAN */}
+                <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="card-outline" size={20} color="#8B5CF6" />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Datos de pago</Text>
+                    </View>
+                    <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 6 }]}>
+                        IBAN (obligatorio para recibir pagos)
+                    </Text>
+                    <TextInput
+                        style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                        value={iban}
+                        onChangeText={setIban}
+                        placeholder="ES00 0000 0000 0000 0000 0000"
+                        placeholderTextColor={theme.textSecondary}
+                        autoCapitalize="characters"
+                        maxLength={34}
+                    />
                 </View>
 
                 {/* Servicios */}

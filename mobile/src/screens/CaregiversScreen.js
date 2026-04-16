@@ -79,8 +79,9 @@ export default function CaregiversScreen({ navigation }) {
     };
 
     const renderCaregiver = ({ item }) => {
-        const hasPrice = item.price && item.price > 0;
+        const hasPrice = item.price != null && item.price > 0;
         const services = item.serviceTypes || [];
+        const species = item.acceptedSpecies || [];
 
         return (
             <TouchableOpacity 
@@ -127,9 +128,12 @@ export default function CaregiversScreen({ navigation }) {
                             </View>
                         ) : null}
 
-                        <Text style={[styles.cityText, { color: theme.textSecondary }]} numberOfLines={1}>
-                            <Ionicons name="location-outline" size={12} /> {item.city || 'Sin ubicación'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="location-outline" size={12} color={theme.textSecondary} />
+                            <Text style={[styles.cityText, { color: theme.textSecondary }]} numberOfLines={1}>
+                                {item.city || 'Sin ubicación'}
+                            </Text>
+                        </View>
 
                         {hasPrice && (
                             <View style={styles.priceRow}>
@@ -143,10 +147,23 @@ export default function CaregiversScreen({ navigation }) {
                 {/* Services chips */}
                 {services.length > 0 && (
                     <View style={styles.servicesRow}>
-                        {services.slice(0, 3).map(s => (
-                            <View key={s} style={[styles.serviceChip, { backgroundColor: COLORS.primaryBg }]}>
+                        {services.slice(0, 3).map(svc => (
+                            <View key={svc} style={[styles.serviceChip, { backgroundColor: COLORS.primaryBg }]}>
                                 <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: '700' }}>
-                                    {SERVICE_LABELS[s] || s}
+                                    {SERVICE_LABELS[svc] || svc}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Accepted species */}
+                {species.length > 0 && (
+                    <View style={[styles.servicesRow, { paddingTop: 0 }]}>
+                        {species.map(sp => (
+                            <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE' }]}>
+                                <Text style={{ fontSize: 11, color: '#0891b2', fontWeight: '700' }}>
+                                    {sp === 'perro' ? '🐶 Perros' : sp === 'gato' ? '🐱 Gatos' : sp === 'ave' ? '🐦 Aves' : sp === 'reptil' ? '🦎 Reptiles' : '🐾 ' + sp}
                                 </Text>
                             </View>
                         ))}

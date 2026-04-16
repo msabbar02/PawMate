@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../config/supabase';
 import { Search, Edit2, Trash2, X, CalendarDays, Eye, FileText } from 'lucide-react';
 import './UsersPage.css'; // Shared table styles
@@ -15,12 +15,7 @@ export default function ReservationsPage() {
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [editStatus, setEditStatus] = useState('');
 
-    useEffect(() => {
-        fetchReservations();
-    }, []);
-
-    const fetchReservations = async () => {
-        setLoading(true);
+    const fetchReservations = useCallback(async () => {
         try {
             const { data: resData } = await supabase.from('reservations').select('*').order('created_at', { ascending: false });
             if (resData) setReservations(resData);
@@ -29,7 +24,27 @@ export default function ReservationsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchReservations();
+
+        // ── Realtime: auto-refresh reservations ──
+        const channel = supabase
+            .channel('admin:reservations')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setReservations(prev => [payload.new, ...prev]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setReservations(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
+                } else if (payload.eventType === 'DELETE') {
+                    setReservations(prev => prev.filter(r => r.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchReservations]);
 
     const handleDelete = async (resId) => {
         if (window.confirm('¿Seguro que deseas eliminar esta reserva?')) {
@@ -74,6 +89,11 @@ export default function ReservationsPage() {
         return type === 'walking' ? '🚶 Paseo' : type === 'daycare' ? '☀️ Guardería' : '🏨 Hotel';
     };
 
+    const statusLabel = (s) => {
+        const labels = { pendiente: 'Pendiente', aceptada: 'Aceptada', activa: 'Activa', in_progress: 'En progreso', completada: 'Completada', cancelada: 'Cancelada' };
+        return labels[s] || s || 'Pendiente';
+    };
+
     return (
         <div className="page-container">
             <div className="page-header">
@@ -100,6 +120,7 @@ export default function ReservationsPage() {
                     <option value="pendiente">Pendiente</option>
                     <option value="aceptada">Aceptada</option>
                     <option value="activa">Activa</option>
+                    <option value="in_progress">En progreso</option>
                     <option value="completada">Completada</option>
                     <option value="cancelada">Cancelada</option>
                 </select>
@@ -150,7 +171,7 @@ export default function ReservationsPage() {
                                             </td>
                                             <td>
                                                 <span className={`status-badge ${res.status || 'pendiente'}`}>
-                                                    {res.status || 'pendiente'}
+                                                    {statusLabel(res.status)}
                                                 </span>
                                             </td>
                                             <td>
@@ -196,7 +217,7 @@ export default function ReservationsPage() {
                             </div>
 
                             <div className="form-group">
-                                <label>Cambiar Estado Manulamente</label>
+                                <label>Cambiar Estado Manualmente</label>
                                 <select 
                                     className="form-control"
                                     value={editStatus}
@@ -205,6 +226,7 @@ export default function ReservationsPage() {
                                     <option value="pendiente">Pendiente</option>
                                     <option value="aceptada">Aceptada</option>
                                     <option value="activa">Activa</option>
+                                    <option value="in_progress">En progreso</option>
                                     <option value="completada">Completada</option>
                                     <option value="cancelada">Cancelada</option>
                                 </select>
@@ -281,6 +303,18 @@ export default function ReservationsPage() {
                                         <span className="premium-detail-value">{selectedRes.notes}</span>
                                     </div>
                                 )}
+                                {selectedRes.penaltyAmount > 0 && (
+                                    <div className="premium-detail-card">
+                                        <span className="premium-detail-label">Penalización</span>
+                                        <span className="premium-detail-value" style={{ color: '#ef4444', fontWeight: 700 }}>€{selectedRes.penaltyAmount}</span>
+                                    </div>
+                                )}
+                                <div className="premium-detail-card">
+                                    <span className="premium-detail-label">Pago liberado</span>
+                                    <span className="premium-detail-value" style={{ color: selectedRes.paymentReleased ? '#22c55e' : '#f59e0b' }}>
+                                        {selectedRes.paymentReleased ? '✅ Sí' : '⏳ Pendiente'}
+                                    </span>
+                                </div>
                             </div>
                             
                             <div className="modal-footer" style={{ borderTop: 'none', padding: 0 }}>

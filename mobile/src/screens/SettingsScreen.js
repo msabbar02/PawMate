@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
@@ -440,7 +441,9 @@ export default function SettingsScreen({ navigation }) {
                             {photoUri
                                 ? <Image source={{ uri: photoUri }} style={s.avatar} />
                                 : <View style={[s.avatar, s.avatarFallback, { backgroundColor: theme.primaryBg }]}>
-                                    <Text style={{ fontSize: 42 }}>🐾</Text>
+                                    <Text style={{ fontSize: 32, fontWeight: '800', color: theme.primary }}>
+                                        {(userData?.fullName || userData?.email || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+                                    </Text>
                                   </View>
                             }
                         </View>
@@ -458,6 +461,25 @@ export default function SettingsScreen({ navigation }) {
                         <Text style={{ fontSize: 12 }}>{role.emoji}</Text>
                         <Text style={[s.rolePillText, { color: role.color }]}>{role.label}</Text>
                     </View>
+
+                    {/* Badge for caregivers */}
+                    {userData?.role === 'caregiver' && (() => {
+                        const TIERS = [
+                            { min: 0,  label: 'Bronce', emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
+                            { min: 5,  label: 'Plata',  emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
+                            { min: 20, label: 'Oro',    emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                        ];
+                        const done = userData?.completedServices || 0;
+                        let b = TIERS[0];
+                        for (const t of TIERS) { if (done >= t.min) b = t; }
+                        return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: b.bg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14 }}>
+                                <Text style={{ fontSize: 18 }}>{b.emoji}</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: b.color }}>Cuidador {b.label}</Text>
+                                <Text style={{ fontSize: 11, color: b.color + '99' }}> · {done} servicios</Text>
+                            </View>
+                        );
+                    })()}
 
                     <View style={[s.statsStrip, { borderTopColor: theme.border }]}>
                         <View style={s.statItem}>
@@ -620,6 +642,7 @@ export default function SettingsScreen({ navigation }) {
                         iconBg={isDarkMode ? theme.primaryBg : '#F0F9FF'}
                         label="Cambiar contraseña"
                         onPress={() => setShowPasswordModal(true)}
+                        last={userData?.role !== 'normal' && userData?.verificationStatus !== 'pending'}
                     />
                     {userData?.role === 'normal' && userData?.verificationStatus !== 'pending' && (
                         <SettingRow
@@ -628,6 +651,7 @@ export default function SettingsScreen({ navigation }) {
                             label="Verificar mi cuenta"
                             sublabel="Conviértete en Dueño o Cuidador"
                             onPress={() => navigation.navigate('Verify')}
+                            last
                         />
                     )}
                     {userData?.verificationStatus === 'pending' && (
@@ -636,31 +660,9 @@ export default function SettingsScreen({ navigation }) {
                             iconBg={isDarkMode ? theme.primaryBg : '#FEF3C7'}
                             label="Verificación en revisión"
                             sublabel="Te avisaremos en 24-48h"
+                            last
                         />
                     )}
-                    <SettingRow
-                        icon="notifications-outline"
-                        iconBg={isDarkMode ? theme.primaryBg : '#FFF7ED'}
-                        label="Notificaciones Push"
-                        sublabel="Recibir alertas de paseos y salud"
-                        last
-                        right={
-                            <Switch
-                                value={notifsEnabled}
-                                onValueChange={async (val) => {
-                                    setNotifsEnabled(val);
-                                    try {
-                                        await supabase.from('users').update({ notificationsEnabled: val }).eq('id', user.id);
-                                        await refreshUserData();
-                                    } catch {
-                                        setNotifsEnabled(!val);
-                                    }
-                                }}
-                                trackColor={{ false: theme.border, true: theme.primary }}
-                                thumbColor="#FFF"
-                            />
-                        }
-                    />
                 </SettingGroup>
 
                 {/* ── CUIDADOR: ESTADO ONLINE ── */}
@@ -681,9 +683,12 @@ export default function SettingsScreen({ navigation }) {
                                             const update = { isOnline: val };
                                             if (val) {
                                                 try {
-                                                    const loc = await import('expo-location').then(m => m.getCurrentPositionAsync({}));
-                                                    update.latitude = loc.coords.latitude;
-                                                    update.longitude = loc.coords.longitude;
+                                                    const { status } = await Location.requestForegroundPermissionsAsync();
+                                                    if (status === 'granted') {
+                                                        const loc = await Location.getCurrentPositionAsync({});
+                                                        update.latitude = loc.coords.latitude;
+                                                        update.longitude = loc.coords.longitude;
+                                                    }
                                                 } catch { /* ignore */ }
                                             }
                                             await supabase.from('users').update(update).eq('id', user.id);

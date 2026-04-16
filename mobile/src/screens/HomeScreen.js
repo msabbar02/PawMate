@@ -28,7 +28,7 @@ const DARK_MAP_STYLE = [
 ];
 
 export default function HomeScreen({ navigation }) {
-    const { userData, user } = useContext(AuthContext);
+    const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = useContext(ThemeContext);
 
     const [location, setLocation] = useState(null);
@@ -180,6 +180,7 @@ export default function HomeScreen({ navigation }) {
         const update = { isOnline: newVal };
         if (newVal && location) { update.latitude = location.latitude; update.longitude = location.longitude; }
         await supabase.from('users').update(update).eq('id', user.id);
+        if (refreshUserData) refreshUserData();
     };
 
     const togglePanel = () => {
@@ -195,7 +196,8 @@ export default function HomeScreen({ navigation }) {
     };
 
     const firstName = userData?.fullName?.split(' ')[0] || userData?.email?.split('@')[0] || 'amigo';
-    const userPhoto = user?.photoURL || userData?.photoURL || null;
+    const userPhoto = userData?.avatar || userData?.photoURL || user?.photoURL || null;
+    const userInitials = (userData?.fullName || userData?.email || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -203,7 +205,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* SECCIÓN DEL MAPA - crece cuando el panel está cerrado */}
             <Animated.View style={[styles.mapSection, {
-                flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.68] })
+                flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0.65] })
             }]}>
                 {location ? (
                     <MapView
@@ -215,7 +217,7 @@ export default function HomeScreen({ navigation }) {
                         showsCompass={false}
                         customMapStyle={isDarkMode ? DARK_MAP_STYLE : []}
                     >
-                        {mapMode === 'caregivers' && onlineCaregivers.map(cg => (
+                        {mapMode === 'caregivers' && !isCaregiver && onlineCaregivers.map(cg => (
                             <Marker key={cg.id} coordinate={{ latitude: Number(cg.latitude), longitude: Number(cg.longitude) }} onPress={() => setSelectedCaregiver(cg)}>
                                 <View style={{ width: 46, height: 46, borderRadius: 23, borderWidth: 3, borderColor: '#22c55e', overflow: 'hidden', backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 6 }}>
                                     <Image source={{ uri: cg.avatar || cg.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
@@ -242,11 +244,11 @@ export default function HomeScreen({ navigation }) {
 
                 {/* HEADER PÍLDORA FLOTANTE ENCIMA DEL MAPA */}
                 <View style={styles.topBar}>
-                    <View style={[styles.topBarRow, { backgroundColor: isDarkMode ? theme.surface : 'rgba(255, 255, 255, 0.95)' }]}>
+                    <View style={[styles.topBarRow, { backgroundColor: isDarkMode ? theme.cardBackground : 'rgba(255, 255, 255, 0.95)' }]}>
                         <TouchableOpacity style={styles.userAvatarBox} onPress={() => navigation.navigate('Profile')}>
                             {userPhoto
                                 ? <Image source={{ uri: userPhoto }} style={styles.userAvatarImg} />
-                                : <Ionicons name={"person"} size={18} color="#FFF" />
+                                : <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFF' }}>{userInitials}</Text>
                             }
                         </TouchableOpacity>
 
@@ -286,7 +288,7 @@ export default function HomeScreen({ navigation }) {
             </Animated.View>
 
             {/* SECCIÓN INFERIOR: Dashboard y Cards */}
-            <Animated.View style={[styles.bottomSection, { backgroundColor: theme.background, flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.32] }) }]}>
+            <Animated.View style={[styles.bottomSection, { backgroundColor: theme.background, flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] }) }]}>
                 
                 {/* DRAG HANDLE */}
                 <TouchableOpacity onPress={togglePanel} style={{ alignItems: 'center', paddingVertical: 10 }}>
@@ -367,7 +369,7 @@ export default function HomeScreen({ navigation }) {
                             </View>
                             <TouchableOpacity
                                 style={{ backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, alignItems: 'center' }}
-                                onPress={() => { setSelectedCaregiver(null); navigation.navigate('CaregiverProfile', { caregiver: selectedCaregiver }); }}
+                                onPress={() => { setSelectedCaregiver(null); navigation.navigate('CaregiverProfile', { caregiverId: selectedCaregiver?.id }); }}
                             >
                                 <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>Ver Perfil</Text>
                             </TouchableOpacity>
@@ -384,7 +386,7 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     
     // Header Info (Pill)
-    topBar: { position: 'absolute', top: Platform.OS === 'ios' ? 60 : 40, left: 16, right: 16, zIndex: 10 },
+    topBar: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 30, left: 16, right: 16, zIndex: 10 },
     topBarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 28, paddingVertical: 10, paddingHorizontal: 10, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 20, elevation: 8 },
     userAvatarBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
     userAvatarImg: { width: '100%', height: '100%', borderRadius: 22 },

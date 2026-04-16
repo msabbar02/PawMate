@@ -13,4 +13,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
     flowType: 'pkce',
   },
+  realtime: {
+    params: { eventsPerSecond: 10 },
+  },
 });

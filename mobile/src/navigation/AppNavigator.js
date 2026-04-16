@@ -14,6 +14,7 @@ import SignupScreen from '../screens/SignupScreen';
 import MyPetsScreen from '../screens/MyPetsScreen';
 import BookingScreen from '../screens/BookingScreen';
 import CaregiversScreen from '../screens/CaregiversScreen';
+import CaregiverDashboardScreen from '../screens/CaregiverDashboardScreen';
 import CaregiverProfileScreen from '../screens/CaregiverProfileScreen';
 import CreateBookingScreen from '../screens/CreateBookingScreen';
 import ChatScreen from '../screens/ChatScreen';
@@ -42,19 +43,32 @@ function ProfileIncompleteBanner() {
 
     if (missing.length === 0) return null;
 
+    const pct = Math.round(((3 - missing.length) / 3) * 100);
+
     return (
         <TouchableOpacity
-            style={styles.incompleteBanner}
+            style={[styles.incompleteBanner, { backgroundColor: theme.primary || '#F5A623' }]}
             onPress={() => navigation.navigate('Profile')}
             activeOpacity={0.85}
         >
-            <Ionicons name="alert-circle-outline" size={18} color="#fff" />
+            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>{pct}%</Text>
+            </View>
             <Text style={styles.incompleteBannerText}>
                 Completa tu perfil: falta {missing.join(', ')}
             </Text>
             <Ionicons name="chevron-forward" size={16} color="#fff" />
         </TouchableOpacity>
     );
+}
+
+// Caregiver tab: shows dashboard for caregivers, list for owners
+function CaregiverTabScreen(props) {
+    const { userData } = useContext(AuthContext);
+    if (userData?.role === 'caregiver') {
+        return <CaregiverDashboardScreen {...props} />;
+    }
+    return <CaregiversScreen {...props} />;
 }
 
 // Wrapper that locks the Booking tab for 'normal' users
@@ -108,7 +122,7 @@ const MainTabNavigator = () => {
                     else if (route.name === 'Ajustes') iconName = focused ? 'settings' : 'settings-outline';
 
                     const activeColor = '#F5A623';
-                    const routeLabel = route.name === 'Reservas' ? 'Reservas' : route.name === 'Mascotas' ? 'Mascotas' : route.name === 'Cuidadores' ? 'Cuidar' : route.name === 'Ajustes' ? 'Ajustes' : 'Inicio';
+                    const routeLabel = route.name === 'Reservas' ? 'Reservas' : route.name === 'Mascotas' ? 'Mascotas' : route.name === 'Cuidadores' ? (role === 'caregiver' ? 'Mi Panel' : 'Cuidar') : route.name === 'Ajustes' ? 'Ajustes' : 'Inicio';
 
                     if (focused) {
                         return (
@@ -186,7 +200,7 @@ const MainTabNavigator = () => {
             />
             <Tab.Screen
                 name="Cuidadores"
-                component={CaregiversScreen}
+                component={CaregiverTabScreen}
                 options={{ tabBarLabel: 'Cuidadores' }}
             />
             <Tab.Screen

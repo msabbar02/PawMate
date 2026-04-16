@@ -2,12 +2,13 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView, FlatList,
     TextInput, ActivityIndicator, Alert, KeyboardAvoidingView,
-    Platform, Modal, Image,
+    Platform, Modal, Image, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
+import * as Location from 'expo-location';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
@@ -20,11 +21,12 @@ const SERVER_URL = 'https://api.apppawmate.com';
 // STATUS CONFIG
 // ─────────────────────────────────────────────────
 const STATUS = {
-    pendiente:  { label: 'Pendiente',   bg: '#FEF3C7', color: '#D97706', icon: 'time-outline' },
-    aceptada:   { label: 'Aceptada',    bg: '#DCFCE7', color: '#16A34A', icon: 'checkmark-circle-outline' },
-    activa:     { label: 'Activa',      bg: '#ECFDF5', color: '#1a7a4c', icon: 'radio-button-on-outline' },
-    cancelada:  { label: 'Cancelada',   bg: '#F3F4F6', color: '#9CA3AF', icon: 'close-circle-outline' },
-    completada: { label: 'Completada',  bg: '#E0F2FE', color: '#0891b2', icon: 'ribbon-outline' },
+    pendiente:    { label: 'Pendiente',    bg: '#FEF3C7', color: '#D97706', icon: 'time-outline' },
+    aceptada:     { label: 'Aceptada',     bg: '#DCFCE7', color: '#16A34A', icon: 'checkmark-circle-outline' },
+    activa:       { label: 'Activa',       bg: '#ECFDF5', color: '#1a7a4c', icon: 'radio-button-on-outline' },
+    in_progress:  { label: 'En progreso',  bg: '#DBEAFE', color: '#2563EB', icon: 'pulse-outline' },
+    cancelada:    { label: 'Cancelada',    bg: '#F3F4F6', color: '#9CA3AF', icon: 'close-circle-outline' },
+    completada:   { label: 'Completada',   bg: '#E0F2FE', color: '#0891b2', icon: 'ribbon-outline' },
 };
 
 const SERVICE_TYPES = [
@@ -86,7 +88,8 @@ export default function BookingScreen() {
         };
         fetchReservations();
         
-        const channel = supabase.channel('reservations_bs')
+        const channelName = `reservations_bs_${user.id}_${Date.now()}`;
+        const channel = supabase.channel(channelName)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations', filter: `${field}=eq.${user.id}` }, fetchReservations)
             .subscribe();
             
@@ -101,10 +104,17 @@ export default function BookingScreen() {
         const fetchMessages = async () => {
              const { data } = await supabase.from('messages').select('*').eq('conversationId', activeConversation.id).order('created_at', { ascending: true });
              if (data) setMessages(data);
+             // Mark unread messages as read
+             await supabase.from('messages')
+                 .update({ read: true })
+                 .eq('conversationId', activeConversation.id)
+                 .eq('receiverId', user?.id)
+                 .eq('read', false);
         };
         fetchMessages();
         
-        const channel = supabase.channel('messages_bs')
+        const msgChannelName = `messages_bs_${activeConversation.id}_${Date.now()}`;
+        const channel = supabase.channel(msgChannelName)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversationId=eq.${activeConversation.id}` }, fetchMessages)
             .subscribe();
             
@@ -254,23 +264,67 @@ export default function BookingScreen() {
         if (cameraScanned || !user?.id) return;
         setCameraScanned(true);
         try {
-            const { data, error } = await supabase.from('reservations')
+            // Try to find an 'activa' reservation first (check-in → in_progress)
+            let { data } = await supabase.from('reservations')
                 .select('*')
                 .eq('caregiverId', user.id)
                 .eq('qrCode', qrData)
                 .eq('status', 'activa')
                 .limit(1);
-            
-            if (error || !data || data.length === 0) {
-                Alert.alert('QR inválido', 'No se encontró ninguna reserva activa.', [
-                    { text: 'OK', onPress: () => setCameraScanned(false) },
-                ]);
+
+            if (data && data.length > 0) {
+                const res = data[0];
+                await supabase.from('reservations').update({ status: 'in_progress' }).eq('id', res.id);
+                await createNotification(res.ownerId, {
+                    type: 'checkin_confirmed',
+                    bookingId: res.id,
+                    title: '✅ Check-in confirmado',
+                    body: `${userData?.fullName || 'El cuidador'} ha confirmado el check-in. El servicio está en marcha.`,
+                    icon: 'checkmark-circle-outline',
+                    iconBg: '#DCFCE7', iconColor: '#16A34A',
+                });
+                setIsScannerVisible(false);
+                Alert.alert('✅ Check-in confirmado', 'El servicio está en marcha. Escanea de nuevo cuando termine.');
                 return;
             }
-            setIsScannerVisible(false);
-            Alert.alert('✅ Check-in confirmado', '¡El servicio ya está activo!');
-        } catch {
-            Alert.alert('Error', 'No se pudo verificar el QR.');
+
+            // Try to find an 'in_progress' reservation (check-out → completed)
+            ({ data } = await supabase.from('reservations')
+                .select('*')
+                .eq('caregiverId', user.id)
+                .eq('qrCode', qrData)
+                .eq('status', 'in_progress')
+                .limit(1));
+
+            if (data && data.length > 0) {
+                const res = data[0];
+                await supabase.from('reservations').update({ status: 'completada', completedAt: new Date().toISOString() }).eq('id', res.id);
+                // Increment caregiver completedServices
+                await supabase.rpc('increment_completed_services', { user_id: user.id }).catch(() => {
+                    supabase.from('users').update({ completedServices: (userData?.completedServices || 0) + 1 }).eq('id', user.id);
+                });
+                // Release payment: mark as paymentReleased for backend processing
+                await supabase.from('reservations').update({ paymentReleased: true, paymentReleasedAt: new Date().toISOString() }).eq('id', res.id).catch(() => {});
+                await createNotification(res.ownerId, {
+                    type: 'booking_completed',
+                    bookingId: res.id,
+                    title: '🏁 Servicio completado',
+                    body: `${userData?.fullName || 'El cuidador'} ha finalizado el servicio. ¡Deja una reseña!`,
+                    icon: 'ribbon-outline',
+                    iconBg: '#E0F2FE', iconColor: '#0891b2',
+                });
+                setIsScannerVisible(false);
+                Alert.alert('🏁 Servicio completado', '¡El servicio ha finalizado y el pago ha sido liberado!');
+                return;
+            }
+
+            Alert.alert('QR inválido', 'No se encontró ninguna reserva activa o en progreso.', [
+                { text: 'OK', onPress: () => setCameraScanned(false) },
+            ]);
+        } catch (e) {
+            console.error('QR scan error:', e);
+            Alert.alert('Error', 'No se pudo procesar el código QR.');
+        } finally {
             setCameraScanned(false);
         }
     };
@@ -278,14 +332,43 @@ export default function BookingScreen() {
     // ─────────────────────────────────────────────────
     // CANCEL / DELETE
     // ─────────────────────────────────────────────────
-    const handleCancelReservation = (reservationId) => {
-        Alert.alert('Cancelar reserva', '¿Estás seguro?', [
+    const handleCancelReservation = (reservation) => {
+        // 24h cancellation rule: if less than 24h before start, 50% penalty
+        const resObj = typeof reservation === 'object' ? reservation : reservations.find(r => r.id === reservation);
+        const resId = resObj?.id || reservation;
+        const startDate = resObj?.startDate ? new Date(resObj.startDate) : null;
+        const now = new Date();
+        const hoursUntilStart = startDate ? (startDate - now) / (1000 * 60 * 60) : 999;
+        const hasPenalty = hoursUntilStart < 24 && resObj?.totalPrice > 0 && resObj?.status !== 'pendiente';
+        const penaltyAmount = hasPenalty ? (resObj.totalPrice * 0.5).toFixed(2) : 0;
+
+        const message = hasPenalty
+            ? `Faltan menos de 24h para el servicio. Se aplicará una penalización del 50% (€${penaltyAmount}).`
+            : '¿Estás seguro de que quieres cancelar esta reserva?';
+
+        Alert.alert('Cancelar reserva', message, [
             { text: 'No', style: 'cancel' },
             {
-                text: 'Sí, cancelar', style: 'destructive',
+                text: hasPenalty ? `Cancelar (−€${penaltyAmount})` : 'Sí, cancelar',
+                style: 'destructive',
                 onPress: async () => {
                     try {
-                        await supabase.from('reservations').update({ status: 'cancelada' }).eq('id', reservationId);
+                        await supabase.from('reservations').update({
+                            status: 'cancelada',
+                            ...(hasPenalty ? { penaltyAmount: Number(penaltyAmount) } : {}),
+                        }).eq('id', resId);
+                        // Notify the other party
+                        const notifyId = userData?.role === 'caregiver' ? resObj?.ownerId : resObj?.caregiverId;
+                        if (notifyId) {
+                            await createNotification(notifyId, {
+                                type: 'booking_cancelled',
+                                bookingId: resId,
+                                title: '❌ Reserva cancelada',
+                                body: `${userData?.fullName || 'El usuario'} ha cancelado la reserva.${hasPenalty ? ` Penalización: €${penaltyAmount}` : ''}`,
+                                icon: 'close-circle-outline',
+                                iconBg: '#FEE2E2', iconColor: '#EF4444',
+                            });
+                        }
                         setDetailRes(null);
                     } catch { Alert.alert('Error', 'No se pudo cancelar.'); }
                 },
@@ -306,6 +389,91 @@ export default function BookingScreen() {
                 },
             },
         ]);
+    };
+
+    // ─────────────────────────────────────────────────
+    // TRACK PET (Owner → see caregiver's location)
+    // ─────────────────────────────────────────────────
+    const handleTrackPet = async (reservation) => {
+        try {
+            const { data: caregiver } = await supabase
+                .from('users')
+                .select('latitude, longitude, fullName, isOnline')
+                .eq('id', reservation.caregiverId)
+                .single();
+
+            if (!caregiver?.latitude || !caregiver?.longitude) {
+                Alert.alert('Ubicación no disponible', 'El cuidador aún no ha activado el seguimiento del paseo.');
+                return;
+            }
+
+            const petNames = reservation.petNames?.join(', ') || 'tu mascota';
+            Alert.alert(
+                `📍 Ubicación de ${petNames}`,
+                `${caregiver.fullName || 'El cuidador'} está ${caregiver.isOnline ? 'online' : 'offline'}.\n¿Abrir en el mapa?`,
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                        text: 'Abrir mapa',
+                        onPress: () => {
+                            const url = Platform.OS === 'ios'
+                                ? `maps:0,0?q=${caregiver.latitude},${caregiver.longitude}`
+                                : `geo:${caregiver.latitude},${caregiver.longitude}?q=${caregiver.latitude},${caregiver.longitude}(${caregiver.fullName || 'Cuidador'})`;
+                            Linking.openURL(url).catch(() => {
+                                Linking.openURL(`https://www.google.com/maps?q=${caregiver.latitude},${caregiver.longitude}`);
+                            });
+                        },
+                    },
+                ]
+            );
+        } catch {
+            Alert.alert('Error', 'No se pudo obtener la ubicación del cuidador.');
+        }
+    };
+
+    // ─────────────────────────────────────────────────
+    // TOGGLE WALK (Caregiver activates/deactivates walk tracking)
+    // ─────────────────────────────────────────────────
+    const handleToggleWalk = async (reservation) => {
+        try {
+            const newVal = !reservation.walkActive;
+            const update = { walkActive: newVal };
+
+            if (newVal) {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status !== 'granted') {
+                    Alert.alert('Permiso necesario', 'Necesitamos acceso a tu ubicación para el seguimiento.');
+                    return;
+                }
+                const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                // Also update caregiver location in users table
+                await supabase.from('users').update({
+                    latitude: loc.coords.latitude,
+                    longitude: loc.coords.longitude,
+                    isOnline: true,
+                }).eq('id', user.id);
+            }
+
+            await supabase.from('reservations').update(update).eq('id', reservation.id);
+
+            // Notify owner
+            if (reservation.ownerId) {
+                const petNames = reservation.petNames?.join(', ') || 'tu mascota';
+                await createNotification(reservation.ownerId, {
+                    type: newVal ? 'walk_started' : 'walk_ended',
+                    bookingId: reservation.id,
+                    title: newVal ? '🚶 Paseo iniciado' : '🏠 Paseo finalizado',
+                    body: newVal
+                        ? `${userData?.fullName || 'El cuidador'} ha iniciado el paseo con ${petNames}. ¡Puedes seguir su ubicación!`
+                        : `${userData?.fullName || 'El cuidador'} ha finalizado el paseo con ${petNames}.`,
+                    icon: newVal ? 'walk-outline' : 'home-outline',
+                    iconBg: newVal ? '#DCFCE7' : '#E0F2FE',
+                    iconColor: newVal ? '#16A34A' : '#0891b2',
+                });
+            }
+        } catch {
+            Alert.alert('Error', 'No se pudo actualizar el estado del paseo.');
+        }
     };
 
     // ─────────────────────────────────────────────────
@@ -408,6 +576,18 @@ export default function BookingScreen() {
                 lastMessage: text,
                 lastMessageAt: new Date().toISOString(),
             }).eq('id', activeConversation.id);
+
+            // Notify the receiver about the new message
+            await createNotification(receiverId, {
+                type: 'new_message',
+                title: '💬 Nuevo mensaje',
+                body: `${userData?.fullName || 'Alguien'}: ${text.substring(0, 80)}`,
+                icon: 'chatbubble-outline',
+                iconBg: '#DBEAFE',
+                iconColor: '#2563EB',
+                conversationId: activeConversation.id,
+            });
+
             setMessageInput('');
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         } catch { Alert.alert('Error', 'No se pudo enviar el mensaje.'); }
@@ -436,6 +616,9 @@ export default function BookingScreen() {
         const isCaregiver = userData?.role === 'caregiver';
         const serviceLbl = SERVICE_TYPES.find(s => s.value === res.serviceType)?.label || res.serviceType;
         const isCancelled = res.status === 'cancelada';
+        const otherName = isCaregiver ? res.ownerName : res.caregiverName;
+        const otherAvatar = isCaregiver ? res.ownerAvatar : res.caregiverAvatar;
+        const initials = (otherName || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
         return (
             <TouchableOpacity
@@ -448,18 +631,27 @@ export default function BookingScreen() {
                 activeOpacity={0.8}
             >
                 <View style={s.resCardHeader}>
-                    <View style={[s.resAvatarBox, { backgroundColor: theme.primaryBg }]}>
-                        <Ionicons name="person" size={22} color={theme.primary} />
-                    </View>
+                    {otherAvatar ? (
+                        <Image source={{ uri: otherAvatar }} style={s.resAvatarImg} />
+                    ) : (
+                        <View style={[s.resAvatarBox, { backgroundColor: theme.primaryBg }]}>
+                            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.primary }}>{initials}</Text>
+                        </View>
+                    )}
                     <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={[s.resName, { color: theme.text }]}>
-                            {isCaregiver ? res.ownerName : res.caregiverName}
+                            {otherName}
                         </Text>
                         <Text style={[s.resService, { color: theme.textSecondary }]}>{serviceLbl}</Text>
                     </View>
-                    <View style={[s.statusChip, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg }]}>
-                        <Ionicons name={st.icon} size={12} color={isDarkMode ? theme.primary : st.color} />
-                        <Text style={[s.statusLabel, { color: isDarkMode ? theme.primary : st.color }]}>{st.label}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <View style={[s.statusChip, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg }]}>
+                            <Ionicons name={st.icon} size={12} color={isDarkMode ? theme.primary : st.color} />
+                            <Text style={[s.statusLabel, { color: isDarkMode ? theme.primary : st.color }]}>{st.label}</Text>
+                        </View>
+                        {res.totalPrice > 0 && (
+                            <Text style={{ fontSize: 16, fontWeight: '900', color: theme.primary, marginTop: 6 }}>€{res.totalPrice.toFixed(2)}</Text>
+                        )}
                     </View>
                 </View>
 
@@ -468,6 +660,13 @@ export default function BookingScreen() {
                     <Text style={[s.resDateText, { color: theme.textSecondary }]}>
                         {res.startDate}{res.endDate && res.endDate !== res.startDate ? ` → ${res.endDate}` : ''}
                     </Text>
+                    {res.petNames?.length > 0 && (
+                        <>
+                            <Text style={{ color: theme.textSecondary, marginHorizontal: 4 }}>·</Text>
+                            <Ionicons name="paw-outline" size={13} color={theme.textSecondary} />
+                            <Text style={[s.resDateText, { color: theme.textSecondary }]}>{res.petNames.join(', ')}</Text>
+                        </>
+                    )}
                 </View>
 
                 {/* Quick actions row (only for non-cancelled) */}
@@ -479,6 +678,28 @@ export default function BookingScreen() {
                         >
                             <Ionicons name="chatbubble-outline" size={14} color={theme.primary} />
                             <Text style={[s.quickBtnText, { color: theme.primary }]}>Chat</Text>
+                        </TouchableOpacity>
+                    )}
+                    {/* Track button for owners with active/in_progress reservations */}
+                    {!isCaregiver && (res.status === 'activa' || res.status === 'in_progress') && (
+                        <TouchableOpacity
+                            style={[s.quickBtn, { backgroundColor: '#E0F2FE' }]}
+                            onPress={() => handleTrackPet(res)}
+                        >
+                            <Ionicons name="locate-outline" size={14} color="#0891b2" />
+                            <Text style={[s.quickBtnText, { color: '#0891b2' }]}>Track</Text>
+                        </TouchableOpacity>
+                    )}
+                    {/* Activate walk for caregivers with active/in_progress reservations */}
+                    {isCaregiver && (res.status === 'activa' || res.status === 'in_progress') && (
+                        <TouchableOpacity
+                            style={[s.quickBtn, { backgroundColor: res.walkActive ? '#DCFCE7' : '#FEF3C7' }]}
+                            onPress={() => handleToggleWalk(res)}
+                        >
+                            <Ionicons name={res.walkActive ? 'pause-circle-outline' : 'play-circle-outline'} size={14} color={res.walkActive ? '#16A34A' : '#D97706'} />
+                            <Text style={[s.quickBtnText, { color: res.walkActive ? '#16A34A' : '#D97706' }]}>
+                                {res.walkActive ? 'Pausar' : 'Activar paseo'}
+                            </Text>
                         </TouchableOpacity>
                     )}
                     {isCancelled && (
@@ -505,11 +726,20 @@ export default function BookingScreen() {
             <View style={[s.messageWrap, isMe ? s.bubbleRight : s.bubbleLeft]}>
                 <View style={[s.bubble, isMe ? s.bubbleMine : [s.bubbleOther, { backgroundColor: theme.cardBackground }]]}>
                     <Text style={[s.bubbleText, { color: isMe ? '#FFF' : theme.text }]}>{item.text}</Text>
-                    {item.created_at && (
-                        <Text style={[s.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>
-                            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+                        {item.created_at && (
+                            <Text style={[s.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : theme.textSecondary, marginTop: 0 }]}>
+                                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                        )}
+                        {isMe && (
+                            <Ionicons
+                                name={item.read ? 'checkmark-done' : 'checkmark'}
+                                size={14}
+                                color={item.read ? '#34d399' : 'rgba(255,255,255,0.5)'}
+                            />
+                        )}
+                    </View>
                 </View>
             </View>
         );
@@ -601,18 +831,23 @@ export default function BookingScreen() {
                     renderItem={({ item: res }) => {
                         const serviceLbl = SERVICE_TYPES.find(s => s.value === res.serviceType)?.label || res.serviceType;
                         const isCaregiver = userData?.role === 'caregiver';
+                        const cName = isCaregiver ? res.ownerName : res.caregiverName;
+                        const cAvatar = isCaregiver ? res.ownerAvatar : res.caregiverAvatar;
+                        const cInitials = (cName || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
                         return (
                             <TouchableOpacity
                                 style={[s.convoRow, { backgroundColor: theme.cardBackground }]}
                                 onPress={() => openChat(res)}
                             >
-                                <View style={[s.convoAvatar, { backgroundColor: theme.primaryBg }]}>
-                                    <Ionicons name="person" size={22} color={theme.primary} />
-                                </View>
+                                {cAvatar ? (
+                                    <Image source={{ uri: cAvatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                                ) : (
+                                    <View style={[s.convoAvatar, { backgroundColor: theme.primaryBg }]}>
+                                        <Text style={{ fontSize: 16, fontWeight: '800', color: theme.primary }}>{cInitials}</Text>
+                                    </View>
+                                )}
                                 <View style={{ flex: 1, marginLeft: 14 }}>
-                                    <Text style={[s.convoName, { color: theme.text }]}>
-                                        {isCaregiver ? res.ownerName : res.caregiverName}
-                                    </Text>
+                                    <Text style={[s.convoName, { color: theme.text }]}>{cName}</Text>
                                     <Text style={[s.convoService, { color: theme.textSecondary }]}>
                                         {serviceLbl} · {res.startDate}
                                     </Text>
@@ -638,6 +873,9 @@ export default function BookingScreen() {
                     const st = STATUS[detailRes.status] || STATUS.pendiente;
                     const serviceLbl = SERVICE_TYPES.find(s => s.value === detailRes.serviceType)?.label || detailRes.serviceType;
                     const isCancelled = detailRes.status === 'cancelada';
+                    const otherName = isCaregiver ? detailRes.ownerName : detailRes.caregiverName;
+                    const otherAvatar = isCaregiver ? detailRes.ownerAvatar : detailRes.caregiverAvatar;
+                    const initials = (otherName || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
                     return (
                         <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -651,12 +889,30 @@ export default function BookingScreen() {
                             </View>
 
                             <ScrollView contentContainerStyle={{ padding: 20 }}>
-                                {/* Status banner */}
-                                <View style={[s.statusBanner, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg }]}>
-                                    <Ionicons name={st.icon} size={22} color={isDarkMode ? theme.primary : st.color} />
-                                    <Text style={[s.statusBannerText, { color: isDarkMode ? theme.primary : st.color }]}>
-                                        {st.label}
-                                    </Text>
+                                {/* User hero card */}
+                                <View style={[s.infoCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, padding: 20, marginBottom: 16 }]}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                        {otherAvatar ? (
+                                            <Image source={{ uri: otherAvatar }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+                                        ) : (
+                                            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: theme.primaryBg, justifyContent: 'center', alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 20, fontWeight: '800', color: theme.primary }}>{initials}</Text>
+                                            </View>
+                                        )}
+                                        <View style={{ flex: 1, marginLeft: 14 }}>
+                                            <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text }}>{otherName}</Text>
+                                            <Text style={{ fontSize: 14, color: theme.textSecondary, marginTop: 2 }}>{serviceLbl}</Text>
+                                        </View>
+                                        {detailRes.totalPrice > 0 && (
+                                            <View style={{ alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 22, fontWeight: '900', color: theme.primary }}>€{detailRes.totalPrice.toFixed(2)}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <View style={[s.statusBanner, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg, marginBottom: 0 }]}>
+                                        <Ionicons name={st.icon} size={18} color={isDarkMode ? theme.primary : st.color} />
+                                        <Text style={[s.statusBannerText, { color: isDarkMode ? theme.primary : st.color, fontSize: 14 }]}>{st.label}</Text>
+                                    </View>
                                 </View>
 
                                 {/* Info card */}
@@ -723,32 +979,32 @@ export default function BookingScreen() {
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={[s.actionBtn, { flex: 1, backgroundColor: '#FEE2E2' }]}
-                                                    onPress={() => handleCancelReservation(detailRes.id)}
+                                                    onPress={() => handleCancelReservation(detailRes)}
                                                 >
                                                     <Text style={[s.actionBtnText, { color: '#EF4444' }]}>Rechazar</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         )}
 
-                                        {/* CAREGIVER: aceptada → scan QR */}
-                                        {isCaregiver && detailRes.status === 'aceptada' && (
+                                        {/* CAREGIVER: activa → scan QR for check-in */}
+                                        {isCaregiver && detailRes.status === 'activa' && (
                                             <TouchableOpacity
                                                 style={[s.actionBtn, { backgroundColor: '#0891b2' }]}
                                                 onPress={() => { setCameraScanned(false); setIsScannerVisible(true); setDetailRes(null); }}
                                             >
                                                 <Ionicons name="qr-code-outline" size={18} color="#FFF" />
-                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Escanear QR del dueño</Text>
+                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Escanear QR — Check-in</Text>
                                             </TouchableOpacity>
                                         )}
 
-                                        {/* CAREGIVER: activa → complete */}
-                                        {isCaregiver && detailRes.status === 'activa' && (
+                                        {/* CAREGIVER: in_progress → scan QR for check-out */}
+                                        {isCaregiver && detailRes.status === 'in_progress' && (
                                             <TouchableOpacity
                                                 style={[s.actionBtn, { backgroundColor: '#16A34A' }]}
-                                                onPress={() => handleComplete(detailRes)}
+                                                onPress={() => { setCameraScanned(false); setIsScannerVisible(true); setDetailRes(null); }}
                                             >
-                                                <Ionicons name="checkmark-done-outline" size={18} color="#FFF" />
-                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Marcar como completado</Text>
+                                                <Ionicons name="qr-code-outline" size={18} color="#FFF" />
+                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Escanear QR — Check-out</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -756,7 +1012,7 @@ export default function BookingScreen() {
                                         {!isCaregiver && detailRes.status === 'pendiente' && (
                                             <TouchableOpacity
                                                 style={[s.actionBtn, { backgroundColor: '#FEE2E2' }]}
-                                                onPress={() => handleCancelReservation(detailRes.id)}
+                                                onPress={() => handleCancelReservation(detailRes)}
                                             >
                                                 <Text style={[s.actionBtnText, { color: '#EF4444' }]}>Cancelar reserva</Text>
                                             </TouchableOpacity>
@@ -774,13 +1030,24 @@ export default function BookingScreen() {
                                         )}
 
                                         {/* OWNER: activa → show QR */}
-                                        {!isCaregiver && detailRes.status === 'activa' && detailRes.qrCode && (
+                                        {!isCaregiver && (detailRes.status === 'activa' || detailRes.status === 'in_progress') && detailRes.qrCode && (
                                             <TouchableOpacity
                                                 style={[s.actionBtn, { backgroundColor: theme.primaryBg, borderWidth: 1.5, borderColor: theme.primary }]}
                                                 onPress={() => { setQrBooking(detailRes); setIsQrModalVisible(true); setDetailRes(null); }}
                                             >
                                                 <Ionicons name="qr-code-outline" size={18} color={theme.primary} />
                                                 <Text style={[s.actionBtnText, { color: theme.primary }]}>Ver mi QR</Text>
+                                            </TouchableOpacity>
+                                        )}
+
+                                        {/* OWNER: in_progress → track location */}
+                                        {!isCaregiver && detailRes.status === 'in_progress' && (
+                                            <TouchableOpacity
+                                                style={[s.actionBtn, { backgroundColor: '#DBEAFE' }]}
+                                                onPress={() => { handleTrackPet(detailRes); }}
+                                            >
+                                                <Ionicons name="locate-outline" size={18} color="#2563EB" />
+                                                <Text style={[s.actionBtnText, { color: '#2563EB' }]}>Seguir ubicación</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -935,12 +1202,29 @@ export default function BookingScreen() {
                 MODAL: CHAT
             ════════════════════════════════════════ */}
             <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.chatHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setIsChatVisible(false)}>
                             <Ionicons name="chevron-back" size={24} color={theme.text} />
                         </TouchableOpacity>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
+                        {(() => {
+                            const chatName = userData?.role === 'caregiver' ? activeConversation?.ownerName : activeConversation?.caregiverName;
+                            const chatAvatar = userData?.role === 'caregiver' ? activeConversation?.ownerAvatar : activeConversation?.caregiverAvatar;
+                            const chatInitials = (chatName || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+                            return (
+                                <>
+                                    {chatAvatar ? (
+                                        <Image source={{ uri: chatAvatar }} style={{ width: 38, height: 38, borderRadius: 19, marginLeft: 8 }} />
+                                    ) : (
+                                        <View style={{ width: 38, height: 38, borderRadius: 19, marginLeft: 8, backgroundColor: theme.primaryBg, justifyContent: 'center', alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 14, fontWeight: '800', color: theme.primary }}>{chatInitials}</Text>
+                                        </View>
+                                    )}
+                                </>
+                            );
+                        })()}
+                        <View style={{ flex: 1, marginLeft: 10 }}>
                             <Text style={[s.chatTitle, { color: theme.text }]}>
                                 {userData?.role === 'caregiver'
                                     ? activeConversation?.ownerName
@@ -966,22 +1250,21 @@ export default function BookingScreen() {
                             </View>
                         }
                     />
-                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                        <View style={[s.chatInputRow, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
-                            <TextInput
-                                style={[s.chatInput, { backgroundColor: theme.background, color: theme.text }]}
-                                value={messageInput}
-                                onChangeText={setMessageInput}
-                                placeholder="Escribe un mensaje..."
-                                placeholderTextColor={theme.textSecondary}
-                                multiline
-                            />
-                            <TouchableOpacity style={[s.sendBtn, { backgroundColor: theme.primary }]} onPress={sendMessage}>
-                                <Ionicons name="send" size={20} color="#FFF" />
-                            </TouchableOpacity>
-                        </View>
-                    </KeyboardAvoidingView>
+                    <View style={[s.chatInputRow, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+                        <TextInput
+                            style={[s.chatInput, { backgroundColor: theme.background, color: theme.text }]}
+                            value={messageInput}
+                            onChangeText={setMessageInput}
+                            placeholder="Escribe un mensaje..."
+                            placeholderTextColor={theme.textSecondary}
+                            multiline
+                        />
+                        <TouchableOpacity style={[s.sendBtn, { backgroundColor: theme.primary }]} onPress={sendMessage}>
+                            <Ionicons name="send" size={20} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );
@@ -1021,6 +1304,7 @@ const s = StyleSheet.create({
     },
     resCardHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     resAvatarBox:   { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center' },
+    resAvatarImg:   { width: 46, height: 46, borderRadius: 23 },
     resName:        { fontSize: 16, fontWeight: '800' },
     resService:     { fontSize: 13, fontWeight: '500', marginTop: 1 },
     statusChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
@@ -1055,6 +1339,7 @@ const s = StyleSheet.create({
     // Conversations
     convoRow:    { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 18, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
     convoAvatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+    convoAvatarImg: { width: 48, height: 48, borderRadius: 24 },
     convoName:   { fontSize: 16, fontWeight: '700' },
     convoService:{ fontSize: 12, marginTop: 2 },
 

@@ -153,9 +153,15 @@
 
 .status-badge.pendiente { background-color: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3); }
 .status-badge.aceptada { background-color: rgba(16, 185, 129, 0.15); color: #047857; border: 1px solid rgba(16, 185, 129, 0.3); }
-.status-badge.activa { background-color: rgba(6, 95, 70, 0.15); color: #065f46; border: 1px solid rgba(6, 95, 70, 0.3); }
+.status-badge.activa { background-color: rgba(6, 95, 70, 0.15); color: #065f46; border: 1px solid rgba(6, 95, 70, 0.3); animation: pulse-badge 2s ease-in-out infinite; }
+.status-badge.in_progress { background-color: rgba(37, 99, 235, 0.15); color: #2563EB; border: 1px solid rgba(37, 99, 235, 0.3); animation: pulse-badge 2s ease-in-out infinite; }
 .status-badge.cancelada { background-color: rgba(100, 116, 139, 0.15); color: #475569; border: 1px solid rgba(100, 116, 139, 0.3); }
 .status-badge.completada { background-color: rgba(59, 130, 246, 0.15); color: #1d4ed8; border: 1px solid rgba(59, 130, 246, 0.3); }
+
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.03); }
+}
 
 /* Loading State */
 .loading-state {

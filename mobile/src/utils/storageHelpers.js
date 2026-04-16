@@ -100,6 +100,18 @@ export async function uploadReportImage(localUri, storagePath) {
     }
 }
 
+// For GALLERY images: uploads to gallery/{userId}/{timestamp}.jpg, returns public URL.
+export async function uploadGalleryPhoto(localUri, userId) {
+    if (!localUri) throw new Error('No URI provided');
+    if (localUri.startsWith('http')) return localUri;
+    try {
+        return await _uploadToStorage(localUri, `gallery/${userId}/${Date.now()}.jpg`);
+    } catch (e) {
+        console.error('Gallery image upload error:', e);
+        throw e;
+    }
+}
+
 // Legacy alias — kept for backward compat
 export async function saveAvatarToFirestore(localUri, userId) {
     if (!localUri) return null;

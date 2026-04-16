@@ -4,6 +4,15 @@
 -- ==========================================
 
 -- ══════════════════════════════════════════
+-- MIGRATION: Run these on existing databases
+-- ══════════════════════════════════════════
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS iban text;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "completedServices" integer DEFAULT 0;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "walkActive" boolean DEFAULT false;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "galleryPhotos" jsonb DEFAULT '[]'::jsonb;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "acceptedSpecies" jsonb DEFAULT '[]'::jsonb;
+
+-- ══════════════════════════════════════════
 -- 1. USERS
 -- ══════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.users (
@@ -53,6 +62,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   longitude numeric,
   "isOnline" boolean DEFAULT false,
   "isGroupWalking" boolean DEFAULT false,
+  iban text,
+  "completedServices" integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -114,6 +125,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   "paymentStatus" text,
   "qrCode" text,
   "reviewedByOwner" boolean DEFAULT false,
+  "walkActive" boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now()
 );
 

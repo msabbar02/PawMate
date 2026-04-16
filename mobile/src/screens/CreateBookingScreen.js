@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
-    TextInput, Alert, ActivityIndicator, Platform,
+    TextInput, Alert, ActivityIndicator, Platform, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -30,11 +30,14 @@ export default function CreateBookingScreen({ route, navigation }) {
     const [endDate, setEndDate] = useState(new Date());
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
+    const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+    const [showEndTimePicker, setShowEndTimePicker] = useState(false);
     const [notes, setNotes] = useState('');
     const [selectedPets, setSelectedPets] = useState([]);
     const [myPets, setMyPets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingPets, setLoadingPets] = useState(true);
+    const [walkHours, setWalkHours] = useState(1);
 
     // Only show services that the caregiver offers
     const availableServices = caregiver?.serviceTypes?.length > 0
@@ -61,14 +64,21 @@ export default function CreateBookingScreen({ route, navigation }) {
         return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
+    const formatTime = (date) => {
+        return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
+    };
+
     const calculatePrice = () => {
         if (!caregiver?.price) return 0;
+        if (serviceType === 'walking') {
+            return walkHours * caregiver.price;
+        }
         const diffMs = endDate.getTime() - startDate.getTime();
-        const diffHours = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
         if (serviceType === 'hotel' || serviceType === 'daycare') {
             const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-            return days * caregiver.price * 8; // 8h/day rate
+            return days * caregiver.price * 8;
         }
+        const diffHours = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60)));
         return diffHours * caregiver.price;
     };
 
@@ -92,9 +102,15 @@ export default function CreateBookingScreen({ route, navigation }) {
                 caregiverId: caregiver.id,
                 ownerName: userData?.fullName || 'Dueño',
                 caregiverName: caregiver.fullName || 'Cuidador',
+                ownerAvatar: userData?.photoURL || userData?.avatar || null,
+                caregiverAvatar: caregiver.photoURL || caregiver.avatar || null,
                 serviceType,
                 startDate: formatDate(startDate),
                 endDate: formatDate(endDate),
+                startTime: formatTime(startDate),
+                endTime: formatTime(endDate),
+                startDateTime: startDate.toISOString(),
+                endDateTime: endDate.toISOString(),
                 totalPrice,
                 petNames,
                 petIds: selectedPets,
@@ -128,7 +144,7 @@ export default function CreateBookingScreen({ route, navigation }) {
             Alert.alert(
                 '✅ Reserva enviada',
                 `Tu solicitud ha sido enviada a ${caregiver.fullName || 'el cuidador'}. Te notificaremos cuando responda.`,
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
+                [{ text: 'Ver reservas', onPress: () => navigation.navigate('MainTabs', { screen: 'Reservas' }) }]
             );
         } catch (e) {
             console.error('Error creating booking:', e);
@@ -161,27 +177,76 @@ export default function CreateBookingScreen({ route, navigation }) {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-                {/* Caregiver info */}
+                {/* ── Caregiver Profile Card ── */}
                 <View style={[styles.caregiverCard, { backgroundColor: theme.cardBackground }]}>
-                    <View style={[styles.cgAvatar, { backgroundColor: COLORS.primaryBg }]}>
-                        <Text style={{ fontSize: 24 }}>{(caregiver.fullName || 'C').charAt(0)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={[styles.cgName, { color: theme.text }]}>{caregiver.fullName || 'Cuidador'}</Text>
-                        <Text style={[styles.cgCity, { color: theme.textSecondary }]}>
-                            <Ionicons name="location-outline" size={12} /> {caregiver.city || 'Sin ubicación'}
-                        </Text>
-                        {caregiver.price > 0 && (
-                            <Text style={styles.cgPrice}>{caregiver.price}€/hora</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {(caregiver.avatar || caregiver.photoURL) ? (
+                            <Image source={{ uri: caregiver.avatar || caregiver.photoURL }} style={styles.cgAvatarImg} />
+                        ) : (
+                            <View style={[styles.cgAvatarImg, { backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' }]}>
+                                <Text style={{ fontSize: 26, fontWeight: '800' }}>{(caregiver.fullName || 'C').charAt(0)}</Text>
+                            </View>
+                        )}
+                        <View style={{ flex: 1, marginLeft: 14 }}>
+                            <Text style={[styles.cgName, { color: theme.text }]}>{caregiver.fullName || 'Cuidador'}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                                <Ionicons name="location-outline" size={13} color={theme.textSecondary} />
+                                <Text style={{ fontSize: 13, color: theme.textSecondary }}>{caregiver.city || 'Sin ubicación'}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                                <Ionicons name="star" size={14} color="#f59e0b" />
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>
+                                    {caregiver.rating ? Number(caregiver.rating).toFixed(1) : 'Nuevo'}
+                                </Text>
+                                {caregiver.reviewCount > 0 && (
+                                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>({caregiver.reviewCount} reseñas)</Text>
+                                )}
+                            </View>
+                        </View>
+                        {Number(caregiver.price) > 0 && (
+                            <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 }}>
+                                <Text style={{ fontSize: 20, fontWeight: '900', color: COLORS.primary }}>{caregiver.price}€</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: COLORS.primary, textAlign: 'center' }}>/hora</Text>
+                            </View>
                         )}
                     </View>
+
+                    {/* Accepted species */}
+                    {caregiver.acceptedSpecies?.length > 0 && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+                            {caregiver.acceptedSpecies.map(sp => (
+                                <View key={sp} style={{ backgroundColor: '#E0F2FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#0891b2' }}>
+                                        {sp === 'perro' ? '🐶 Perros' : sp === 'gato' ? '🐱 Gatos' : sp === 'ave' ? '🐦 Aves' : sp === 'reptil' ? '🦎 Reptiles' : '🐾 ' + sp}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* Bio */}
+                    {caregiver.bio ? (
+                        <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 10, lineHeight: 18 }} numberOfLines={3}>
+                            {caregiver.bio}
+                        </Text>
+                    ) : null}
+
+                    {/* Gallery photos */}
+                    {caregiver.galleryPhotos?.length > 0 && (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+                            {caregiver.galleryPhotos.map((uri, i) => (
+                                <Image key={i} source={{ uri }} style={{ width: 80, height: 80, borderRadius: 14, marginRight: 8 }} />
+                            ))}
+                        </ScrollView>
+                    )}
                 </View>
 
                 {/* Service type */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                        <Ionicons name="briefcase-outline" size={16} /> Tipo de servicio
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                        <Ionicons name="briefcase-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Tipo de servicio</Text>
+                    </View>
                     <View style={styles.chipsWrap}>
                         {availableServices.map(s => {
                             const active = serviceType === s.value;
@@ -202,17 +267,51 @@ export default function CreateBookingScreen({ route, navigation }) {
                     </View>
                 </View>
 
-                {/* Dates */}
+                {/* Walk Hours Picker (only for walks) */}
+                {serviceType === 'walking' && (
+                    <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                            <Ionicons name="time-outline" size={16} color={theme.text} />
+                            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Duración del paseo</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                            <TouchableOpacity
+                                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: walkHours <= 1 ? theme.border : COLORS.primary, justifyContent: 'center', alignItems: 'center' }}
+                                onPress={() => setWalkHours(Math.max(1, walkHours - 1))}
+                                disabled={walkHours <= 1}
+                            >
+                                <Ionicons name="remove" size={22} color="#FFF" />
+                            </TouchableOpacity>
+                            <View style={{ alignItems: 'center', minWidth: 80 }}>
+                                <Text style={{ fontSize: 36, fontWeight: '900', color: theme.text }}>{walkHours}</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textSecondary }}>{walkHours === 1 ? 'hora' : 'horas'}</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: walkHours >= 24 ? theme.border : COLORS.primary, justifyContent: 'center', alignItems: 'center' }}
+                                onPress={() => setWalkHours(Math.min(24, walkHours + 1))}
+                                disabled={walkHours >= 24}
+                            >
+                                <Ionicons name="add" size={22} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={{ textAlign: 'center', fontSize: 12, color: theme.textSecondary, marginTop: 8 }}>Máximo 24 horas</Text>
+                    </View>
+                )}
+
+                {/* Dates & Times */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                        <Ionicons name="calendar-outline" size={16} /> Fechas
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                        <Ionicons name="calendar-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Fechas y horario</Text>
+                    </View>
+
+                    {/* Date row */}
                     <View style={styles.dateRow}>
                         <TouchableOpacity
                             style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                             onPress={() => setShowStartPicker(true)}
                         >
-                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Inicio</Text>
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Fecha inicio</Text>
                             <Text style={[styles.dateValue, { color: theme.text }]}>{formatDate(startDate)}</Text>
                         </TouchableOpacity>
                         <Ionicons name="arrow-forward" size={18} color={theme.textSecondary} />
@@ -220,10 +319,36 @@ export default function CreateBookingScreen({ route, navigation }) {
                             style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                             onPress={() => setShowEndPicker(true)}
                         >
-                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Fin</Text>
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Fecha fin</Text>
                             <Text style={[styles.dateValue, { color: theme.text }]}>{formatDate(endDate)}</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {/* Time row */}
+                    <View style={[styles.dateRow, { marginTop: 12 }]}>
+                        <TouchableOpacity
+                            style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                            onPress={() => setShowStartTimePicker(true)}
+                        >
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Hora inicio</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="time-outline" size={14} color={COLORS.primary} />
+                                <Text style={[styles.dateValue, { color: theme.text }]}>{formatTime(startDate)}</Text>
+                            </View>
+                        </TouchableOpacity>
+                        <Ionicons name="arrow-forward" size={18} color={theme.textSecondary} />
+                        <TouchableOpacity
+                            style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                            onPress={() => setShowEndTimePicker(true)}
+                        >
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Hora fin</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="time-outline" size={14} color={COLORS.primary} />
+                                <Text style={[styles.dateValue, { color: theme.text }]}>{formatTime(endDate)}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
                     {showStartPicker && (
                         <DateTimePicker
                             value={startDate}
@@ -240,13 +365,44 @@ export default function CreateBookingScreen({ route, navigation }) {
                             onChange={(e, d) => { setShowEndPicker(false); if (d) setEndDate(d); }}
                         />
                     )}
+                    {showStartTimePicker && (
+                        <DateTimePicker
+                            value={startDate}
+                            mode="time"
+                            is24Hour={true}
+                            onChange={(e, d) => {
+                                setShowStartTimePicker(false);
+                                if (d) {
+                                    const updated = new Date(startDate);
+                                    updated.setHours(d.getHours(), d.getMinutes());
+                                    setStartDate(updated);
+                                }
+                            }}
+                        />
+                    )}
+                    {showEndTimePicker && (
+                        <DateTimePicker
+                            value={endDate}
+                            mode="time"
+                            is24Hour={true}
+                            onChange={(e, d) => {
+                                setShowEndTimePicker(false);
+                                if (d) {
+                                    const updated = new Date(endDate);
+                                    updated.setHours(d.getHours(), d.getMinutes());
+                                    setEndDate(updated);
+                                }
+                            }}
+                        />
+                    )}
                 </View>
 
                 {/* My Pets */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                        <Ionicons name="paw-outline" size={16} /> Selecciona mascotas
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                        <Ionicons name="paw-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Selecciona mascotas</Text>
+                    </View>
                     {loadingPets ? (
                         <ActivityIndicator color={COLORS.primary} />
                     ) : myPets.length > 0 ? (
@@ -279,9 +435,10 @@ export default function CreateBookingScreen({ route, navigation }) {
 
                 {/* Notes */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                        <Ionicons name="document-text-outline" size={16} /> Notas (opcional)
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                        <Ionicons name="document-text-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Notas (opcional)</Text>
+                    </View>
                     <TextInput
                         style={[styles.notesInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                         value={notes}
@@ -294,15 +451,22 @@ export default function CreateBookingScreen({ route, navigation }) {
                 </View>
 
                 {/* Price summary */}
-                {serviceType && caregiver.price > 0 && (
+                {serviceType && Number(caregiver.price) > 0 && (
                     <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                            <Ionicons name="card-outline" size={16} /> Resumen
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                            <Ionicons name="card-outline" size={16} color={theme.text} />
+                            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Resumen</Text>
+                        </View>
                         <View style={styles.summaryRow}>
                             <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Tarifa del cuidador</Text>
                             <Text style={[styles.summaryValue, { color: theme.text }]}>{caregiver.price}€/hora</Text>
                         </View>
+                        {serviceType === 'walking' && (
+                            <View style={styles.summaryRow}>
+                                <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Horas de paseo</Text>
+                                <Text style={[styles.summaryValue, { color: theme.text }]}>{walkHours}h</Text>
+                            </View>
+                        )}
                         <View style={[styles.summaryDivider, { backgroundColor: theme.border }]} />
                         <View style={styles.summaryRow}>
                             <Text style={[styles.totalLabel, { color: theme.text }]}>Total estimado</Text>
@@ -347,13 +511,11 @@ const styles = StyleSheet.create({
     scrollContent: { padding: 16, paddingBottom: 40 },
 
     caregiverCard: {
-        flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, marginBottom: 16,
+        padding: 16, borderRadius: 20, marginBottom: 16,
         shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
     },
-    cgAvatar: { width: 56, height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-    cgName: { fontSize: 17, fontWeight: '800' },
-    cgCity: { fontSize: 13, marginTop: 2 },
-    cgPrice: { fontSize: 16, fontWeight: '800', color: COLORS.primary, marginTop: 4 },
+    cgAvatarImg: { width: 60, height: 60, borderRadius: 20 },
+    cgName: { fontSize: 18, fontWeight: '800' },
 
     section: { borderRadius: 20, padding: 20, marginBottom: 16 },
     sectionTitle: { fontSize: 16, fontWeight: '800', marginBottom: 14 },

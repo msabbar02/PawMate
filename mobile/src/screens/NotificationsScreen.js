@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, FlatList,
-    Platform, ScrollView, Alert, ActivityIndicator,
+    Platform, ScrollView, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
+import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
 
@@ -27,7 +28,7 @@ function relativeTime(ts) {
 
 export default function NotificationsScreen({ navigation }) {
     const { userData, user } = useContext(AuthContext);
-    const { theme, isDarkMode } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
+    const { theme, isDarkMode } = useContext(ThemeContext);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -101,8 +102,9 @@ export default function NotificationsScreen({ navigation }) {
 
     // ── ACCEPT BOOKING (Caregiver) ─────────────────
     const handleAcceptBooking = async (notif) => {
-        const bookingId = notif.data?.bookingId;
-        if (!bookingId) return;
+        const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data) : (notif.data || {});
+        const bookingId = notifData.bookingId;
+        if (!bookingId) { Alert.alert('Error', 'No se encontró la reserva asociada.'); return; }
         try {
             // Fetch reservation to get real data
             const { data: reservation } = await supabase
@@ -148,8 +150,9 @@ export default function NotificationsScreen({ navigation }) {
 
     // ── REJECT BOOKING (Caregiver) ─────────────────
     const handleRejectBooking = async (notif) => {
-        const bookingId = notif.data?.bookingId;
-        if (!bookingId) return;
+        const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data) : (notif.data || {});
+        const bookingId = notifData.bookingId;
+        if (!bookingId) { Alert.alert('Error', 'No se encontró la reserva asociada.'); return; }
         try {
             // Fetch reservation to get ownerId
             const { data: reservation } = await supabase
@@ -230,6 +233,24 @@ export default function NotificationsScreen({ navigation }) {
                         <Text style={[styles.detailBody, { color: theme.text }]}>{activeNotif.body}</Text>
                     </View>
                     {renderBookingActions(activeNotif)}
+
+                    {/* Emergency location in detail view */}
+                    {activeNotif.type === 'emergency_location' && activeNotif.data?.latitude && activeNotif.data?.longitude && (
+                        <TouchableOpacity
+                            style={[styles.acceptBtn, { marginTop: 16, backgroundColor: '#EF4444', alignSelf: 'center', paddingHorizontal: 24 }]}
+                            onPress={() => {
+                                const url = Platform.OS === 'ios'
+                                    ? `maps:0,0?q=${activeNotif.data.latitude},${activeNotif.data.longitude}`
+                                    : `geo:${activeNotif.data.latitude},${activeNotif.data.longitude}?q=${activeNotif.data.latitude},${activeNotif.data.longitude}`;
+                                Linking.openURL(url).catch(() => {
+                                    Linking.openURL(`https://www.google.com/maps?q=${activeNotif.data.latitude},${activeNotif.data.longitude}`);
+                                });
+                            }}
+                        >
+                            <Ionicons name="navigate" size={16} color="#FFF" />
+                            <Text style={styles.acceptBtnText}>Abrir en Google Maps</Text>
+                        </TouchableOpacity>
+                    )}
                 </ScrollView>
             </View>
         );
@@ -343,6 +364,24 @@ export default function NotificationsScreen({ navigation }) {
                                             <Text style={styles.rejectBtnText}>Rechazar</Text>
                                         </TouchableOpacity>
                                     </View>
+                                )}
+
+                                {/* Emergency location */}
+                                {item.type === 'emergency_location' && item.data?.latitude && item.data?.longitude && (
+                                    <TouchableOpacity
+                                        style={[styles.acceptBtn, { marginTop: 8, backgroundColor: '#EF4444' }]}
+                                        onPress={() => {
+                                            const url = Platform.OS === 'ios'
+                                                ? `maps:0,0?q=${item.data.latitude},${item.data.longitude}`
+                                                : `geo:${item.data.latitude},${item.data.longitude}?q=${item.data.latitude},${item.data.longitude}`;
+                                            Linking.openURL(url).catch(() => {
+                                                Linking.openURL(`https://www.google.com/maps?q=${item.data.latitude},${item.data.longitude}`);
+                                            });
+                                        }}
+                                    >
+                                        <Ionicons name="navigate" size={13} color="#FFF" />
+                                        <Text style={styles.acceptBtnText}>Ver ubicación</Text>
+                                    </TouchableOpacity>
                                 )}
                             </View>
 

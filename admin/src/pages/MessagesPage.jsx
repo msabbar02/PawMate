@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../config/supabase';
 import { Search, MessageSquare, X, User } from 'lucide-react';
 import './UsersPage.css'; // Inheriting shared list styles
@@ -13,14 +13,8 @@ export default function MessagesPage() {
     const [messages, setMessages] = useState([]);
     const [loadingMessages, setLoadingMessages] = useState(false);
 
-    useEffect(() => {
-        fetchThreads();
-    }, []);
-
-    const fetchThreads = async () => {
-        setLoading(true);
+    const fetchThreads = useCallback(async () => {
         try {
-            // Fetch conversations (where messages are linked)
             const { data: convos } = await supabase.from('conversations').select('*').order('lastMessageAt', { ascending: false });
             if (!convos) { setLoading(false); return; }
             
@@ -39,7 +33,27 @@ export default function MessagesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchThreads();
+
+        // ── Realtime: auto-refresh on new messages / conversations ──
+        const convoChannel = supabase
+            .channel('admin:conversations')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, fetchThreads)
+            .subscribe();
+
+        const msgChannel = supabase
+            .channel('admin:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchThreads)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(convoChannel);
+            supabase.removeChannel(msgChannel);
+        };
+    }, [fetchThreads]);
 
     const openThreadModal = async (thread) => {
         setSelectedThread(thread);
@@ -54,6 +68,21 @@ export default function MessagesPage() {
             setLoadingMessages(false);
         }
     };
+
+    // Realtime for open chat modal
+    useEffect(() => {
+        if (!selectedThread) return;
+        const channel = supabase
+            .channel(`admin:chat:${selectedThread.id}`)
+            .on('postgres_changes', {
+                event: 'INSERT', schema: 'public', table: 'messages',
+                filter: `conversationId=eq.${selectedThread.id}`
+            }, (payload) => {
+                setMessages(prev => [...prev, payload.new]);
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [selectedThread]);
 
     const filteredThreads = threads.filter(thread => {
         const matchesSearch = (thread.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
