@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { useTranslation } from '../context/LanguageContext';
 
 const API_KEY = "6ebcc59234e348b8af6172715260403";
 
 const TopBar = ({ onSearchFocus }) => {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const [weatherData, setWeatherData] = useState({
         temp: null,
         icon: 'partly-sunny',
@@ -100,11 +102,11 @@ const TopBar = ({ onSearchFocus }) => {
                 onPress={onSearchFocus}
                 activeOpacity={0.8}
             >
-                <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+                <Icon name="search" size={20} color="#6B7280" style={styles.searchIcon} />
                 <View style={{ flex: 1 }} pointerEvents="none">
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Buscar zonas, parques..."
+                        placeholder={t('components.searchPlaces')}
                         placeholderTextColor="#9CA3AF"
                         editable={false}
                     />
@@ -120,7 +122,7 @@ const TopBar = ({ onSearchFocus }) => {
                         <Text style={styles.weatherText}>
                             {weatherData.temp !== null ? `${weatherData.temp}°C` : '--°C'}
                         </Text>
-                        <Ionicons
+                        <Icon
                             name={weatherData.icon}
                             size={18}
                             color={weatherData.color}

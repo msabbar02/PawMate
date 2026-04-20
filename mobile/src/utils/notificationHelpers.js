@@ -9,7 +9,7 @@ async function sendPushNotification(userId, title, body) {
         const { data: userData } = await supabase.from('users').select('expoPushToken').eq('id', userId).single();
         if (!userData?.expoPushToken) return;
 
-        await fetch('https://exp.host/--/api/v2/push/send', {
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -19,6 +19,9 @@ async function sendPushNotification(userId, title, body) {
                 body,
             }),
         });
+        if (!response.ok) {
+            console.warn('Push notification failed:', response.status, await response.text().catch(() => ''));
+        }
     } catch (e) {
         console.warn('sendPushNotification failed:', e.message);
     }

@@ -1,18 +1,20 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+﻿import React, { useState, useContext, useEffect, useRef } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, FlatList,
     TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../context/LanguageContext';
 
 export default function ChatScreen({ route, navigation }) {
     const { conversation, otherUser } = route.params || {};
     const { user, userData } = useContext(AuthContext);
     const { theme } = useContext(ThemeContext);
+    const { t } = useTranslation();
 
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -21,7 +23,7 @@ export default function ChatScreen({ route, navigation }) {
     const convoId = conversation?.id;
     const otherName = otherUser?.fullName || otherUser?.firstName
         || (userData?.role === 'caregiver' ? conversation?.ownerName : conversation?.caregiverName)
-        || 'Usuario';
+        || t('common.user');
     const otherAvatar = otherUser?.avatar
         || (userData?.role === 'caregiver' ? conversation?.ownerAvatar : conversation?.caregiverAvatar);
 
@@ -62,7 +64,7 @@ export default function ChatScreen({ route, navigation }) {
             await supabase.from('messages').insert({
                 conversationId: convoId,
                 senderId: user.id,
-                senderName: userData?.fullName || 'Usuario',
+                senderName: userData?.fullName || t('common.user'),
                 text,
                 read: false,
             });
@@ -101,7 +103,7 @@ export default function ChatScreen({ route, navigation }) {
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="chevron-back" size={24} color={theme.text} />
+                    <Icon name="chevron-back" size={24} color={theme.text} />
                 </TouchableOpacity>
                 <View style={styles.headerInfo}>
                     {otherAvatar ? (
@@ -114,7 +116,7 @@ export default function ChatScreen({ route, navigation }) {
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.headerName, { color: theme.text }]} numberOfLines={1}>{otherName}</Text>
                         <Text style={[styles.headerRole, { color: theme.textSecondary }]}>
-                            {otherUser?.role === 'caregiver' ? 'Cuidador' : 'Dueño'}
+                            {otherUser?.role === 'caregiver' ? t('roles.caregiver') : t('roles.owner')}
                         </Text>
                     </View>
                 </View>
@@ -132,7 +134,7 @@ export default function ChatScreen({ route, navigation }) {
                     <View style={styles.emptyChat}>
                         <Text style={{ fontSize: 44 }}>💬</Text>
                         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                            Empieza la conversación con {otherName}
+                            {t('chat.startConversationWith', { name: otherName })}
                         </Text>
                     </View>
                 }
@@ -145,7 +147,7 @@ export default function ChatScreen({ route, navigation }) {
                         style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
                         value={input}
                         onChangeText={setInput}
-                        placeholder="Escribe un mensaje..."
+                        placeholder={t('bookings.typeMessage')}
                         placeholderTextColor={theme.textSecondary}
                         multiline
                         maxLength={1000}
@@ -155,7 +157,7 @@ export default function ChatScreen({ route, navigation }) {
                         onPress={sendMessage}
                         disabled={!input.trim()}
                     >
-                        <Ionicons name="send" size={18} color="#FFF" />
+                        <Icon name="send" size={18} color="#FFF" />
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>

@@ -1,14 +1,16 @@
-import React, { useContext, useState, useEffect, useCallback } from 'react';
+﻿import React, { useContext, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Platform, RefreshControl } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../context/LanguageContext';
 
 export default function MessagesScreen({ navigation }) {
     const { theme } = useContext(ThemeContext);
     const { user, userData } = useContext(AuthContext);
+    const { t } = useTranslation();
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -81,14 +83,14 @@ export default function MessagesScreen({ navigation }) {
                 )}
                 <View style={{ flex: 1, marginLeft: 14 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={[styles.convoName, { color: theme.text }]} numberOfLines={1}>{name || 'Usuario'}</Text>
+                        <Text style={[styles.convoName, { color: theme.text }]} numberOfLines={1}>{name || t('common.user')}</Text>
                         <Text style={[styles.convoTime, { color: theme.textSecondary }]}>{timeAgo}</Text>
                     </View>
                     <Text style={[styles.convoMsg, { color: theme.textSecondary }]} numberOfLines={1}>
-                        {item.lastMessage || 'Toca para empezar a chatear'}
+                        {item.lastMessage || t('messages.tapToChat')}
                     </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
+                <Icon name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
             </TouchableOpacity>
         );
     };
@@ -97,9 +99,9 @@ export default function MessagesScreen({ navigation }) {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="chevron-back" size={26} color={theme.text} />
+                    <Icon name="chevron-back" size={26} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.title, { color: theme.text }]}>Mensajes</Text>
+                <Text style={[styles.title, { color: theme.text }]}>{t('messages.title')}</Text>
             </View>
 
             <FlatList
@@ -110,12 +112,12 @@ export default function MessagesScreen({ navigation }) {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                 ListEmptyComponent={
                     <View style={styles.emptyBox}>
-                        <Ionicons name="chatbubbles-outline" size={64} color={COLORS.textLight} />
+                        <Icon name="chatbubbles-outline" size={64} color={COLORS.textLight} />
                         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                            {loading ? 'Cargando...' : 'No tienes mensajes recientes'}
+                            {loading ? t('common.loading') : t('messages.noMessages')}
                         </Text>
                         <Text style={[styles.emptySub, { color: COLORS.textLight }]}>
-                            Cuando contactes a un cuidador, aparecerán aquí.
+                            {t('messages.noMessagesDesc')}
                         </Text>
                     </View>
                 }

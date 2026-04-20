@@ -40,6 +40,7 @@ function App() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admins" element={<AdminsPage />} />
         <Route path="verifications" element={<VerificationsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
-import { Users, Dog, CalendarDays, AlertTriangle, Wifi } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUsers, faDog, faCalendarDays, faTriangleExclamation, faWifi } from '@fortawesome/free-solid-svg-icons';
 import './DashboardPage.css';
 
 export default function DashboardPage() {
+    const { t } = useTranslation();
     const [stats, setStats] = useState({
         users: 0,
         pets: 0,
@@ -50,53 +53,59 @@ export default function DashboardPage() {
     useEffect(() => {
         fetchDashboardData();
 
-        // ── Realtime: auto-refresh on any DB change ──
+        // ── Realtime: auto-refresh on any DB change (debounced) ──
+        let debounceTimer = null;
+        const debouncedFetch = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(fetchDashboardData, 1000);
+        };
         const channels = [];
 
         const usersChannel = supabase
             .channel('admin:dash:users')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchDashboardData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, debouncedFetch)
             .subscribe();
         channels.push(usersChannel);
 
         const petsChannel = supabase
             .channel('admin:dash:pets')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, fetchDashboardData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, debouncedFetch)
             .subscribe();
         channels.push(petsChannel);
 
         const resChannel = supabase
             .channel('admin:dash:reservations')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, fetchDashboardData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, debouncedFetch)
             .subscribe();
         channels.push(resChannel);
 
         const repChannel = supabase
             .channel('admin:dash:reports')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, fetchDashboardData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, debouncedFetch)
             .subscribe();
         channels.push(repChannel);
 
         return () => {
+            clearTimeout(debounceTimer);
             channels.forEach(ch => supabase.removeChannel(ch));
         };
     }, [fetchDashboardData]);
 
     const statCards = [
-        { title: 'Total Usuarios', value: stats.users, icon: <Users size={24} />, color: 'var(--primary-color)', bg: 'rgba(59, 130, 246, 0.2)' },
-        { title: 'Mascotas', value: stats.pets, icon: <Dog size={24} />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
-        { title: 'Reservas Totales', value: stats.reservations, icon: <CalendarDays size={24} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.2)' },
-        { title: 'Reportes', value: stats.reports, icon: <AlertTriangle size={24} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)' },
-        { title: 'Cuidadores Online', value: stats.onlineCaregivers, icon: <Wifi size={24} />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.2)' }
+        { title: t('dashboard.totalUsers'), value: stats.users, icon: <FontAwesomeIcon icon={faUsers} style={{ fontSize: 24 }} />, color: 'var(--primary-color)', bg: 'rgba(59, 130, 246, 0.2)' },
+        { title: t('dashboard.pets'), value: stats.pets, icon: <FontAwesomeIcon icon={faDog} style={{ fontSize: 24 }} />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)' },
+        { title: t('dashboard.totalReservations'), value: stats.reservations, icon: <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 24 }} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.2)' },
+        { title: t('dashboard.reports'), value: stats.reports, icon: <FontAwesomeIcon icon={faTriangleExclamation} style={{ fontSize: 24 }} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)' },
+        { title: t('dashboard.onlineCaregivers'), value: stats.onlineCaregivers, icon: <FontAwesomeIcon icon={faWifi} style={{ fontSize: 24 }} />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.2)' }
     ];
 
     if (loading) {
-        return <div className="loading-state"><div className="spinner"></div><p>Cargando panel...</p></div>;
+        return <div className="loading-state"><div className="spinner"></div><p>{t('dashboard.loading')}</p></div>;
     }
 
     return (
         <div className="dashboard-container">
-            <h2 className="page-title">Vista General</h2>
+            <h2 className="page-title">{t('dashboard.pageTitle')}</h2>
             
             <div className="stats-grid">
                 {statCards.map((card, idx) => (
@@ -115,12 +124,12 @@ export default function DashboardPage() {
             <div className="dashboard-sections">
                 <div className="recent-activity glass-panel">
                     <div className="section-header">
-                        <h3>Actividad Reciente (Reservas)</h3>
+                        <h3>{t('dashboard.recentActivity')}</h3>
                     </div>
                     {recentActivity.length === 0 ? (
                         <div className="empty-state">
-                            <CalendarDays size={40} />
-                            <p>No hay actividad reciente</p>
+                            <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 40 }} />
+                            <p>{t('dashboard.noRecentActivity')}</p>
                         </div>
                     ) : (
                         <div className="activity-list">
@@ -132,9 +141,9 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="activity-details">
                                             <p className="activity-text">
-                                                <strong>{activity.ownerName || 'Usuario'}</strong> ha reservado {activity.serviceType === 'walking' ? 'un paseo' : 'estancia'} con <strong>{activity.caregiverName || 'cuidador'}</strong>
+                                                <strong>{activity.ownerName || t('dashboard.userFallback')}</strong> {t('dashboard.hasBooked')} {activity.serviceType === 'walking' ? t('dashboard.walkService') : t('dashboard.stayService')} con <strong>{activity.caregiverName || t('dashboard.caregiverFallback')}</strong>
                                             </p>
-                                            <span className="activity-meta">Estado: <span className={`status-badge ${activity.status || 'pendiente'}`}>{activity.status || 'pendiente'}</span> · {new Date(activity.created_at).toLocaleDateString('es-ES')}</span>
+                                            <span className="activity-meta">{t('dashboard.statusLabel')} <span className={`status-badge ${activity.status || 'pendiente'}`}>{activity.status || t('dashboard.pendingStatus')}</span> · {new Date(activity.created_at).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                 );

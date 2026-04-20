@@ -1,12 +1,13 @@
-import React, { useContext } from 'react';
+﻿import React, { useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -57,7 +58,7 @@ function ProfileIncompleteBanner() {
             <Text style={styles.incompleteBannerText}>
                 Completa tu perfil: falta {missing.join(', ')}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#fff" />
+            <Icon name="chevron-forward" size={16} color="#fff" />
         </TouchableOpacity>
     );
 }
@@ -82,7 +83,7 @@ function BookingTabScreen() {
         return (
             <View style={[styles.lockContainer, { backgroundColor: theme.background }]}>
                 <View style={[styles.lockCard, { backgroundColor: theme.cardBackground }]}>
-                    <Ionicons name="lock-closed" size={52} color={theme.primary} />
+                    <Icon name="lock-closed" size={52} color={theme.primary} />
                     <Text style={[styles.lockTitle, { color: theme.text }]}>Acceso restringido</Text>
                     <Text style={[styles.lockSubtitle, { color: theme.textSecondary }]}>
                         Para acceder a Reservas necesitas verificar tu cuenta como Dueño o Cuidador.
@@ -104,6 +105,7 @@ function BookingTabScreen() {
 const MainTabNavigator = () => {
     const { userData } = useContext(AuthContext);
     const { theme } = useContext(ThemeContext);
+    const { t } = useTranslation();
     const role = userData?.role;
     const isLocked = !role || role === 'normal';
 
@@ -115,14 +117,14 @@ const MainTabNavigator = () => {
                     let iconName;
                     if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
                     else if (route.name === 'Mascotas') iconName = focused ? 'paw' : 'paw-outline';
+                    else if (route.name === 'Cuidadores') iconName = focused ? 'people' : 'people-outline';
                     else if (route.name === 'Reservas') {
                         iconName = isLocked ? 'lock-closed' : (focused ? 'calendar' : 'calendar-outline');
                     }
-                    else if (route.name === 'Cuidadores') iconName = focused ? 'people' : 'people-outline';
                     else if (route.name === 'Ajustes') iconName = focused ? 'settings' : 'settings-outline';
 
                     const activeColor = '#F5A623';
-                    const routeLabel = route.name === 'Reservas' ? 'Reservas' : route.name === 'Mascotas' ? 'Mascotas' : route.name === 'Cuidadores' ? (role === 'caregiver' ? 'Mi Panel' : 'Cuidar') : route.name === 'Ajustes' ? 'Ajustes' : 'Inicio';
+                    const routeLabel = route.name === 'Cuidadores' ? t('tabs.caregivers') : route.name === 'Reservas' ? t('tabs.bookings') : route.name === 'Mascotas' ? t('tabs.pets') : route.name === 'Ajustes' ? t('tabs.settings') : t('tabs.home');
 
                     if (focused) {
                         return (
@@ -140,7 +142,7 @@ const MainTabNavigator = () => {
                                     shadowRadius: 8,
                                     elevation: 6,
                                 }}>
-                                    <Ionicons name={iconName} size={22} color="#FFF" />
+                                    <Icon name={iconName} size={22} color="#FFF" />
                                 </View>
                                 <Text style={{ fontSize: 10, fontWeight: '700', color: activeColor, marginTop: 4 }}>
                                     {routeLabel}
@@ -151,10 +153,10 @@ const MainTabNavigator = () => {
 
                     return (
                         <View style={{ alignItems: 'center', justifyContent: 'center', width: 64, height: 64 }}>
-                            <Ionicons name={iconName} size={23} color="rgba(255,255,255,0.45)" />
+                            <Icon name={iconName} size={23} color="rgba(255,255,255,0.45)" />
                             {isLocked && route.name === 'Reservas' && (
                                 <View style={[styles.lockBadge, { position: 'absolute', top: 14, right: 14 }]}>
-                                    <Ionicons name="lock-closed" size={9} color="#fff" />
+                                    <Icon name="lock-closed" size={9} color="#fff" />
                                 </View>
                             )}
                             <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: '600' }}>
@@ -186,27 +188,27 @@ const MainTabNavigator = () => {
             <Tab.Screen
                 name="Home"
                 component={HomeScreen}
-                options={{ tabBarLabel: 'Inicio' }}
+                options={{ tabBarLabel: t('tabs.home') }}
             />
             <Tab.Screen
                 name="Mascotas"
                 component={MyPetsScreen}
-                options={{ tabBarLabel: 'Mascotas' }}
-            />
-            <Tab.Screen
-                name="Reservas"
-                component={BookingTabScreen}
-                options={{ tabBarLabel: 'Reservas' }}
+                options={{ tabBarLabel: t('tabs.pets') }}
             />
             <Tab.Screen
                 name="Cuidadores"
                 component={CaregiverTabScreen}
-                options={{ tabBarLabel: 'Cuidadores' }}
+                options={{ tabBarLabel: t('tabs.caregivers') }}
+            />
+            <Tab.Screen
+                name="Reservas"
+                component={BookingTabScreen}
+                options={{ tabBarLabel: t('tabs.bookings') }}
             />
             <Tab.Screen
                 name="Ajustes"
                 component={SettingsScreen}
-                options={{ tabBarLabel: 'Ajustes' }}
+                options={{ tabBarLabel: t('tabs.settings') }}
             />
         </Tab.Navigator>
     );

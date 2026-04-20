@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
-import { Search, Edit2, Trash2, X, CalendarDays, Eye, FileText } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCalendarDays, faEye, faFileLines } from '@fortawesome/free-solid-svg-icons';
 import './UsersPage.css'; // Shared table styles
 
 export default function ReservationsPage() {
+    const { t } = useTranslation();
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -47,12 +50,13 @@ export default function ReservationsPage() {
     }, [fetchReservations]);
 
     const handleDelete = async (resId) => {
-        if (window.confirm('¿Seguro que deseas eliminar esta reserva?')) {
+        if (window.confirm(t('reservations.confirmDelete'))) {
             try {
-                await supabase.from('reservations').delete().eq('id', resId);
-                setReservations(reservations.filter(r => r.id !== resId));
+                const { error } = await supabase.from('reservations').delete().eq('id', resId);
+                if (error) throw error;
+                setReservations(prev => prev.filter(r => r.id !== resId));
             } catch (error) {
-                alert("Error al eliminar la reserva");
+                alert(t('reservations.errorDelete'));
             }
         }
     };
@@ -70,11 +74,12 @@ export default function ReservationsPage() {
 
     const handleSaveEdit = async () => {
         try {
-            await supabase.from('reservations').update({ status: editStatus }).eq('id', selectedRes.id);
-            setReservations(reservations.map(r => r.id === selectedRes.id ? { ...r, status: editStatus } : r));
+            const { error } = await supabase.from('reservations').update({ status: editStatus }).eq('id', selectedRes.id);
+            if (error) throw error;
+            setReservations(prev => prev.map(r => r.id === selectedRes.id ? { ...r, status: editStatus } : r));
             setIsEditModalOpen(false);
         } catch (error) {
-            alert("Error al actualizar la reserva");
+            alert(t('reservations.errorUpdate'));
         }
     };
 
@@ -86,26 +91,26 @@ export default function ReservationsPage() {
     });
 
     const getServiceIcon = (type) => {
-        return type === 'walking' ? '🚶 Paseo' : type === 'daycare' ? '☀️ Guardería' : '🏨 Hotel';
+        return type === 'walking' ? `🚶 ${t('reservations.walkService')}` : type === 'daycare' ? `☀️ ${t('reservations.daycareService')}` : `🏨 ${t('reservations.hotelService')}`;
     };
 
     const statusLabel = (s) => {
-        const labels = { pendiente: 'Pendiente', aceptada: 'Aceptada', activa: 'Activa', in_progress: 'En progreso', completada: 'Completada', cancelada: 'Cancelada' };
-        return labels[s] || s || 'Pendiente';
+        const labels = { pendiente: t('reservations.statusPending'), aceptada: t('reservations.statusAccepted'), activa: t('reservations.statusActive'), in_progress: t('reservations.statusInProgress'), completada: t('reservations.statusCompleted'), cancelada: t('reservations.statusCancelled') };
+        return labels[s] || s || t('reservations.statusPending');
     };
 
     return (
         <div className="page-container">
             <div className="page-header">
-                <h1 className="page-title">Gestión de Reservas</h1>
+                <h1 className="page-title">{t('reservations.pageTitle')}</h1>
             </div>
 
             <div className="filters-bar glass-panel">
                 <div className="search-box">
-                    <Search size={18} className="search-icon" />
+                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: 18 }} className="search-icon" />
                     <input 
                         type="text" 
-                        placeholder="Buscar por dueño o cuidador..." 
+                        placeholder={t('reservations.searchPlaceholder')} 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -116,34 +121,34 @@ export default function ReservationsPage() {
                     value={statusFilter} 
                     onChange={(e) => setStatusFilter(e.target.value)}
                 >
-                    <option value="all">Todos los estados</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="aceptada">Aceptada</option>
-                    <option value="activa">Activa</option>
-                    <option value="in_progress">En progreso</option>
-                    <option value="completada">Completada</option>
-                    <option value="cancelada">Cancelada</option>
+                    <option value="all">{t('reservations.allStatuses')}</option>
+                    <option value="pendiente">{t('reservations.statusPending')}</option>
+                    <option value="aceptada">{t('reservations.statusAccepted')}</option>
+                    <option value="activa">{t('reservations.statusActive')}</option>
+                    <option value="in_progress">{t('reservations.statusInProgress')}</option>
+                    <option value="completada">{t('reservations.statusCompleted')}</option>
+                    <option value="cancelada">{t('reservations.statusCancelled')}</option>
                 </select>
             </div>
 
             {loading ? (
-                <div className="loading-state"><div className="spinner"></div><p>Cargando reservas...</p></div>
+                <div className="loading-state"><div className="spinner"></div><p>{t('reservations.loading')}</p></div>
             ) : (
                 <div className="table-container glass-panel">
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                <th>Servicio</th>
-                                <th>Involucrados</th>
-                                <th>Fechas / Precio</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
+                                <th>{t('reservations.colService')}</th>
+                                <th>{t('reservations.colInvolved')}</th>
+                                <th>{t('reservations.colDatePrice')}</th>
+                                <th>{t('reservations.colStatus')}</th>
+                                <th>{t('reservations.colActions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="empty-cell">No se encontraron reservas</td>
+                                    <td colSpan="5" className="empty-cell">{t('reservations.noReservationsFound')}</td>
                                 </tr>
                             ) : (
                                 filtered.map(res => {
@@ -158,15 +163,15 @@ export default function ReservationsPage() {
                                             </td>
                                             <td>
                                                 <div className="contact-info">
-                                                    <span><strong>D:</strong> {res.ownerName || 'Usuario'}</span>
-                                                    <span><strong>C:</strong> {res.caregiverName || 'Usuario'}</span>
+                                                    <span><strong>{t('reservations.ownerPrefix')}</strong> {res.ownerName || t('reservations.userFallback')}</span>
+                                                    <span><strong>{t('reservations.caregiverPrefix')}</strong> {res.caregiverName || t('reservations.userFallback')}</span>
                                                     {res.petNames && <span className="text-muted">🐾 {res.petNames.join(', ')}</span>}
                                                 </div>
                                             </td>
                                             <td>
                                                 <div className="contact-info">
-                                                    <span>Cita: {res.startDate} {res.endDate && res.endDate !== res.startDate ? ` al ${res.endDate}` : ''}</span>
-                                                    <span className="text-muted" style={{ fontWeight: 600, color: '#10b981' }}>{res.totalPrice}€ total</span>
+                                                    <span>{t('reservations.appointmentPrefix')} {res.startDate} {res.endDate && res.endDate !== res.startDate ? ` ${t('reservations.toDatePrefix')} ${res.endDate}` : ''}</span>
+                                                    <span className="text-muted" style={{ fontWeight: 600, color: '#10b981' }}>{res.totalPrice}€ {t('reservations.totalSuffix')}</span>
                                                 </div>
                                             </td>
                                             <td>
@@ -176,14 +181,14 @@ export default function ReservationsPage() {
                                             </td>
                                             <td>
                                                 <div className="action-buttons">
-                                                    <button className="action-btn view" onClick={() => openViewModal(res)} title="Ver detalles" style={{ color: '#3b82f6' }}>
-                                                        <Eye size={18} />
+                                                    <button className="action-btn view" onClick={() => openViewModal(res)} title={t('reservations.viewDetails')} style={{ color: '#3b82f6' }}>
+                                                        <FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} />
                                                     </button>
-                                                    <button className="action-btn edit" onClick={() => openEditModal(res)} title="Cambiar Estado">
-                                                        <Edit2 size={18} />
+                                                    <button className="action-btn edit" onClick={() => openEditModal(res)} title={t('reservations.changeStatus')}>
+                                                        <FontAwesomeIcon icon={faPenToSquare} style={{ fontSize: 18 }} />
                                                     </button>
-                                                    <button className="action-btn delete" onClick={() => handleDelete(res.id)} title="Eliminar reserva">
-                                                        <Trash2 size={18} />
+                                                    <button className="action-btn delete" onClick={() => handleDelete(res.id)} title={t('reservations.deleteReservation')}>
+                                                        <FontAwesomeIcon icon={faTrash} style={{ fontSize: 18 }} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -201,14 +206,14 @@ export default function ReservationsPage() {
                 <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
                     <div className="modal-content glass-panel" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>Editar Estado de Reserva</h2>
-                            <button className="close-btn" onClick={() => setIsEditModalOpen(false)}><X size={24} /></button>
+                            <h2>{t('reservations.editModalTitle')}</h2>
+                            <button className="close-btn" onClick={() => setIsEditModalOpen(false)}><FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} /></button>
                         </div>
                         
                         <div className="modal-body">
                             <div className="user-profile-preview">
                                 <div className="preview-avatar-placeholder" style={{ backgroundColor: '#8b5cf6' }}>
-                                    <CalendarDays size={24} color="white" />
+                                    <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 24, color: 'white' }} />
                                 </div>
                                 <div>
                                     <h3>{getServiceIcon(selectedRes.serviceType)} - {selectedRes.totalPrice}€</h3>
@@ -217,28 +222,28 @@ export default function ReservationsPage() {
                             </div>
 
                             <div className="form-group">
-                                <label>Cambiar Estado Manualmente</label>
+                                <label>{t('reservations.changeStatusManually')}</label>
                                 <select 
                                     className="form-control"
                                     value={editStatus}
                                     onChange={(e) => setEditStatus(e.target.value)}
                                 >
-                                    <option value="pendiente">Pendiente</option>
-                                    <option value="aceptada">Aceptada</option>
-                                    <option value="activa">Activa</option>
-                                    <option value="in_progress">En progreso</option>
-                                    <option value="completada">Completada</option>
-                                    <option value="cancelada">Cancelada</option>
+                                    <option value="pendiente">{t('reservations.statusPending')}</option>
+                                    <option value="aceptada">{t('reservations.statusAccepted')}</option>
+                                    <option value="activa">{t('reservations.statusActive')}</option>
+                                    <option value="in_progress">{t('reservations.statusInProgress')}</option>
+                                    <option value="completada">{t('reservations.statusCompleted')}</option>
+                                    <option value="cancelada">{t('reservations.statusCancelled')}</option>
                                 </select>
                             </div>
                             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                                Nota: Cambiar el estado aquí no disparará las notificaciones Push automáticas ni transferirá fondos, es solo una modificación a nivel de base de datos para el administrador.
+                                {t('reservations.editNote')}
                             </p>
                         </div>
 
                         <div className="modal-footer">
-                            <button className="btn-secondary" onClick={() => setIsEditModalOpen(false)}>Cancelar</button>
-                            <button className="btn-primary" onClick={handleSaveEdit}>Guardar Estado</button>
+                            <button className="btn-secondary" onClick={() => setIsEditModalOpen(false)}>{t('reservations.cancel')}</button>
+                            <button className="btn-primary" onClick={handleSaveEdit}>{t('reservations.saveStatus')}</button>
                         </div>
                     </div>
                 </div>
@@ -249,13 +254,13 @@ export default function ReservationsPage() {
                 <div className="modal-overlay" onClick={() => setIsViewModalOpen(false)}>
                     <div className="modal-content view-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header view-header">
-                            <h2>Detalles de la Reserva</h2>
-                            <button className="close-btn" onClick={() => setIsViewModalOpen(false)}><X size={24} /></button>
+                            <h2>{t('reservations.viewModalTitle')}</h2>
+                            <button className="close-btn" onClick={() => setIsViewModalOpen(false)}><FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} /></button>
                         </div>
                         <div className="modal-body view-modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
                             <div className="premium-profile-header">
                                 <div className="premium-avatar-placeholder" style={{background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'}}>
-                                    <CalendarDays size={36} color="white" />
+                                    <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 36, color: 'white' }} />
                                 </div>
                                 <div className="premium-profile-info">
                                     <h3 className="premium-profile-name">{getServiceIcon(selectedRes.serviceType)}</h3>
@@ -263,62 +268,62 @@ export default function ReservationsPage() {
                                 </div>
                                 <div className="premium-top-right-badge">
                                     <span className={`status-badge ${selectedRes.status || 'pendiente'}`} style={{display: 'inline-block', padding: '8px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold', textTransform: 'capitalize', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}}>
-                                        {selectedRes.status || 'Pendiente'}
+                                        {selectedRes.status || t('reservations.statusPending')}
                                     </span>
                                 </div>
                             </div>
                             
                             <h3 className="premium-section-title" style={{marginTop: '10px'}}>
-                                <FileText size={20} color="#8b5cf6"/> Información General
+                                <FontAwesomeIcon icon={faFileLines} style={{ fontSize: 20, color: '#8b5cf6' }} /> {t('reservations.generalInfo')}
                             </h3>
                             
                             <div className="premium-details-grid">
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">ID Reserva</span>
+                                    <span className="premium-detail-label">{t('reservations.reservationId')}</span>
                                     <span className="premium-detail-value" style={{fontFamily: 'monospace', fontSize: '13px'}}>{selectedRes.id}</span>
                                 </div>
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">Servicio</span>
+                                    <span className="premium-detail-label">{t('reservations.service')}</span>
                                     <span className="premium-detail-value" style={{textTransform: 'capitalize'}}>{selectedRes.serviceType || 'N/A'}</span>
                                 </div>
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">Dueño</span>
+                                    <span className="premium-detail-label">{t('reservations.owner')}</span>
                                     <span className="premium-detail-value">{selectedRes.ownerName || 'N/A'}</span>
                                 </div>
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">Cuidador</span>
+                                    <span className="premium-detail-label">{t('reservations.caregiver')}</span>
                                     <span className="premium-detail-value">{selectedRes.caregiverName || 'N/A'}</span>
                                 </div>
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">Mascotas Involucradas</span>
-                                    <span className="premium-detail-value">{selectedRes.petNames ? selectedRes.petNames.join(', ') : 'Ninguna'}</span>
+                                    <span className="premium-detail-label">{t('reservations.involvedPets')}</span>
+                                    <span className="premium-detail-value">{selectedRes.petNames ? selectedRes.petNames.join(', ') : t('reservations.noPets')}</span>
                                 </div>
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">Fechas</span>
+                                    <span className="premium-detail-label">{t('reservations.dates')}</span>
                                     <span className="premium-detail-value">{selectedRes.startDate} {selectedRes.endDate && selectedRes.endDate !== selectedRes.startDate ? `- ${selectedRes.endDate}` : ''}</span>
                                 </div>
                                 {selectedRes.notes && (
                                     <div className="premium-detail-card" style={{ gridColumn: '1 / -1' }}>
-                                        <span className="premium-detail-label">Notas del Cliente</span>
+                                        <span className="premium-detail-label">{t('reservations.clientNotes')}</span>
                                         <span className="premium-detail-value">{selectedRes.notes}</span>
                                     </div>
                                 )}
                                 {selectedRes.penaltyAmount > 0 && (
                                     <div className="premium-detail-card">
-                                        <span className="premium-detail-label">Penalización</span>
+                                        <span className="premium-detail-label">{t('reservations.penalty')}</span>
                                         <span className="premium-detail-value" style={{ color: '#ef4444', fontWeight: 700 }}>€{selectedRes.penaltyAmount}</span>
                                     </div>
                                 )}
                                 <div className="premium-detail-card">
-                                    <span className="premium-detail-label">Pago liberado</span>
+                                    <span className="premium-detail-label">{t('reservations.paymentReleased')}</span>
                                     <span className="premium-detail-value" style={{ color: selectedRes.paymentReleased ? '#22c55e' : '#f59e0b' }}>
-                                        {selectedRes.paymentReleased ? '✅ Sí' : '⏳ Pendiente'}
+                                        {selectedRes.paymentReleased ? `✅ ${t('reservations.paymentReleasedYes')}` : `⏳ ${t('reservations.paymentReleasedPending')}`}
                                     </span>
                                 </div>
                             </div>
                             
                             <div className="modal-footer" style={{ borderTop: 'none', padding: 0 }}>
-                                <button className="btn-primary" onClick={() => setIsViewModalOpen(false)}>Cerrar</button>
+                                <button className="btn-primary" onClick={() => setIsViewModalOpen(false)}>{t('reservations.close')}</button>
                             </div>
                         </div>
                     </div>

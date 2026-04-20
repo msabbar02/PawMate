@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
+const { createTransporter, FROM_DEFAULT } = require('./email.controller');
 
 /**
  * Notificar al dueño por email cuando el cuidador acepta o rechaza la reserva.
@@ -23,6 +24,11 @@ const sendReservationStatusEmail = async (req, res) => {
             return sendError(res, 'Reservation not found', 404);
         }
 
+        // Verify the requesting user is a participant of this reservation
+        if (req.user.uid !== data.ownerId && req.user.uid !== data.caregiverId) {
+            return sendError(res, 'Not authorized for this reservation', 403);
+        }
+
         // Look up the owner's email from the users table
         const { data: ownerData } = await supabase
             .from('users')
@@ -42,27 +48,18 @@ const sendReservationStatusEmail = async (req, res) => {
 
         let sent = false;
         try {
-            const nodemailer = require('nodemailer');
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-                port: parseInt(process.env.SMTP_PORT || '587', 10),
-                secure: false,
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS,
-                },
-            });
+            const transporter = createTransporter();
 
-            const subject = status === 'accepted'
+            const subject = (status === 'aceptada' || status === 'accepted')
                 ? `PawMate: ${caregiverName} ha aceptado tu reserva`
                 : `PawMate: ${caregiverName} ha rechazado tu reserva`;
 
-            const text = status === 'accepted'
+            const text = (status === 'aceptada' || status === 'accepted')
                 ? `Hola ${ownerName},\n\n${caregiverName} ha aceptado tu solicitud de reserva para ${petName}. Ya puedes coordinar el servicio.\n\nGracias por usar PawMate.`
                 : `Hola ${ownerName},\n\n${caregiverName} no ha podido aceptar tu solicitud de reserva para ${petName}. Puedes buscar otro cuidador en la app.\n\nGracias por usar PawMate.`;
 
             await transporter.sendMail({
-                from: process.env.SMTP_FROM || 'hola@apppawmate.com',
+                from: FROM_DEFAULT,
                 to: ownerEmail,
                 subject,
                 text,

@@ -1,15 +1,18 @@
-import React, { useRef, useEffect } from 'react';
+﻿import React, { useRef, useEffect } from 'react';
 import { TouchableOpacity, Animated, StyleSheet, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import * as Location from 'expo-location';
+import { useTranslation } from '../context/LanguageContext';
 
 const SOSButton = ({ isActive, onPress }) => {
+    const { t } = useTranslation();
     // Animación de latido (pulse) que usa el driver nativo por rendimiento
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
+        let animation;
         if (isActive) {
-            Animated.loop(
+            animation = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, {
                         toValue: 1.2,
@@ -22,10 +25,12 @@ const SOSButton = ({ isActive, onPress }) => {
                         useNativeDriver: true,
                     }),
                 ])
-            ).start();
+            );
+            animation.start();
         } else {
             pulseAnim.setValue(1);
         }
+        return () => { if (animation) animation.stop(); };
     }, [isActive]);
 
     const handlePress = async () => {
@@ -33,7 +38,7 @@ const SOSButton = ({ isActive, onPress }) => {
             // Requerimos GPS de alta precisión en emergencia
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert("Permisos denegados", "Necesitamos acceso a tu ubicación para enviar la alerta SOS.");
+                Alert.alert(t('components.sosPermissionDenied'), t('components.sosPermissionMsg'));
                 return;
             }
 
@@ -49,7 +54,7 @@ const SOSButton = ({ isActive, onPress }) => {
                 });
             }
         } catch (error) {
-            Alert.alert("Error de GPS", "No pudimos obtener tu ubicación exacta. Intenta de nuevo.");
+            Alert.alert(t('components.sosGPSError'), t('components.sosGPSErrorMsg'));
             console.warn("SOS Error:", error);
         }
     };
@@ -59,7 +64,7 @@ const SOSButton = ({ isActive, onPress }) => {
     return (
         <Animated.View style={[styles.container, { transform: [{ scale: pulseAnim }] }]}>
             <TouchableOpacity style={styles.button} onPress={handlePress} activeOpacity={0.8}>
-                <Ionicons name="warning" size={28} color="#FFFFFF" />
+                <Icon name="warning" size={28} color="#FFFFFF" />
             </TouchableOpacity>
         </Animated.View>
     );

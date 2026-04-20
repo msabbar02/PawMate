@@ -7,7 +7,9 @@ const errorHandler = (err, req, res, next) => {
     console.error('Error:', err);
 
     let statusCode = err.statusCode || 500;
-    let message = err.message || 'Internal Server Error';
+    let message = (process.env.NODE_ENV === 'production' && statusCode === 500)
+        ? 'Internal Server Error'
+        : (err.message || 'Internal Server Error');
 
     // Supabase error codes
     if (err.code) {

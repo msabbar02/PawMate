@@ -1,9 +1,9 @@
-import React, { useState, useContext, useEffect } from 'react';
+﻿import React, { useState, useContext, useEffect } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     TextInput, Alert, ActivityIndicator, Platform, Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { AuthContext } from '../context/AuthContext';
@@ -11,19 +11,18 @@ import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
 import { COLORS } from '../constants/colors';
-
-const SERVICE_TYPES = [
-    { value: 'walking', label: '🚶 Paseo', icon: 'walk-outline' },
-    { value: 'hotel', label: '🏨 Hotel', icon: 'home-outline' },
-    { value: 'daycare', label: '☀️ Guardería', icon: 'sunny-outline' },
-    { value: 'grooming', label: '✂️ Peluquería', icon: 'cut-outline' },
-    { value: 'training', label: '🏋️ Entreno', icon: 'fitness-outline' },
-];
+import { useTranslation } from '../context/LanguageContext';
 
 export default function CreateBookingScreen({ route, navigation }) {
     const { caregiver } = route.params || {};
     const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
+    const { t } = useTranslation();
+
+    const SERVICE_TYPES = [
+        { value: 'walking', label: '🚶 ' + t('services.walking'), icon: 'walk-outline' },
+        { value: 'hotel', label: '🏨 ' + t('services.hotel'), icon: 'home-outline' },
+    ];
 
     const [serviceType, setServiceType] = useState(null);
     const [startDate, setStartDate] = useState(new Date());
@@ -84,11 +83,11 @@ export default function CreateBookingScreen({ route, navigation }) {
 
     const handleSubmit = async () => {
         if (!serviceType) {
-            Alert.alert('Error', 'Selecciona un tipo de servicio.');
+            Alert.alert(t('common.error'), t('createBooking.serviceRequired'));
             return;
         }
         if (selectedPets.length === 0) {
-            Alert.alert('Error', 'Selecciona al menos una mascota.');
+            Alert.alert(t('common.error'), t('createBooking.petRequired'));
             return;
         }
 
@@ -100,8 +99,8 @@ export default function CreateBookingScreen({ route, navigation }) {
             const { data: insertedRes, error } = await supabase.from('reservations').insert({
                 ownerId: user.id,
                 caregiverId: caregiver.id,
-                ownerName: userData?.fullName || 'Dueño',
-                caregiverName: caregiver.fullName || 'Cuidador',
+                ownerName: userData?.fullName || t('roles.owner'),
+                caregiverName: caregiver.fullName || t('roles.caregiver'),
                 ownerAvatar: userData?.photoURL || userData?.avatar || null,
                 caregiverAvatar: caregiver.photoURL || caregiver.avatar || null,
                 serviceType,
@@ -124,8 +123,8 @@ export default function CreateBookingScreen({ route, navigation }) {
             await supabase.from('conversations').upsert({
                 ownerId: user.id,
                 caregiverId: caregiver.id,
-                ownerName: userData?.fullName || 'Dueño',
-                caregiverName: caregiver.fullName || 'Cuidador',
+                ownerName: userData?.fullName || t('roles.owner'),
+                caregiverName: caregiver.fullName || t('roles.caregiver'),
                 ownerAvatar: userData?.photoURL || userData?.avatar || null,
                 caregiverAvatar: caregiver.photoURL || caregiver.avatar || null,
             }, { onConflict: 'ownerId,caregiverId' });
@@ -135,20 +134,20 @@ export default function CreateBookingScreen({ route, navigation }) {
                 type: 'booking_request',
                 bookingId: insertedRes?.id,
                 title: '📅 Nueva solicitud de reserva',
-                body: `${userData?.fullName || 'Un dueño'} quiere reservar ${SERVICE_TYPES.find(s => s.value === serviceType)?.label || serviceType}`,
+                body: `${userData?.fullName || t('roles.owner')} quiere reservar ${SERVICE_TYPES.find(s => s.value === serviceType)?.label || serviceType}`,
                 icon: 'calendar-outline',
                 iconBg: '#FEF3C7',
                 iconColor: '#D97706',
             });
 
             Alert.alert(
-                '✅ Reserva enviada',
-                `Tu solicitud ha sido enviada a ${caregiver.fullName || 'el cuidador'}. Te notificaremos cuando responda.`,
-                [{ text: 'Ver reservas', onPress: () => navigation.navigate('MainTabs', { screen: 'Reservas' }) }]
+                t('createBooking.bookingSent'),
+                t('createBooking.bookingSentMsg'),
+                [{ text: t('tabs.bookings'), onPress: () => navigation.navigate('MainTabs', { screen: 'Reservas' }) }]
             );
         } catch (e) {
             console.error('Error creating booking:', e);
-            Alert.alert('Error', 'No se pudo crear la reserva. Intenta de nuevo.');
+            Alert.alert(t('common.error'), t('createBooking.bookingError'));
         } finally {
             setLoading(false);
         }
@@ -157,7 +156,7 @@ export default function CreateBookingScreen({ route, navigation }) {
     if (!caregiver) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: theme.text }}>Error: cuidador no encontrado</Text>
+                <Text style={{ color: theme.text }}>{t('createBooking.caregiverNotFound')}</Text>
             </View>
         );
     }
@@ -169,9 +168,9 @@ export default function CreateBookingScreen({ route, navigation }) {
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+                    <Icon name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>Nueva Reserva</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{t('createBooking.title')}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
@@ -188,25 +187,25 @@ export default function CreateBookingScreen({ route, navigation }) {
                             </View>
                         )}
                         <View style={{ flex: 1, marginLeft: 14 }}>
-                            <Text style={[styles.cgName, { color: theme.text }]}>{caregiver.fullName || 'Cuidador'}</Text>
+                            <Text style={[styles.cgName, { color: theme.text }]}>{caregiver.fullName || t('roles.caregiver')}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
-                                <Ionicons name="location-outline" size={13} color={theme.textSecondary} />
-                                <Text style={{ fontSize: 13, color: theme.textSecondary }}>{caregiver.city || 'Sin ubicación'}</Text>
+                                <Icon name="location-outline" size={13} color={theme.textSecondary} />
+                                <Text style={{ fontSize: 13, color: theme.textSecondary }}>{caregiver.city || t('caregivers.noLocation')}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
-                                <Ionicons name="star" size={14} color="#f59e0b" />
+                                <Icon name="star" size={14} color="#f59e0b" />
                                 <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>
-                                    {caregiver.rating ? Number(caregiver.rating).toFixed(1) : 'Nuevo'}
+                                    {caregiver.rating ? Number(caregiver.rating).toFixed(1) : t('caregivers.newBadge')}
                                 </Text>
                                 {caregiver.reviewCount > 0 && (
-                                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>({caregiver.reviewCount} reseñas)</Text>
+                                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>({caregiver.reviewCount} {t('caregivers.reviews')})</Text>
                                 )}
                             </View>
                         </View>
                         {Number(caregiver.price) > 0 && (
                             <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 }}>
                                 <Text style={{ fontSize: 20, fontWeight: '900', color: COLORS.primary }}>{caregiver.price}€</Text>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: COLORS.primary, textAlign: 'center' }}>/hora</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: COLORS.primary, textAlign: 'center' }}>{t('caregivers.perHour')}</Text>
                             </View>
                         )}
                     </View>
@@ -217,7 +216,7 @@ export default function CreateBookingScreen({ route, navigation }) {
                             {caregiver.acceptedSpecies.map(sp => (
                                 <View key={sp} style={{ backgroundColor: '#E0F2FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
                                     <Text style={{ fontSize: 11, fontWeight: '700', color: '#0891b2' }}>
-                                        {sp === 'perro' ? '🐶 Perros' : sp === 'gato' ? '🐱 Gatos' : sp === 'ave' ? '🐦 Aves' : sp === 'reptil' ? '🦎 Reptiles' : '🐾 ' + sp}
+                                        {sp === 'perro' ? '🐶 ' + t('species.dogs') : sp === 'gato' ? '🐱 ' + t('species.cats') : sp === 'ave' ? '🐦 ' + t('species.birds') : sp === 'reptil' ? '🦎 ' + t('species.reptiles') : '🐾 ' + sp}
                                     </Text>
                                 </View>
                             ))}
@@ -244,8 +243,8 @@ export default function CreateBookingScreen({ route, navigation }) {
                 {/* Service type */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                        <Ionicons name="briefcase-outline" size={16} color={theme.text} />
-                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Tipo de servicio</Text>
+                        <Icon name="briefcase-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t('createBooking.serviceType')}</Text>
                     </View>
                     <View style={styles.chipsWrap}>
                         {availableServices.map(s => {
@@ -259,7 +258,7 @@ export default function CreateBookingScreen({ route, navigation }) {
                                     ]}
                                     onPress={() => setServiceType(s.value)}
                                 >
-                                    <Ionicons name={s.icon} size={16} color={active ? '#FFF' : theme.text} />
+                                    <Icon name={s.icon} size={16} color={active ? '#FFF' : theme.text} />
                                     <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{s.label}</Text>
                                 </TouchableOpacity>
                             );
@@ -271,8 +270,8 @@ export default function CreateBookingScreen({ route, navigation }) {
                 {serviceType === 'walking' && (
                     <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                            <Ionicons name="time-outline" size={16} color={theme.text} />
-                            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Duración del paseo</Text>
+                            <Icon name="time-outline" size={16} color={theme.text} />
+                            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t('createBooking.walkDuration')}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
                             <TouchableOpacity
@@ -280,29 +279,29 @@ export default function CreateBookingScreen({ route, navigation }) {
                                 onPress={() => setWalkHours(Math.max(1, walkHours - 1))}
                                 disabled={walkHours <= 1}
                             >
-                                <Ionicons name="remove" size={22} color="#FFF" />
+                                <Icon name="remove" size={22} color="#FFF" />
                             </TouchableOpacity>
                             <View style={{ alignItems: 'center', minWidth: 80 }}>
                                 <Text style={{ fontSize: 36, fontWeight: '900', color: theme.text }}>{walkHours}</Text>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textSecondary }}>{walkHours === 1 ? 'hora' : 'horas'}</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textSecondary }}>{walkHours === 1 ? t('createBooking.hour') : t('createBooking.hours')}</Text>
                             </View>
                             <TouchableOpacity
                                 style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: walkHours >= 24 ? theme.border : COLORS.primary, justifyContent: 'center', alignItems: 'center' }}
                                 onPress={() => setWalkHours(Math.min(24, walkHours + 1))}
                                 disabled={walkHours >= 24}
                             >
-                                <Ionicons name="add" size={22} color="#FFF" />
+                                <Icon name="add" size={22} color="#FFF" />
                             </TouchableOpacity>
                         </View>
-                        <Text style={{ textAlign: 'center', fontSize: 12, color: theme.textSecondary, marginTop: 8 }}>Máximo 24 horas</Text>
+                        <Text style={{ textAlign: 'center', fontSize: 12, color: theme.textSecondary, marginTop: 8 }}>{t('createBooking.maxHours')}</Text>
                     </View>
                 )}
 
                 {/* Dates & Times */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                        <Ionicons name="calendar-outline" size={16} color={theme.text} />
-                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Fechas y horario</Text>
+                        <Icon name="calendar-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t('createBooking.datesAndTime')}</Text>
                     </View>
 
                     {/* Date row */}
@@ -311,15 +310,15 @@ export default function CreateBookingScreen({ route, navigation }) {
                             style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                             onPress={() => setShowStartPicker(true)}
                         >
-                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Fecha inicio</Text>
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>{t('createBooking.startDate')}</Text>
                             <Text style={[styles.dateValue, { color: theme.text }]}>{formatDate(startDate)}</Text>
                         </TouchableOpacity>
-                        <Ionicons name="arrow-forward" size={18} color={theme.textSecondary} />
+                        <Icon name="arrow-forward" size={18} color={theme.textSecondary} />
                         <TouchableOpacity
                             style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                             onPress={() => setShowEndPicker(true)}
                         >
-                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Fecha fin</Text>
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>{t('createBooking.endDate')}</Text>
                             <Text style={[styles.dateValue, { color: theme.text }]}>{formatDate(endDate)}</Text>
                         </TouchableOpacity>
                     </View>
@@ -330,20 +329,20 @@ export default function CreateBookingScreen({ route, navigation }) {
                             style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                             onPress={() => setShowStartTimePicker(true)}
                         >
-                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Hora inicio</Text>
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>{t('createBooking.startTime')}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="time-outline" size={14} color={COLORS.primary} />
+                                <Icon name="time-outline" size={14} color={COLORS.primary} />
                                 <Text style={[styles.dateValue, { color: theme.text }]}>{formatTime(startDate)}</Text>
                             </View>
                         </TouchableOpacity>
-                        <Ionicons name="arrow-forward" size={18} color={theme.textSecondary} />
+                        <Icon name="arrow-forward" size={18} color={theme.textSecondary} />
                         <TouchableOpacity
                             style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
                             onPress={() => setShowEndTimePicker(true)}
                         >
-                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>Hora fin</Text>
+                            <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>{t('createBooking.endTime')}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ionicons name="time-outline" size={14} color={COLORS.primary} />
+                                <Icon name="time-outline" size={14} color={COLORS.primary} />
                                 <Text style={[styles.dateValue, { color: theme.text }]}>{formatTime(endDate)}</Text>
                             </View>
                         </TouchableOpacity>
@@ -400,8 +399,8 @@ export default function CreateBookingScreen({ route, navigation }) {
                 {/* My Pets */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                        <Ionicons name="paw-outline" size={16} color={theme.text} />
-                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Selecciona mascotas</Text>
+                        <Icon name="paw-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t('createBooking.selectPets')}</Text>
                     </View>
                     {loadingPets ? (
                         <ActivityIndicator color={COLORS.primary} />
@@ -420,15 +419,15 @@ export default function CreateBookingScreen({ route, navigation }) {
                                     >
                                         <Text style={{ fontSize: 14 }}>{pet.species === 'perro' || pet.species === 'dog' ? '🐶' : pet.species === 'gato' || pet.species === 'cat' ? '🐱' : '🐾'}</Text>
                                         <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{pet.name}</Text>
-                                        {active && <Ionicons name="checkmark-circle" size={16} color="#FFF" />}
+                                        {active && <Icon name="checkmark-circle" size={16} color="#FFF" />}
                                     </TouchableOpacity>
                                 );
                             })}
                         </View>
                     ) : (
                         <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                            <Ionicons name="paw-outline" size={36} color={COLORS.textLight} />
-                            <Text style={[{ color: theme.textSecondary, marginTop: 8 }]}>No tienes mascotas registradas</Text>
+                            <Icon name="paw-outline" size={36} color={COLORS.textLight} />
+                            <Text style={[{ color: theme.textSecondary, marginTop: 8 }]}>{t('createBooking.noPetsRegistered')}</Text>
                         </View>
                     )}
                 </View>
@@ -436,14 +435,14 @@ export default function CreateBookingScreen({ route, navigation }) {
                 {/* Notes */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                        <Ionicons name="document-text-outline" size={16} color={theme.text} />
-                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Notas (opcional)</Text>
+                        <Icon name="document-text-outline" size={16} color={theme.text} />
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t('createBooking.notesOptional')}</Text>
                     </View>
                     <TextInput
                         style={[styles.notesInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                         value={notes}
                         onChangeText={setNotes}
-                        placeholder="Instrucciones especiales, alergias, medicamentos..."
+                        placeholder={t('createBooking.notesPlaceholder')}
                         placeholderTextColor={theme.textSecondary}
                         multiline
                         maxLength={500}
@@ -454,26 +453,26 @@ export default function CreateBookingScreen({ route, navigation }) {
                 {serviceType && Number(caregiver.price) > 0 && (
                     <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                            <Ionicons name="card-outline" size={16} color={theme.text} />
-                            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Resumen</Text>
+                            <Icon name="card-outline" size={16} color={theme.text} />
+                            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t('createBooking.summary')}</Text>
                         </View>
                         <View style={styles.summaryRow}>
-                            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Tarifa del cuidador</Text>
+                            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>{t('createBooking.caregiverRate')}</Text>
                             <Text style={[styles.summaryValue, { color: theme.text }]}>{caregiver.price}€/hora</Text>
                         </View>
                         {serviceType === 'walking' && (
                             <View style={styles.summaryRow}>
-                                <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Horas de paseo</Text>
+                                <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>{t('createBooking.walkHours')}</Text>
                                 <Text style={[styles.summaryValue, { color: theme.text }]}>{walkHours}h</Text>
                             </View>
                         )}
                         <View style={[styles.summaryDivider, { backgroundColor: theme.border }]} />
                         <View style={styles.summaryRow}>
-                            <Text style={[styles.totalLabel, { color: theme.text }]}>Total estimado</Text>
+                            <Text style={[styles.totalLabel, { color: theme.text }]}>{t('createBooking.estimatedTotal')}</Text>
                             <Text style={styles.totalValue}>{calculatePrice().toFixed(2)}€</Text>
                         </View>
                         <Text style={[styles.summaryNote, { color: theme.textSecondary }]}>
-                            El pago se realizará una vez el cuidador acepte la reserva.
+                            {t('createBooking.paymentNote')}
                         </Text>
                     </View>
                 )}
@@ -488,8 +487,8 @@ export default function CreateBookingScreen({ route, navigation }) {
                         <ActivityIndicator color="#FFF" />
                     ) : (
                         <>
-                            <Ionicons name="send" size={18} color="#FFF" />
-                            <Text style={styles.submitText}>Enviar solicitud de reserva</Text>
+                            <Icon name="send" size={18} color="#FFF" />
+                            <Text style={styles.submitText}>{t('createBooking.submitBooking')}</Text>
                         </>
                     )}
                 </TouchableOpacity>

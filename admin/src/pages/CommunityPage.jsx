@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-import { Search, Trash2, X, Image as ImageIcon, Eye } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMagnifyingGlass, faTrash, faXmark, faImage, faEye } from '@fortawesome/free-solid-svg-icons';
+import { useTranslation } from 'react-i18next';
 import './UsersPage.css'; // Shared table styles
 
 export default function CommunityPage() {
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    
+    const { t } = useTranslation();
+
     // Modal state
     const [selectedPost, setSelectedPost] = useState(null);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -29,13 +32,13 @@ export default function CommunityPage() {
     };
 
     const handleDelete = async (postId) => {
-        if (window.confirm('¿Seguro que deseas eliminar esta publicación permanentemente?')) {
+        if (window.confirm(t('community.confirmDelete'))) {
             try {
                 await supabase.from('posts').delete().eq('id', postId);
                 setPosts(posts.filter(p => p.id !== postId));
                 setIsViewModalOpen(false);
             } catch (error) {
-                alert("Error al eliminar la publicación");
+                alert(t('community.errorDelete'));
             }
         }
     };
@@ -54,15 +57,15 @@ export default function CommunityPage() {
     return (
         <div className="page-container">
             <div className="page-header">
-                <h1 className="page-title">Moderación de Comunidad</h1>
+                <h1 className="page-title">{t('community.pageTitle')}</h1>
             </div>
 
             <div className="filters-bar glass-panel">
                 <div className="search-box">
-                    <Search size={18} className="search-icon" />
+                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: 18 }} className="search-icon" />
                     <input 
                         type="text" 
-                        placeholder="Buscar por autor o descripción..." 
+                        placeholder={t('community.searchPlaceholder')} 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -70,23 +73,23 @@ export default function CommunityPage() {
             </div>
 
             {loading ? (
-                <div className="loading-state"><div className="spinner"></div><p>Cargando publicaciones...</p></div>
+                <div className="loading-state"><div className="spinner"></div><p>{t('community.loading')}</p></div>
             ) : (
                 <div className="table-container glass-panel">
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                <th>Imagen</th>
-                                <th>Autor/Fecha</th>
-                                <th>Descripción</th>
-                                <th>Métricas</th>
-                                <th>Acciones</th>
+                                <th>{t('community.colImage')}</th>
+                                <th>{t('community.colAuthorDate')}</th>
+                                <th>{t('community.colDescription')}</th>
+                                <th>{t('community.colMetrics')}</th>
+                                <th>{t('community.colActions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="empty-cell">No se encontraron publicaciones</td>
+                                    <td colSpan="5" className="empty-cell">{t('community.noPostsFound')}</td>
                                 </tr>
                             ) : (
                                 filtered.map(post => {
@@ -99,20 +102,20 @@ export default function CommunityPage() {
                                                     {imgs.length > 0 ? (
                                                         <img src={imgs[0]} alt="post" />
                                                     ) : (
-                                                        <ImageIcon size={24} color="var(--text-muted)" />
+                                                        <FontAwesomeIcon icon={faImage} style={{ fontSize: 24, color: 'var(--text-muted)' }} />
                                                     )}
                                                 </div>
                                             </td>
                                             <td>
                                                 <div className="contact-info">
-                                                    <span style={{ fontWeight: 600 }}>{post.authorName || 'Usuario'}</span>
+                                                    <span style={{ fontWeight: 600 }}>{post.authorName || t('community.userFallback')}</span>
                                                     <span className="text-muted">{created}</span>
-                                                    <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>ID: {post.authorUid || 'Desconocido'}</span>
+                                                    <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>ID: {post.authorUid || t('community.unknownAuthorId')}</span>
                                                 </div>
                                             </td>
                                             <td>
                                                 <p style={{ maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '13px' }}>
-                                                    {post.caption || 'Sin descripción'}
+                                                    {post.caption || t('community.noDescription')}
                                                 </p>
                                             </td>
                                             <td>
@@ -123,11 +126,11 @@ export default function CommunityPage() {
                                             </td>
                                             <td>
                                                 <div className="action-buttons">
-                                                    <button className="action-btn view" onClick={() => openViewModal(post)} title="Ver detalle" style={{ color: '#3b82f6' }}>
-                                                        <Eye size={18} />
+                                                    <button className="action-btn view" onClick={() => openViewModal(post)} title={t('community.viewDetail')} style={{ color: '#3b82f6' }}>
+                                                        <FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} />
                                                     </button>
-                                                    <button className="action-btn delete" onClick={() => handleDelete(post.id)} title="Eliminar Post">
-                                                        <Trash2 size={18} />
+                                                    <button className="action-btn delete" onClick={() => handleDelete(post.id)} title={t('community.deletePost')}>
+                                                        <FontAwesomeIcon icon={faTrash} style={{ fontSize: 18 }} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -145,8 +148,8 @@ export default function CommunityPage() {
                 <div className="modal-overlay" onClick={() => setIsViewModalOpen(false)}>
                     <div className="modal-content view-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header view-header">
-                            <h2>Detalle de Publicación</h2>
-                            <button className="close-btn" onClick={() => setIsViewModalOpen(false)}><X size={24} /></button>
+                            <h2>{t('community.viewModalTitle')}</h2>
+                            <button className="close-btn" onClick={() => setIsViewModalOpen(false)}><FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} /></button>
                         </div>
                         
                         <div className="modal-body view-modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
@@ -161,7 +164,7 @@ export default function CommunityPage() {
                                 <div className="premium-profile-info">
                                     <h3 className="premium-profile-name">{selectedPost.authorName}</h3>
                                     <p className="premium-profile-subtitle" style={{color: 'white', fontWeight: '500'}}>
-                                        {selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleString('es-ES') : 'Fecha desconocida'}
+                                        {selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleString('es-ES') : t('community.unknownDate')}
                                     </p>
                                 </div>
                             </div>
@@ -186,19 +189,19 @@ export default function CommunityPage() {
 
                             <div style={{ display: 'flex', gap: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '20px', marginBottom: '10px' }}>
                                 <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-                                    <span style={{ fontSize: '18px' }}>♥</span> {selectedPost.likesCount || 0} Likes
+                                    <span style={{ fontSize: '18px' }}>♥</span> {selectedPost.likesCount || 0} {t('community.likes')}
                                 </div>
                                 <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-                                    <span style={{ fontSize: '18px' }}>🗨</span> {selectedPost.commentsCount || 0} Comentarios
+                                    <span style={{ fontSize: '18px' }}>🗨</span> {selectedPost.commentsCount || 0} {t('community.comments')}
                                 </div>
                             </div>
                         </div>
 
                         <div className="modal-footer" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', justifyContent: 'space-between', padding: '20px 30px' }}>
                             <button className="btn-secondary" style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)' }} onClick={() => handleDelete(selectedPost.id)}>
-                                Eliminar Publicación
+                                {t('community.deletePublication')}
                             </button>
-                            <button className="btn-primary" onClick={() => setIsViewModalOpen(false)}>Cerrar</button>
+                            <button className="btn-primary" onClick={() => setIsViewModalOpen(false)}>{t('community.close')}</button>
                         </div>
                     </div>
                 </div>

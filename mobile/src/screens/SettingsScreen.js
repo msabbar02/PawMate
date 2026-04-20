@@ -1,10 +1,10 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+﻿import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, TextInput, Switch,
     Platform, Linking, Modal,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -14,6 +14,8 @@ import { supabase } from '../config/supabase';
 import { uploadImageToStorage, uploadReportImage } from '../utils/storageHelpers';
 import * as Contacts from 'expo-contacts';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from '../context/LanguageContext';
+import { COLORS } from '../constants/colors';
 
 const APP_VERSION = '1.0.0';
 
@@ -65,6 +67,7 @@ Para consultas sobre privacidad: privacidad@pawmate.app`;
 export default function SettingsScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, toggleTheme, isDarkMode, isLeftHanded, toggleHandedness } = useContext(ThemeContext);
+    const { t, lang, switchLanguage } = useTranslation();
 
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [photoUri, setPhotoUri]             = useState(userData?.photoURL || null);
@@ -113,9 +116,9 @@ export default function SettingsScreen({ navigation }) {
 
 
     const ROLE_CONFIG = {
-        normal:    { label: 'Usuario',             emoji: '👤', color: '#6B7280' },
-        owner:     { label: 'Dueño Verificado',    emoji: '🐾', color: theme.primary },
-        caregiver: { label: 'Cuidador Verificado', emoji: '🛡️', color: '#0891b2' },
+        normal:    { label: t('roles.user'),             emoji: '👤', color: '#6B7280' },
+        owner:     { label: t('roles.verifiedOwner'),    emoji: '🐾', color: theme.primary },
+        caregiver: { label: t('roles.verifiedCaregiver'), emoji: '🛡️', color: '#0891b2' },
     };
     const role = ROLE_CONFIG[userData?.role] || ROLE_CONFIG.normal;
 
@@ -164,7 +167,7 @@ export default function SettingsScreen({ navigation }) {
     // ── Invites ──
     const handleInviteFriend = async () => {
         if (!inviteEmail || !inviteEmail.includes('@')) {
-            return Alert.alert('Email inválido', 'Introduce un correo válido por favor.');
+            return Alert.alert(t('settings.invalidEmail'), t('settings.invalidEmailMsg'));
         }
         setSendingInvite(true);
         try {
@@ -173,11 +176,11 @@ export default function SettingsScreen({ navigation }) {
                 options: { emailRedirectTo: 'pawmate://' }
             });
             if (error) throw error;
-            Alert.alert('¡Magia enviada!', 'Tu amigo recibirá un enlace mágico en su correo. ¡Suma 10 amigos unidos para ganar un paseo gratis!');
+            Alert.alert(t('settings.magicSent'), t('settings.magicSentMsg'));
             setShowInviteModal(false);
             setInviteEmail('');
         } catch (err) {
-            Alert.alert('Error', err.message || 'No se pudo enviar la invitación');
+            Alert.alert(t('common.error'), err.message || t('settings.magicSendError'));
         } finally {
             setSendingInvite(false);
         }
@@ -197,7 +200,7 @@ export default function SettingsScreen({ navigation }) {
             await supabase.from('users').update({ photoURL: url, avatar: url }).eq('id', user.id);
             await refreshUserData();
         } catch {
-            Alert.alert('Error', 'No se pudo subir la foto.');
+            Alert.alert(t('common.error'), t('settings.reportPhotoError'));
         } finally {
             setUploadingPhoto(false);
         }
@@ -205,10 +208,10 @@ export default function SettingsScreen({ navigation }) {
 
     // ── Change password ──
     const handleChangePassword = async () => {
-        if (!oldPass) return Alert.alert('Error', 'Introduce tu contraseña actual.');
-        if (newPass.length < 6) return Alert.alert('Error', 'La nueva contraseña debe tener al menos 6 caracteres.');
-        if (newPass === oldPass) return Alert.alert('Error', 'La nueva contraseña no puede ser igual a la actual.');
-        if (newPass !== confirmPass) return Alert.alert('Error', 'Las contraseñas no coinciden.');
+        if (!oldPass) return Alert.alert(t('common.error'), t('settings.currentRequired'));
+        if (newPass.length < 6) return Alert.alert(t('common.error'), t('settings.newMinLength'));
+        if (newPass === oldPass) return Alert.alert(t('common.error'), t('settings.sameAsOld'));
+        if (newPass !== confirmPass) return Alert.alert(t('common.error'), t('settings.mismatch'));
         setChangingPass(true);
         try {
             const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: oldPass });
@@ -217,17 +220,17 @@ export default function SettingsScreen({ navigation }) {
             if (updateError) throw updateError;
             setShowPasswordModal(false);
             setOldPass(''); setNewPass(''); setConfirmPass('');
-            Alert.alert('✅ Contraseña actualizada');
+            Alert.alert(t('settings.passwordUpdated'));
         } catch (e) {
-            Alert.alert('Error', e.message === 'wrong-password'
-                ? 'La contraseña actual es incorrecta.'
-                : 'No se pudo cambiar la contraseña.');
+            Alert.alert(t('common.error'), e.message === 'wrong-password'
+                ? t('settings.wrongPassword')
+                : t('settings.passwordError'));
         } finally { setChangingPass(false); }
     };
 
     // ── Send report ──
     const handleAddReportImage = async () => {
-        if (reportImages.length >= 4) return Alert.alert('Límite', 'Máximo 4 imágenes por reporte.');
+        if (reportImages.length >= 4) return Alert.alert(t('settings.limitTitle'), t('settings.reportImageLimit'));
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'], allowsEditing: false, quality: 0.7,
         });
@@ -240,7 +243,7 @@ export default function SettingsScreen({ navigation }) {
     };
 
     const handleSendReport = async () => {
-        if (!reportText.trim()) return Alert.alert('Error', 'Describe el problema antes de enviar.');
+        if (!reportText.trim()) return Alert.alert(t('common.error'), t('settings.reportDescRequired'));
         setSendingReport(true);
         try {
             // Upload images if any
@@ -269,10 +272,10 @@ export default function SettingsScreen({ navigation }) {
             setReportText('');
             setReportReason('');
             setReportImages([]);
-            Alert.alert('✅ Reporte enviado', 'Gracias por tu feedback. Lo revisaremos pronto.');
+            Alert.alert(t('settings.reportSent'), t('settings.reportSentMsg'));
         } catch (e) {
             console.error('Report error:', e);
-            Alert.alert('Error', 'No se pudo enviar el reporte. Inténtalo de nuevo.');
+            Alert.alert(t('common.error'), t('settings.reportSendError'));
         } finally {
             setSendingReport(false);
         }
@@ -280,10 +283,10 @@ export default function SettingsScreen({ navigation }) {
 
     // ── Emergency contacts ──
     const handleAddContactOption = () => {
-        Alert.alert('Añadir Contacto', '¿Cómo deseas añadir un contacto de emergencia?', [
-            { text: 'Añadir Manualmente', onPress: openAddContact },
-            { text: 'Importar del Móvil', onPress: importContactFromDevice },
-            { text: 'Cancelar', style: 'cancel' }
+        Alert.alert(t('settings.addContactTitle'), t('settings.addContactMsg'), [
+            { text: t('settings.addManually'), onPress: openAddContact },
+            { text: t('settings.importFromPhone'), onPress: importContactFromDevice },
+            { text: t('common.cancel'), style: 'cancel' }
         ]);
     };
 
@@ -291,13 +294,13 @@ export default function SettingsScreen({ navigation }) {
         setLoadingDeviceContacts(true);
         try {
             const { status } = await Contacts.requestPermissionsAsync();
-            if (status !== 'granted') return Alert.alert('Permiso denegado', 'Necesitas permitir el acceso a los contactos.');
+            if (status !== 'granted') return Alert.alert(t('settings.permissionDenied'), t('settings.contactsPermission'));
             const { data } = await Contacts.getContactsAsync({ fields: [Contacts.Fields.PhoneNumbers] });
             const valid = data.filter(c => c.name && c.phoneNumbers && c.phoneNumbers.length > 0);
             setDeviceContacts(valid.sort((a,b) => a.name.localeCompare(b.name)));
             setShowPhonePicker(true);
         } catch (e) {
-            Alert.alert('Error', 'No se pudieron recuperar los contactos.');
+            Alert.alert(t('common.error'), t('settings.contactsFetchError'));
         } finally {
             setLoadingDeviceContacts(false);
         }
@@ -319,7 +322,7 @@ export default function SettingsScreen({ navigation }) {
 
     const handleSaveContact = async () => {
         if (!contactName.trim() || !contactPhone.trim()) {
-            return Alert.alert('Error', 'Rellena el nombre y el teléfono.');
+            return Alert.alert(t('common.error'), t('settings.contactFieldsRequired'));
         }
         setSavingContact(true);
         const newContacts = [...emergencyContacts];
@@ -329,7 +332,7 @@ export default function SettingsScreen({ navigation }) {
         } else {
             if (newContacts.length >= 3) {
                 setSavingContact(false);
-                return Alert.alert('Límite alcanzado', 'Puedes tener como máximo 3 contactos de emergencia.');
+                return Alert.alert(t('settings.contactLimit'), t('settings.contactLimitMsg'));
             }
             newContacts.push(entry);
         }
@@ -338,22 +341,22 @@ export default function SettingsScreen({ navigation }) {
             setEmergencyContacts(newContacts);
             setShowContactModal(false);
             await refreshUserData();
-        } catch { Alert.alert('Error', 'No se pudo guardar el contacto.'); }
+        } catch { Alert.alert(t('common.error'), t('settings.contactSaveError')); }
         finally { setSavingContact(false); }
     };
 
     const handleDeleteContact = async (index) => {
-        Alert.alert('Eliminar contacto', '¿Eliminar este contacto de emergencia?', [
-            { text: 'Cancelar', style: 'cancel' },
+        Alert.alert(t('settings.deleteContact'), t('settings.deleteContactConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Eliminar', style: 'destructive',
+                text: t('common.delete'), style: 'destructive',
                 onPress: async () => {
                     const newContacts = emergencyContacts.filter((_, i) => i !== index);
                     try {
                         await supabase.from('users').update({ emergencyContacts: newContacts }).eq('id', user.id);
                         setEmergencyContacts(newContacts);
                         await refreshUserData();
-                    } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+                    } catch { Alert.alert(t('common.error'), t('settings.deleteContactError')); }
                 },
             },
         ]);
@@ -361,23 +364,23 @@ export default function SettingsScreen({ navigation }) {
 
     // ── Sign out / Delete account ──
     const handleSignOut = () => {
-        Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Salir', style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
+        Alert.alert(t('settings.signOut'), t('settings.signOutConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('settings.signOutBtn'), style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
         ]);
     };
 
     const handleDeleteAccount = () => {
-        Alert.alert('⚠️ Eliminar cuenta', 'Esta acción es IRREVERSIBLE.', [
-            { text: 'Cancelar', style: 'cancel' },
+        Alert.alert(t('settings.deleteAccountTitle'), t('settings.deleteAccountMsg'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Eliminar', style: 'destructive',
+                text: t('common.delete'), style: 'destructive',
                 onPress: async () => {
                     try {
                         await supabase.from('users').delete().eq('id', user.id);
                         await supabase.auth.signOut();
                     } catch {
-                        Alert.alert('Error', 'Vuelve a iniciar sesión antes de eliminar tu cuenta.');
+                        Alert.alert(t('common.error'), t('settings.deleteAccountReauth'));
                     }
                 },
             },
@@ -401,16 +404,16 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={onPress ? 0.65 : 1}
         >
             <View style={[s.settingIconWrap, { backgroundColor: iconBg || theme.primaryBg }]}>
-                <Ionicons name={icon} size={18} color={danger ? '#EF4444' : theme.primary} />
+                <Icon name={icon} size={18} color={danger ? '#EF4444' : theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={[s.settingLabel, { color: danger ? '#EF4444' : theme.text }]}>{label}</Text>
-                {sublabel && <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>{sublabel}</Text>}
+                {sublabel ? <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>{sublabel}</Text> : null}
             </View>
             {right !== undefined
                 ? right
                 : onPress
-                    ? <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                    ? <Icon name="chevron-forward" size={16} color={theme.textSecondary} />
                     : null
             }
         </TouchableOpacity>
@@ -450,12 +453,12 @@ export default function SettingsScreen({ navigation }) {
                         <View style={[s.cameraBtn, { backgroundColor: theme.primary, borderColor: theme.cardBackground }]}>
                             {uploadingPhoto
                                 ? <ActivityIndicator size="small" color="#FFF" />
-                                : <Ionicons name="camera" size={14} color="#FFF" />
+                                : <Icon name="camera" size={14} color="#FFF" />
                             }
                         </View>
                     </TouchableOpacity>
 
-                    <Text style={[s.heroName, { color: theme.text }]}>{userData?.fullName || 'Tu nombre'}</Text>
+                    <Text style={[s.heroName, { color: theme.text }]}>{userData?.fullName || t('settings.yourName')}</Text>
                     <Text style={[s.heroEmail, { color: theme.textSecondary }]}>{user?.email || ''}</Text>
                     <View style={[s.rolePill, { backgroundColor: role.color + '15', marginBottom: 16 }]}>
                         <Text style={{ fontSize: 12 }}>{role.emoji}</Text>
@@ -465,9 +468,11 @@ export default function SettingsScreen({ navigation }) {
                     {/* Badge for caregivers */}
                     {userData?.role === 'caregiver' && (() => {
                         const TIERS = [
-                            { min: 0,  label: 'Bronce', emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
-                            { min: 5,  label: 'Plata',  emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
-                            { min: 20, label: 'Oro',    emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                            { min: 0,  label: t('settings.tierBronze'), emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
+                            { min: 5,  label: t('settings.tierSilver'),  emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
+                            { min: 20, label: t('settings.tierGold'),    emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                            { min: 50, label: t('settings.tierPlatinum'), emoji: '💎', color: '#0ea5e9', bg: '#E0F2FE' },
+                            { min: 100,label: t('settings.tierLegend'),   emoji: '👑', color: '#8B5CF6', bg: '#EDE9FE' },
                         ];
                         const done = userData?.completedServices || 0;
                         let b = TIERS[0];
@@ -475,8 +480,8 @@ export default function SettingsScreen({ navigation }) {
                         return (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: b.bg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14 }}>
                                 <Text style={{ fontSize: 18 }}>{b.emoji}</Text>
-                                <Text style={{ fontSize: 13, fontWeight: '800', color: b.color }}>Cuidador {b.label}</Text>
-                                <Text style={{ fontSize: 11, color: b.color + '99' }}> · {done} servicios</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: b.color }}>{t('settings.caregiverTier', { tier: b.label })}</Text>
+                                <Text style={{ fontSize: 11, color: b.color + '99' }}> · {t('settings.servicesCount', { count: done })}</Text>
                             </View>
                         );
                     })()}
@@ -484,67 +489,67 @@ export default function SettingsScreen({ navigation }) {
                     <View style={[s.statsStrip, { borderTopColor: theme.border }]}>
                         <View style={s.statItem}>
                             <Text style={[s.statNum, { color: theme.text }]}>{petCount}</Text>
-                            <Text style={[s.statLabel, { color: theme.textSecondary }]}>Mascotas</Text>
+                            <Text style={[s.statLabel, { color: theme.textSecondary }]}>{t('settings.petsCount')}</Text>
                         </View>
                         <View style={[s.statDivider, { backgroundColor: theme.border }]} />
                         <View style={s.statItem}>
                             <Text style={[s.statNum, { color: theme.text }]}>{userData?.reviewCount || 0}</Text>
-                            <Text style={[s.statLabel, { color: theme.textSecondary }]}>Reseñas</Text>
+                            <Text style={[s.statLabel, { color: theme.textSecondary }]}>{t('settings.reviewsCount')}</Text>
                         </View>
                     </View>
                 </View>
 
                 {/* ── DATOS PERSONALES (read-only) ── */}
-                <SectionTitle>DATOS PERSONALES</SectionTitle>
+                <SectionTitle>{t('settings.personalData')}</SectionTitle>
                 <View style={[s.infoCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                     <View style={s.infoRow}>
                         <View style={[s.infoIconWrap, { backgroundColor: theme.primaryBg }]}>
-                            <Ionicons name="person-outline" size={16} color={theme.primary} />
+                            <Icon name="person-outline" size={16} color={theme.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>Nombre completo</Text>
+                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>{t('settings.fullName')}</Text>
                             <Text style={[s.infoValue, { color: theme.text }]}>{userData?.fullName || '—'}</Text>
                         </View>
                     </View>
                     <View style={[s.infoDiv, { backgroundColor: theme.border }]} />
                     <View style={s.infoRow}>
                         <View style={[s.infoIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                            <Ionicons name="call-outline" size={16} color="#3B82F6" />
+                            <Icon name="call-outline" size={16} color="#3B82F6" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>Teléfono</Text>
+                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>{t('settings.phone')}</Text>
                             <Text style={[s.infoValue, { color: theme.text }]}>{userData?.phone || '—'}</Text>
                         </View>
                     </View>
                     <View style={[s.infoDiv, { backgroundColor: theme.border }]} />
                     <View style={s.infoRow}>
                         <View style={[s.infoIconWrap, { backgroundColor: '#F5F3FF' }]}>
-                            <Ionicons name="mail-outline" size={16} color="#7C3AED" />
+                            <Icon name="mail-outline" size={16} color="#7C3AED" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>Email</Text>
+                            <Text style={[s.infoLabel, { color: theme.textSecondary }]}>{t('settings.email')}</Text>
                             <Text style={[s.infoValue, { color: theme.text }]}>{user?.email || '—'}</Text>
                         </View>
-                        <Ionicons name="lock-closed-outline" size={13} color={theme.textSecondary} />
+                        <Icon name="lock-closed-outline" size={13} color={theme.textSecondary} />
                     </View>
                     <View style={[s.infoDiv, { backgroundColor: theme.border }]} />
                     <TouchableOpacity style={[s.infoNote, { backgroundColor: theme.primaryBg }]} onPress={() => navigation.navigate('Profile')}>
-                        <Ionicons name="pencil" size={14} color={theme.primary} />
+                        <Icon name="pencil" size={14} color={theme.primary} />
                         <Text style={[s.infoNoteText, { color: theme.primary }]}>
-                            Modificar mis datos en Perfil
+                            {t('settings.editProfile')}
                         </Text>
-                        <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+                        <Icon name="chevron-forward" size={16} color={theme.primary} />
                     </TouchableOpacity>
                 </View>
 
                 {/* ── APARIENCIA ── */}
-                <SectionTitle>APARIENCIA</SectionTitle>
+                <SectionTitle>{t('settings.appearance')}</SectionTitle>
                 <SettingGroup>
                     <SettingRow
                         icon={isDarkMode ? 'moon' : 'sunny-outline'}
                         iconBg={isDarkMode ? theme.primaryBg : '#FEF9C3'}
-                        label={isDarkMode ? 'Modo oscuro' : 'Modo claro'}
-                        sublabel="Cambia el aspecto de la app"
+                        label={isDarkMode ? t('settings.darkMode') : t('settings.lightMode')}
+                        sublabel={t('settings.changeAppearance')}
                         right={
                             <Switch
                                 value={isDarkMode}
@@ -557,9 +562,8 @@ export default function SettingsScreen({ navigation }) {
                     <SettingRow
                         icon="hand-left-outline"
                         iconBg={isLeftHanded ? theme.primaryBg : '#FEF9C3'}
-                        label="Modo zurdo"
-                        sublabel="Mueve los botones al lado izquierdo"
-                        last
+                        label={t('settings.leftHanded')}
+                        sublabel={t('settings.leftHandedDesc')}
                         right={
                             <Switch
                                 value={isLeftHanded}
@@ -569,33 +573,50 @@ export default function SettingsScreen({ navigation }) {
                             />
                         }
                     />
+                    <SettingRow
+                        icon="language-outline"
+                        iconBg="#DBEAFE"
+                        label={t('settings.languageLabel')}
+                        sublabel={lang === 'es' ? t('settings.spanish') : t('settings.english')}
+                        last
+                        right={
+                            <TouchableOpacity
+                                onPress={() => switchLanguage(lang === 'es' ? 'en' : 'es')}
+                                style={{ backgroundColor: theme.primaryBg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12 }}
+                            >
+                                <Text style={{ color: COLORS.primary, fontWeight: '700', fontSize: 13 }}>
+                                    {lang === 'es' ? 'EN 🇬🇧' : 'ES 🇪🇸'}
+                                </Text>
+                            </TouchableOpacity>
+                        }
+                    />
                 </SettingGroup>
 
                 {/* ── CONTACTOS DE EMERGENCIA ── */}
-                <SectionTitle>CONTACTOS DE EMERGENCIA</SectionTitle>
+                <SectionTitle>{t('settings.emergencyContacts')}</SectionTitle>
                 <View style={[s.settingGroup, { borderColor: theme.border }]}>
                     {emergencyContacts.length === 0 && (
                         <View style={[s.settingRow, { backgroundColor: theme.cardBackground }]}>
-                            <Ionicons name="alert-circle-outline" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
+                            <Icon name="alert-circle-outline" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
                             <Text style={[s.settingSublabel, { color: theme.textSecondary, flex: 1 }]}>
-                                Sin contactos de emergencia. El botón SOS necesita al menos uno.
+                                {t('settings.noEmergencyContacts')}
                             </Text>
                         </View>
                     )}
                     {emergencyContacts.map((contact, i) => (
                         <View key={i} style={[s.settingRow, { backgroundColor: theme.cardBackground }, i === emergencyContacts.length - 1 && emergencyContacts.length > 0 && s.settingRowLast]}>
                             <View style={[s.settingIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                                <Ionicons name="call" size={18} color="#EF4444" />
+                                <Icon name="call" size={18} color="#EF4444" />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={[s.settingLabel, { color: theme.text }]}>{contact.name}</Text>
                                 <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>{contact.phone}</Text>
                             </View>
                             <TouchableOpacity onPress={() => openEditContact(contact, i)} style={{ marginRight: 12 }}>
-                                <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
+                                <Icon name="pencil-outline" size={18} color={theme.textSecondary} />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => handleDeleteContact(i)}>
-                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                <Icon name="trash-outline" size={18} color="#EF4444" />
                             </TouchableOpacity>
                         </View>
                     ))}
@@ -605,42 +626,42 @@ export default function SettingsScreen({ navigation }) {
                             onPress={handleAddContactOption}
                         >
                             <View style={[s.settingIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                                <Ionicons name="add" size={18} color="#EF4444" />
+                                <Icon name="add" size={18} color="#EF4444" />
                             </View>
-                            <Text style={[s.settingLabel, { color: theme.primary }]}>Añadir contacto</Text>
-                            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                            <Text style={[s.settingLabel, { color: theme.primary }]}>{t('settings.addContact')}</Text>
+                            <Icon name="chevron-forward" size={16} color={theme.textSecondary} />
                         </TouchableOpacity>
                     )}
                 </View>
 
                 {/* ── MÉTODOS DE PAGO ── */}
-                <SectionTitle>MÉTODOS DE PAGO</SectionTitle>
+                <SectionTitle>{t('settings.payment')}</SectionTitle>
                 <SettingGroup>
                     <View style={[s.settingRow, { backgroundColor: theme.cardBackground }]}>
                         <View style={[s.settingIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                            <Ionicons name="card-outline" size={18} color="#3B82F6" />
+                            <Icon name="card-outline" size={18} color="#3B82F6" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>Sin métodos guardados</Text>
-                            <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>Las tarjetas se gestionan al pagar</Text>
+                            <Text style={[s.settingLabel, { color: theme.textSecondary }]}>{t('settings.noPaymentMethods')}</Text>
+                            <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>{t('settings.paymentManaged')}</Text>
                         </View>
                     </View>
                     <SettingRow
                         icon="shield-checkmark-outline"
                         iconBg="#ECFDF5"
-                        label="Pagos seguros con Stripe"
-                        sublabel="Tus datos bancarios nunca se almacenan en PawMate"
+                        label={t('settings.securePayments')}
+                        sublabel={t('settings.noBankData')}
                         last
                     />
                 </SettingGroup>
 
                 {/* ── CUENTA ── */}
-                <SectionTitle>CUENTA</SectionTitle>
+                <SectionTitle>{t('settings.account')}</SectionTitle>
                 <SettingGroup>
                     <SettingRow
                         icon="key-outline"
                         iconBg={isDarkMode ? theme.primaryBg : '#F0F9FF'}
-                        label="Cambiar contraseña"
+                        label={t('settings.changePassword')}
                         onPress={() => setShowPasswordModal(true)}
                         last={userData?.role !== 'normal' && userData?.verificationStatus !== 'pending'}
                     />
@@ -648,8 +669,8 @@ export default function SettingsScreen({ navigation }) {
                         <SettingRow
                             icon="shield-checkmark-outline"
                             iconBg={theme.primaryBg}
-                            label="Verificar mi cuenta"
-                            sublabel="Conviértete en Dueño o Cuidador"
+                            label={t('settings.verifyAccount')}
+                            sublabel={t('settings.verifyAccountDesc')}
                             onPress={() => navigation.navigate('Verify')}
                             last
                         />
@@ -658,8 +679,8 @@ export default function SettingsScreen({ navigation }) {
                         <SettingRow
                             icon="time-outline"
                             iconBg={isDarkMode ? theme.primaryBg : '#FEF3C7'}
-                            label="Verificación en revisión"
-                            sublabel="Te avisaremos en 24-48h"
+                            label={t('settings.verificationPending')}
+                            sublabel={t('settings.verificationPendingDesc')}
                             last
                         />
                     )}
@@ -668,13 +689,13 @@ export default function SettingsScreen({ navigation }) {
                 {/* ── CUIDADOR: ESTADO ONLINE ── */}
                 {userData?.role === 'caregiver' && (
                     <>
-                        <SectionTitle>CUIDADOR</SectionTitle>
+                        <SectionTitle>{t('settings.caregiverSection')}</SectionTitle>
                         <SettingGroup>
                             <SettingRow
                                 icon="radio-outline"
                                 iconBg="#dcfce7"
-                                label="Estado Online"
-                                sublabel="Aparece en el mapa para los dueños"
+                                label={t('settings.onlineStatus')}
+                                sublabel={t('settings.onlineStatusDesc')}
                                 last
                                 right={
                                     <Switch
@@ -704,41 +725,41 @@ export default function SettingsScreen({ navigation }) {
                 )}
 
                 {/* ── RECOMPENSAS ── */}
-                <SectionTitle>RECOMPENSAS</SectionTitle>
+                <SectionTitle>{t('settings.rewards')}</SectionTitle>
                 <SettingGroup>
                     <SettingRow
                         icon="gift-outline"
                         iconBg="#FEF3C7"
-                        label="Invitar a un amigo"
-                        sublabel="Invita a 10 amigos y gana un paseo gratis"
+                        label={t('settings.inviteFriend')}
+                        sublabel={t('settings.inviteFriendDesc')}
                         last
                         onPress={() => setShowInviteModal(true)}
                     />
                 </SettingGroup>
 
                 {/* ── INFORMACIÓN ── */}
-                <SectionTitle>INFORMACIÓN</SectionTitle>
+                <SectionTitle>{t('settings.info')}</SectionTitle>
                 <SettingGroup>
                     <SettingRow
                         icon="information-circle-outline"
-                        label="Versión de la app"
+                        label={t('settings.appVersion')}
                         sublabel={`PawMate v${APP_VERSION}`}
                     />
                     <SettingRow
                         icon="document-text-outline"
-                        label="Política de privacidad"
+                        label={t('settings.privacyPolicy')}
                         onPress={() => setShowPolicy(true)}
                     />
                     <SettingRow
                         icon="flag-outline"
                         iconBg="#FFF1F2"
-                        label="Enviar reporte"
-                        sublabel="Ayuda a mejorar PawMate"
+                        label={t('settings.sendReport')}
+                        sublabel={t('settings.sendReportDesc')}
                         onPress={() => setShowReportModal(true)}
                     />
                     <SettingRow
                         icon="chatbubble-ellipses-outline"
-                        label="Contactar soporte"
+                        label={t('settings.contactSupport')}
                         sublabel="soporte@pawmate.app"
                         last
                         onPress={() => Linking.openURL('mailto:soporte@pawmate.app')}
@@ -746,20 +767,20 @@ export default function SettingsScreen({ navigation }) {
                 </SettingGroup>
 
                 {/* ── ZONA DE PELIGRO ── */}
-                <SectionTitle danger>ZONA DE PELIGRO</SectionTitle>
+                <SectionTitle danger>{t('settings.dangerZone')}</SectionTitle>
                 <SettingGroup>
                     <SettingRow
                         icon="log-out-outline"
                         iconBg="#FEE2E2"
-                        label="Cerrar sesión"
+                        label={t('settings.signOut')}
                         onPress={handleSignOut}
                         danger
                     />
                     <SettingRow
                         icon="trash-outline"
                         iconBg="#FEE2E2"
-                        label="Eliminar mi cuenta"
-                        sublabel="Esta acción es irreversible"
+                        label={t('settings.deleteAccount')}
+                        sublabel={t('settings.deleteAccountDesc')}
                         onPress={handleDeleteAccount}
                         danger
                         last
@@ -775,48 +796,48 @@ export default function SettingsScreen({ navigation }) {
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => { setShowPasswordModal(false); setOldPass(''); setNewPass(''); setConfirmPass(''); }}>
-                            <Ionicons name="close" size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
-                        <Text style={[s.modalTitle, { color: theme.text }]}>Cambiar contraseña</Text>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>{t('settings.passwordTitle')}</Text>
                         <View style={{ width: 28 }} />
                     </View>
                     <ScrollView contentContainerStyle={{ padding: 24 }}>
                         <View style={[s.infoBanner, { backgroundColor: theme.primaryBg }]}>
-                            <Ionicons name="shield-checkmark-outline" size={18} color={theme.primary} />
+                            <Icon name="shield-checkmark-outline" size={18} color={theme.primary} />
                             <Text style={[s.infoBannerText, { color: theme.primary }]}>
-                                Por seguridad necesitamos verificar tu contraseña actual.
+                                {t('settings.passwordDesc')}
                             </Text>
                         </View>
 
                         {/* Campo 1: Contraseña actual */}
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>CONTRASEÑA ACTUAL</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>{t('settings.currentPassword')}</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text }]}
                                 secureTextEntry={!showOld}
                                 value={oldPass}
                                 onChangeText={setOldPass}
-                                placeholder="Tu contraseña actual"
+                                placeholder={t('settings.currentPasswordPlaceholder')}
                                 placeholderTextColor={theme.textSecondary}
                             />
                             <TouchableOpacity onPress={() => setShowOld(v => !v)}>
-                                <Ionicons name={showOld ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textSecondary} />
+                                <Icon name={showOld ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Campo 2: Nueva contraseña */}
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>NUEVA CONTRASEÑA</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>{t('settings.newPassword')}</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text }]}
                                 secureTextEntry={!showNew}
                                 value={newPass}
                                 onChangeText={setNewPass}
-                                placeholder="Mínimo 6 caracteres"
+                                placeholder={t('settings.newPasswordPlaceholder')}
                                 placeholderTextColor={theme.textSecondary}
                             />
                             <TouchableOpacity onPress={() => setShowNew(v => !v)}>
-                                <Ionicons name={showNew ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textSecondary} />
+                                <Icon name={showNew ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textSecondary} />
                             </TouchableOpacity>
                         </View>
                         {/* Barra de fuerza */}
@@ -830,34 +851,34 @@ export default function SettingsScreen({ navigation }) {
                                     }]} />
                                 ))}
                                 <Text style={[s.strengthLabel, { color: newPass.length < 4 ? '#EF4444' : newPass.length < 8 ? '#F59E0B' : '#22C55E' }]}>
-                                    {newPass.length < 4 ? 'Débil' : newPass.length < 8 ? 'Media' : 'Fuerte'}
+                                    {newPass.length < 4 ? t('settings.strengthWeak') : newPass.length < 8 ? t('settings.strengthMedium') : t('settings.strengthStrong')}
                                 </Text>
                             </View>
                         )}
 
                         {/* Campo 3: Confirmar contraseña */}
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>CONFIRMAR CONTRASEÑA</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>{t('settings.confirmNewPassword')}</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: confirmPass.length > 0 ? (confirmPass === newPass ? '#22C55E' : '#EF4444') : theme.border }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text }]}
                                 secureTextEntry={!showConfirm}
                                 value={confirmPass}
                                 onChangeText={setConfirmPass}
-                                placeholder="Repite la nueva contraseña"
+                                placeholder={t('settings.confirmNewPasswordPlaceholder')}
                                 placeholderTextColor={theme.textSecondary}
                             />
                             <TouchableOpacity onPress={() => setShowConfirm(v => !v)}>
-                                <Ionicons name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textSecondary} />
+                                <Icon name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.textSecondary} />
                             </TouchableOpacity>
                         </View>
                         {confirmPass.length > 0 && confirmPass !== newPass && (
                             <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 6, fontWeight: '600' }}>
-                                ⚠️ Las contraseñas no coinciden
+                                {t('settings.passwordsMismatchWarn')}
                             </Text>
                         )}
                         {confirmPass.length > 0 && confirmPass === newPass && newPass.length >= 6 && (
                             <Text style={{ color: '#22C55E', fontSize: 12, marginTop: 6, fontWeight: '600' }}>
-                                ✅ Las contraseñas coinciden
+                                {t('settings.passwordsMatchOk')}
                             </Text>
                         )}
 
@@ -868,7 +889,7 @@ export default function SettingsScreen({ navigation }) {
                         >
                             {changingPass
                                 ? <ActivityIndicator color="#FFF" />
-                                : <Text style={s.primaryBtnText}>Cambiar contraseña</Text>
+                                : <Text style={s.primaryBtnText}>{t('settings.changePasswordBtn')}</Text>
                             }
                         </TouchableOpacity>
                     </ScrollView>
@@ -882,31 +903,31 @@ export default function SettingsScreen({ navigation }) {
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setShowContactModal(false)}>
-                            <Ionicons name="close" size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
                         <Text style={[s.modalTitle, { color: theme.text }]}>
-                            {editingContact !== null ? 'Editar contacto' : 'Nuevo contacto de emergencia'}
+                            {editingContact !== null ? t('settings.editContact') : t('settings.newEmergencyContact')}
                         </Text>
                         <View style={{ width: 28 }} />
                     </View>
                     <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
                         <View style={[s.infoBanner, { backgroundColor: '#FEE2E2' }]}>
-                            <Ionicons name="alert-circle-outline" size={18} color="#EF4444" />
+                            <Icon name="alert-circle-outline" size={18} color="#EF4444" />
                             <Text style={[s.infoBannerText, { color: '#EF4444' }]}>
-                                Este contacto recibirá una llamada cuando actives el botón SOS durante un paseo.
+                                {t('settings.emergencyContactDesc')}
                             </Text>
                         </View>
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>NOMBRE</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>{t('settings.contactName')}</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text }]}
                                 value={contactName}
                                 onChangeText={setContactName}
-                                placeholder="Ej. Mamá"
+                                placeholder={t('settings.contactNamePlaceholder')}
                                 placeholderTextColor={theme.textSecondary}
                             />
                         </View>
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>TELÉFONO</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>{t('settings.contactPhone')}</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text }]}
@@ -924,7 +945,7 @@ export default function SettingsScreen({ navigation }) {
                         >
                             {savingContact
                                 ? <ActivityIndicator color="#FFF" />
-                                : <Text style={s.primaryBtnText}>Guardar contacto</Text>
+                                : <Text style={s.primaryBtnText}>{t('settings.saveContact')}</Text>
                             }
                         </TouchableOpacity>
                     </ScrollView>
@@ -938,9 +959,9 @@ export default function SettingsScreen({ navigation }) {
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setShowPolicy(false)}>
-                            <Ionicons name="close" size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
-                        <Text style={[s.modalTitle, { color: theme.text }]}>Política de Privacidad</Text>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>{t('settings.policyTitle')}</Text>
                         <View style={{ width: 28 }} />
                     </View>
                     <ScrollView contentContainerStyle={{ padding: 20 }}>
@@ -956,15 +977,15 @@ export default function SettingsScreen({ navigation }) {
                 <View style={[s.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)', flex: 1, justifyContent: 'center', padding: 20 }]}>
                     <View style={[{ backgroundColor: theme.cardBackground, borderRadius: 24, padding: 24, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10, position: 'relative' }]}>
                         <TouchableOpacity style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 8 }} onPress={() => setShowInviteModal(false)}>
-                            <Ionicons name="close" size={24} color={theme.textSecondary} />
+                            <Icon name="close" size={24} color={theme.textSecondary} />
                         </TouchableOpacity>
-                        <Text style={{ fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center', color: theme.text }}>Regala Magia</Text>
+                        <Text style={{ fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center', color: theme.text }}>{t('settings.inviteTitle')}</Text>
                         <Text style={{ fontSize: 13, marginBottom: 20, textAlign: 'center', lineHeight: 18, color: theme.textSecondary }}>
-                            Ingresa el email de tu amigo. Le enviaremos un enlace mágico y si se une, estarás más cerca de ganar un paseo gratis o una pulsera PawMate.
+                            {t('settings.inviteDesc')}
                         </Text>
                         
                         <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, height: 50, marginBottom: 20, backgroundColor: theme.background, borderColor: theme.border }}>
-                            <Ionicons name="mail-outline" size={20} color={theme.textSecondary} style={{ marginRight: 10 }} />
+                            <Icon name="mail-outline" size={20} color={theme.textSecondary} style={{ marginRight: 10 }} />
                             <TextInput
                                 style={{ flex: 1, fontSize: 15, color: theme.text }}
                                 placeholder="amigo@email.com"
@@ -981,7 +1002,7 @@ export default function SettingsScreen({ navigation }) {
                             onPress={handleInviteFriend} 
                             disabled={sendingInvite}
                         >
-                            {sendingInvite ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Enviar Enlace Mágico</Text>}
+                            {sendingInvite ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{t('settings.sendMagicLink')}</Text>}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -994,9 +1015,9 @@ export default function SettingsScreen({ navigation }) {
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setShowPhonePicker(false)}>
-                            <Ionicons name="close" size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
-                        <Text style={[s.modalTitle, { color: theme.text }]}>Elegir Contacto</Text>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>{t('settings.chooseContact')}</Text>
                         <View style={{ width: 28 }} />
                     </View>
                     <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -1015,13 +1036,13 @@ export default function SettingsScreen({ navigation }) {
                                 }}
                             >
                                 <View style={[s.settingIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                                    <Ionicons name="person" size={18} color="#EF4444" />
+                                    <Icon name="person" size={18} color="#EF4444" />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={[s.settingLabel, { color: theme.text }]}>{c.name}</Text>
                                     <Text style={[s.settingSublabel, { color: theme.textSecondary }]}>{c.phoneNumbers[0].number}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                                <Icon name="chevron-forward" size={16} color={theme.textSecondary} />
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
@@ -1035,22 +1056,22 @@ export default function SettingsScreen({ navigation }) {
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => { setShowReportModal(false); setReportText(''); setReportReason(''); setReportImages([]); }}>
-                            <Ionicons name="close" size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
-                        <Text style={[s.modalTitle, { color: theme.text }]}>Enviar Reporte</Text>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>{t('settings.reportTitle')}</Text>
                         <View style={{ width: 28 }} />
                     </View>
                     <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
                         <View style={[s.infoBanner, { backgroundColor: '#FFF1F2' }]}>
-                            <Ionicons name="flag-outline" size={18} color="#E11D48" />
+                            <Icon name="flag-outline" size={18} color="#E11D48" />
                             <Text style={[s.infoBannerText, { color: '#E11D48' }]}>
-                                Tu reporte nos ayuda a mejorar PawMate. Puedes adjuntar capturas o fotos.
+                                {t('settings.reportDesc')}
                             </Text>
                         </View>
 
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>MOTIVO DEL REPORTE</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>{t('settings.reportReason')}</Text>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                            {['Bug / Error', 'Contenido inapropiado', 'Problema con usuario', 'Sugerencia', 'Otro'].map((reason) => (
+                            {[t('settings.reportReasonBug'), t('settings.reportReasonContent'), t('settings.reportReasonUser'), t('settings.reportReasonSuggestion'), t('settings.reportReasonOther')].map((reason) => (
                                 <TouchableOpacity
                                     key={reason}
                                     style={{
@@ -1065,23 +1086,23 @@ export default function SettingsScreen({ navigation }) {
                             ))}
                         </View>
 
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>DESCRIBE EL PROBLEMA</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>{t('settings.reportProblem')}</Text>
                         <View style={[s.passwordInputRow, { backgroundColor: theme.cardBackground, borderColor: theme.border, alignItems: 'flex-start', paddingVertical: 14, minHeight: 130 }]}>
                             <TextInput
                                 style={[s.passwordInput, { color: theme.text, textAlignVertical: 'top', minHeight: 100 }]}
                                 value={reportText}
                                 onChangeText={setReportText}
-                                placeholder="Explica el problema con detalle...&#10;¿Qué pasó? ¿Cuándo ocurrió?"
+                                placeholder={t('settings.reportProblemPlaceholder')}
                                 placeholderTextColor={theme.textSecondary}
                                 multiline
                                 numberOfLines={5}
                             />
                         </View>
                         <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 6 }}>
-                            {reportText.length} / 500 caracteres
+                            {reportText.length} {t('settings.charCount')}
                         </Text>
 
-                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>FOTOS / CAPTURAS (OPCIONAL)</Text>
+                        <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 20 }]}>{t('settings.reportPhotos')}</Text>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
                             {reportImages.map((uri, i) => (
                                 <View key={i} style={{ position: 'relative' }}>
@@ -1090,7 +1111,7 @@ export default function SettingsScreen({ navigation }) {
                                         style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#EF4444', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}
                                         onPress={() => handleRemoveReportImage(i)}
                                     >
-                                        <Ionicons name="close" size={14} color="#FFF" />
+                                        <Icon name="close" size={14} color="#FFF" />
                                     </TouchableOpacity>
                                 </View>
                             ))}
@@ -1099,13 +1120,13 @@ export default function SettingsScreen({ navigation }) {
                                     style={{ width: 80, height: 80, borderRadius: 12, borderWidth: 2, borderColor: theme.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: theme.cardBackground }}
                                     onPress={handleAddReportImage}
                                 >
-                                    <Ionicons name="camera-outline" size={24} color={theme.textSecondary} />
-                                    <Text style={{ fontSize: 10, color: theme.textSecondary, marginTop: 2 }}>Añadir</Text>
+                                    <Icon name="camera-outline" size={24} color={theme.textSecondary} />
+                                    <Text style={{ fontSize: 10, color: theme.textSecondary, marginTop: 2 }}>{t('common.add')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
                         <Text style={{ color: theme.textSecondary, fontSize: 11 }}>
-                            Máximo 4 imágenes
+                            {t('settings.maxImages')}
                         </Text>
 
                         <TouchableOpacity
@@ -1115,7 +1136,7 @@ export default function SettingsScreen({ navigation }) {
                         >
                             {sendingReport
                                 ? <ActivityIndicator color="#FFF" />
-                                : <Text style={s.primaryBtnText}>Enviar Reporte</Text>
+                                : <Text style={s.primaryBtnText}>{t('settings.sendReport2')}</Text>
                             }
                         </TouchableOpacity>
                     </ScrollView>

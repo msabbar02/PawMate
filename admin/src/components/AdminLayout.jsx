@@ -1,22 +1,26 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
-import { 
-    LayoutDashboard, Users, Dog, CalendarDays, 
-    MessageSquare, AlertTriangle, 
-    LogOut, Menu, X, Activity, Sun, Moon,
-    UserCog, ShieldPlus, ShieldCheck, Wifi, WifiOff
-} from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGauge, faUsers, faDog, faCalendarDays, faCommentDots, faTriangleExclamation, faRightFromBracket, faBars, faXmark, faChartLine, faSun, faMoon, faShieldHeart, faShieldHalved, faWifi } from '@fortawesome/free-solid-svg-icons';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
     const { logout, adminUser } = useContext(AuthContext);
     const { theme, toggleTheme } = useContext(ThemeContext);
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [realtimeConnected, setRealtimeConnected] = useState(false);
+
+    const toggleLang = () => {
+        const newLang = i18n.language === 'es' ? 'en' : 'es';
+        i18n.changeLanguage(newLang);
+        localStorage.setItem('@pawmate_admin_lang', newLang);
+    };
 
     // ── Realtime connection heartbeat ──
     useEffect(() => {
@@ -56,15 +60,15 @@ export default function AdminLayout() {
     const initials = displayName.charAt(0).toUpperCase();
 
     const navItems = [
-        { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-        { path: '/users', label: 'Usuarios', icon: <Users size={20} /> },
-        { path: '/pets', label: 'Mascotas', icon: <Dog size={20} /> },
-        { path: '/reservations', label: 'Reservas', icon: <CalendarDays size={20} /> },
-        { path: '/messages', label: 'Mensajes', icon: <MessageSquare size={20} /> },
-        { path: '/reports', label: 'Reportes y Reseñas', icon: <AlertTriangle size={20} /> },
-        { path: '/logs', label: 'Audit Logs', icon: <Activity size={20} /> },
-        { path: '/verifications', label: 'Verificaciones', icon: <ShieldCheck size={20} /> },
-        { path: '/admins', label: 'Administradores', icon: <ShieldPlus size={20} /> },
+        { path: '/', label: t('sidebar.dashboard'), icon: <FontAwesomeIcon icon={faGauge} style={{ fontSize: 20 }} /> },
+        { path: '/users', label: t('sidebar.users'), icon: <FontAwesomeIcon icon={faUsers} style={{ fontSize: 20 }} /> },
+        { path: '/pets', label: t('sidebar.pets'), icon: <FontAwesomeIcon icon={faDog} style={{ fontSize: 20 }} /> },
+        { path: '/reservations', label: t('sidebar.reservations'), icon: <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 20 }} /> },
+        { path: '/messages', label: t('sidebar.messages'), icon: <FontAwesomeIcon icon={faCommentDots} style={{ fontSize: 20 }} /> },
+        { path: '/reports', label: t('sidebar.reports'), icon: <FontAwesomeIcon icon={faTriangleExclamation} style={{ fontSize: 20 }} /> },
+        { path: '/logs', label: t('sidebar.logs'), icon: <FontAwesomeIcon icon={faChartLine} style={{ fontSize: 20 }} /> },
+        { path: '/verifications', label: t('sidebar.verifications'), icon: <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 20 }} /> },
+        { path: '/admins', label: t('sidebar.admins'), icon: <FontAwesomeIcon icon={faShieldHeart} style={{ fontSize: 20 }} /> },
     ];
 
     return (
@@ -73,9 +77,9 @@ export default function AdminLayout() {
 
             <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <h2>PawMate Admin</h2>
+                    <h2>{t('sidebar.brand')}</h2>
                     <button className="mobile-close-btn" onClick={closeSidebar}>
-                        <X size={24} />
+                        <FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} />
                     </button>
                 </div>
 
@@ -95,12 +99,15 @@ export default function AdminLayout() {
 
                 <div className="sidebar-footer">
                     <button onClick={toggleTheme} className="theme-toggle-btn">
-                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                        <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+                        {theme === 'dark' ? <FontAwesomeIcon icon={faSun} style={{ fontSize: 18 }} /> : <FontAwesomeIcon icon={faMoon} style={{ fontSize: 18 }} />}
+                        <span>{theme === 'dark' ? t('sidebar.lightMode') : t('sidebar.darkMode')}</span>
+                    </button>
+                    <button onClick={toggleLang} className="theme-toggle-btn">
+                        {i18n.language === 'es' ? '🇬🇧 English' : '🇪🇸 Español'}
                     </button>
                     <button onClick={handleLogout} className="logout-btn">
-                        <LogOut size={20} />
-                        <span>Cerrar Sesión</span>
+                        <FontAwesomeIcon icon={faRightFromBracket} style={{ fontSize: 20 }} />
+                        <span>{t('sidebar.logout')}</span>
                     </button>
                 </div>
             </aside>
@@ -108,16 +115,16 @@ export default function AdminLayout() {
             <main className="main-content">
                 <header className="topbar">
                     <button className="mobile-menu-btn" onClick={toggleSidebar}>
-                        <Menu size={24} />
+                        <FontAwesomeIcon icon={faBars} style={{ fontSize: 24 }} />
                     </button>
                     <div className="topbar-welcome">
-                        <span className="welcome-text">Hola, <strong>{displayName}</strong></span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 12, fontSize: 11, color: realtimeConnected ? '#22c55e' : '#ef4444', fontWeight: 600 }} title={realtimeConnected ? 'Realtime conectado' : 'Realtime desconectado'}>
-                            {realtimeConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-                            {realtimeConnected ? 'Live' : 'Offline'}
+                        <span className="welcome-text">{t('topbar.greeting')} <strong>{displayName}</strong></span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 12, fontSize: 11, color: realtimeConnected ? '#22c55e' : '#ef4444', fontWeight: 600 }} title={realtimeConnected ? t('topbar.realtimeConnected') : t('topbar.realtimeDisconnected')}>
+                            {realtimeConnected ? <FontAwesomeIcon icon={faWifi} style={{ fontSize: 12 }} /> : <FontAwesomeIcon icon={faWifi} style={{ fontSize: 12, opacity: 0.4 }} />}
+                            {realtimeConnected ? t('topbar.live') : t('topbar.offline')}
                         </span>
                     </div>
-                    <div className="admin-profile" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }} title="Mi Perfil">
+                    <div className="admin-profile" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }} title={t('topbar.myProfile')}>
                         <div className="admin-avatar">
                             {adminUser?.photoURL ? (
                                 <img src={adminUser.photoURL} alt="avatar" className="admin-avatar-img" />

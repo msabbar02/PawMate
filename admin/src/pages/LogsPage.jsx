@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-import { Activity, Search, RefreshCw } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChartLine, faMagnifyingGlass, faRotate } from '@fortawesome/free-solid-svg-icons';
+import { useTranslation } from 'react-i18next';
 import './UsersPage.css'; // Utilizing standard styles
 
 export default function LogsPage() {
+    const { t } = useTranslation();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -46,18 +49,18 @@ export default function LogsPage() {
     return (
         <div className="page-container">
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1 className="page-title" style={{ margin: 0 }}>System Logs</h1>
+                <h1 className="page-title" style={{ margin: 0 }}>{t('logs.pageTitle')}</h1>
                 <button className="btn-secondary" onClick={fetchLogs} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <RefreshCw size={16} /> Refrescar
+                    <FontAwesomeIcon icon={faRotate} style={{ fontSize: 16 }} /> {t('logs.refresh')}
                 </button>
             </div>
 
             <div className="filters-bar glass-panel">
                 <div className="search-box">
-                    <Search size={18} className="search-icon" />
+                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: 18 }} className="search-icon" />
                     <input 
                         type="text" 
-                        placeholder="Buscar log por acción, email, id o entidad..." 
+                        placeholder={t('logs.searchPlaceholder')} 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -65,30 +68,30 @@ export default function LogsPage() {
             </div>
 
             {loading ? (
-                <div className="loading-state"><div className="spinner"></div><p>Cargando auditoría...</p></div>
+                <div className="loading-state"><div className="spinner"></div><p>{t('logs.loading')}</p></div>
             ) : (
                 <div className="table-container glass-panel">
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                <th>Fecha Reali.</th>
-                                <th>Usuario</th>
-                                <th>Acción</th>
-                                <th>Entidad</th>
-                                <th>Detalles Téc.</th>
+                                <th>{t('logs.colDate')}</th>
+                                <th>{t('logs.colUser')}</th>
+                                <th>{t('logs.colAction')}</th>
+                                <th>{t('logs.colEntity')}</th>
+                                <th>{t('logs.colTechDetails')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredLogs.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="empty-cell">
-                                        <Activity size={40} style={{ margin: '0 auto 16px auto', display: 'block', opacity: 0.5 }} />
-                                        No hay registros o no se ha creado la tabla aún
+                                        <FontAwesomeIcon icon={faChartLine} style={{ fontSize: 40, margin: '0 auto 16px auto', display: 'block', opacity: 0.5 }} />
+                                        {t('logs.noLogs')}
                                     </td>
                                 </tr>
                             ) : (
-                                filteredLogs.map(log => (
-                                    <tr key={log.id || Math.random()}>
+                                filteredLogs.map((log, index) => (
+                                    <tr key={log.id || `log-${index}`}>
                                         <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                                             {log.created_at ? new Date(log.created_at).toLocaleString('es-ES') : '-'}
                                         </td>

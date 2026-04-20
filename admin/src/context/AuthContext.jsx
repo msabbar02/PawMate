@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 
 export const AuthContext = createContext();
@@ -8,6 +9,7 @@ export const AuthProvider = ({ children }) => {
     const [adminUser, setAdminUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const initDone = useRef(false);
+    const { t } = useTranslation();
 
     const fetchAdminProfile = async (authUser) => {
         if (!authUser) { setAdminUser(null); return null; }
@@ -104,13 +106,13 @@ export const AuthProvider = ({ children }) => {
 
             if (profileError || !profile || profile.role !== 'admin') {
                 await supabase.auth.signOut();
-                return { success: false, message: 'Acceso denegado: no tienes permisos de administrador.' };
+                return { success: false, message: t('auth.accessDenied') };
             }
             setAdminUser(profile);
             setIsAuthenticated(true);
             return { success: true };
         } catch (error) {
-            return { success: false, message: error.message || 'Error desconocido' };
+            return { success: false, message: error.message || t('auth.unknownError') };
         }
     };
 
@@ -121,8 +123,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     const refreshProfile = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) await fetchAdminProfile(session.user);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) await fetchAdminProfile(session.user);
+        } catch (err) {
+            console.error('refreshProfile error:', err);
+        }
     };
 
     if (loading) {
@@ -143,7 +149,7 @@ export const AuthProvider = ({ children }) => {
                         animation: 'spin 0.8s linear infinite',
                     }} />
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                    <span>Cargando...</span>
+                    <span>{t('auth.loading')}</span>
                 </div>
             </div>
         );

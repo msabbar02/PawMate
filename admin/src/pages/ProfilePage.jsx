@@ -1,10 +1,13 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
-import { Camera, Save, Trash2, User, Mail, Phone, MapPin, FileText } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCamera, faFloppyDisk, faTrash, faUser, faEnvelope, faPhone, faLocationDot, faFileLines } from '@fortawesome/free-solid-svg-icons';
+import { useTranslation } from 'react-i18next';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
+    const { t } = useTranslation();
     const { adminUser, refreshProfile } = useContext(AuthContext);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -33,7 +36,7 @@ export default function ProfilePage() {
 
         const maxSize = 2 * 1024 * 1024;
         if (file.size > maxSize) {
-            setMessage({ text: 'La imagen no puede superar 2MB', type: 'error' });
+            setMessage({ text: t('profile.imageTooLarge'), type: 'error' });
             return;
         }
 
@@ -53,9 +56,9 @@ export default function ProfilePage() {
 
             await supabase.from('users').update({ photoURL: publicUrl }).eq('id', adminUser.id);
             await refreshProfile();
-            setMessage({ text: 'Foto actualizada correctamente', type: 'success' });
+            setMessage({ text: t('profile.photoUpdated'), type: 'success' });
         } catch (err) {
-            setMessage({ text: 'Error al subir foto: ' + err.message, type: 'error' });
+            setMessage({ text: t('profile.errorUploadPhoto') + err.message, type: 'error' });
         }
         setUploading(false);
     };
@@ -79,28 +82,28 @@ export default function ProfilePage() {
             if (error) throw error;
             await refreshProfile();
             setEditing(false);
-            setMessage({ text: 'Perfil actualizado correctamente', type: 'success' });
+            setMessage({ text: t('profile.profileUpdated'), type: 'success' });
         } catch (err) {
-            setMessage({ text: 'Error al guardar: ' + err.message, type: 'error' });
+            setMessage({ text: t('profile.errorSave') + err.message, type: 'error' });
         }
         setSaving(false);
     };
 
     const handleDeleteField = async (field) => {
-        if (!window.confirm(`¿Seguro que quieres borrar tu ${field}?`)) return;
+        if (!window.confirm(t('profile.confirmDeleteField', { field }))) return;
         try {
             await supabase.from('users').update({ [field]: null }).eq('id', adminUser.id);
             setForm(prev => ({ ...prev, [field]: '' }));
             await refreshProfile();
-            setMessage({ text: `${field} eliminado`, type: 'success' });
+            setMessage({ text: t('profile.fieldDeleted', { field }), type: 'success' });
         } catch (err) {
-            setMessage({ text: 'Error: ' + err.message, type: 'error' });
+            setMessage({ text: t('profile.errorGeneric') + err.message, type: 'error' });
         }
     };
 
     return (
         <div className="profile-page">
-            <h2 className="page-title">Mi Perfil</h2>
+            <h2 className="page-title">{t('profile.pageTitle')}</h2>
 
             {message.text && (
                 <div className={`profile-message ${message.type}`}>{message.text}</div>
@@ -110,88 +113,88 @@ export default function ProfilePage() {
                 <div className="profile-photo-section">
                     <div className="profile-photo-wrapper">
                         {adminUser?.photoURL ? (
-                            <img src={adminUser.photoURL} alt="Foto de perfil" className="profile-photo" />
+                            <img src={adminUser.photoURL} alt={t('profile.profilePhotoAlt')} className="profile-photo" />
                         ) : (
                             <div className="profile-photo-placeholder">
                                 {adminUser?.fullName?.charAt(0) || 'A'}
                             </div>
                         )}
-                        <label className="photo-upload-btn" title="Cambiar foto">
-                            <Camera size={18} />
+                        <label className="photo-upload-btn" title={t('profile.changePhoto')}>
+                            <FontAwesomeIcon icon={faCamera} style={{ fontSize: 18 }} />
                             <input type="file" accept="image/*" onChange={handlePhotoUpload} hidden />
                         </label>
                     </div>
-                    {uploading && <span className="upload-status">Subiendo...</span>}
+                    {uploading && <span className="upload-status">{t('profile.uploading')}</span>}
                     <h3 className="profile-display-name">{adminUser?.fullName || 'Admin'}</h3>
-                    <span className="role-badge admin">Admin</span>
+                    <span className="role-badge admin">{t('profile.adminBadge')}</span>
                 </div>
 
                 <div className="profile-details">
                     <div className="detail-row">
-                        <div className="detail-icon"><User size={18} /></div>
+                        <div className="detail-icon"><FontAwesomeIcon icon={faUser} style={{ fontSize: 18 }} /></div>
                         <div className="detail-content">
-                            <label>Nombre</label>
+                            <label>{t('profile.nameLabel')}</label>
                             {editing ? (
                                 <div className="name-fields">
-                                    <input value={form.firstName} onChange={e => handleChange('firstName', e.target.value)} placeholder="Nombre" className="form-control" />
-                                    <input value={form.lastName} onChange={e => handleChange('lastName', e.target.value)} placeholder="Apellido" className="form-control" />
+                                    <input value={form.firstName} onChange={e => handleChange('firstName', e.target.value)} placeholder={t('profile.firstNamePlaceholder')} className="form-control" />
+                                    <input value={form.lastName} onChange={e => handleChange('lastName', e.target.value)} placeholder={t('profile.lastNamePlaceholder')} className="form-control" />
                                 </div>
                             ) : (
-                                <span>{adminUser?.fullName || 'No configurado'}</span>
+                                <span>{adminUser?.fullName || t('profile.notConfigured')}</span>
                             )}
                         </div>
                         {editing && form.fullName && (
-                            <button className="delete-field-btn" onClick={() => handleDeleteField('fullName')}><Trash2 size={14} /></button>
+                            <button className="delete-field-btn" onClick={() => handleDeleteField('fullName')}><FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} /></button>
                         )}
                     </div>
 
                     <div className="detail-row">
-                        <div className="detail-icon"><Mail size={18} /></div>
+                        <div className="detail-icon"><FontAwesomeIcon icon={faEnvelope} style={{ fontSize: 18 }} /></div>
                         <div className="detail-content">
-                            <label>Email</label>
-                            <span>{adminUser?.email || 'No configurado'}</span>
+                            <label>{t('profile.emailLabel')}</label>
+                            <span>{adminUser?.email || t('profile.notConfigured')}</span>
                         </div>
                     </div>
 
                     <div className="detail-row">
-                        <div className="detail-icon"><Phone size={18} /></div>
+                        <div className="detail-icon"><FontAwesomeIcon icon={faPhone} style={{ fontSize: 18 }} /></div>
                         <div className="detail-content">
-                            <label>Teléfono</label>
+                            <label>{t('profile.phoneLabel')}</label>
                             {editing ? (
-                                <input value={form.phone} onChange={e => handleChange('phone', e.target.value)} placeholder="+34..." className="form-control" />
+                                <input value={form.phone} onChange={e => handleChange('phone', e.target.value)} placeholder={t('profile.phonePlaceholder')} className="form-control" />
                             ) : (
-                                <span>{adminUser?.phone || 'No configurado'}</span>
+                                <span>{adminUser?.phone || t('profile.notConfigured')}</span>
                             )}
                         </div>
                         {editing && form.phone && (
-                            <button className="delete-field-btn" onClick={() => handleDeleteField('phone')}><Trash2 size={14} /></button>
+                            <button className="delete-field-btn" onClick={() => handleDeleteField('phone')}><FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} /></button>
                         )}
                     </div>
 
                     <div className="detail-row">
-                        <div className="detail-icon"><MapPin size={18} /></div>
+                        <div className="detail-icon"><FontAwesomeIcon icon={faLocationDot} style={{ fontSize: 18 }} /></div>
                         <div className="detail-content">
-                            <label>Ubicación</label>
+                            <label>{t('profile.locationLabel')}</label>
                             {editing ? (
                                 <div className="name-fields">
-                                    <input value={form.city} onChange={e => handleChange('city', e.target.value)} placeholder="Ciudad" className="form-control" />
-                                    <input value={form.province} onChange={e => handleChange('province', e.target.value)} placeholder="Provincia" className="form-control" />
-                                    <input value={form.country} onChange={e => handleChange('country', e.target.value)} placeholder="País" className="form-control" />
+                                    <input value={form.city} onChange={e => handleChange('city', e.target.value)} placeholder={t('profile.cityPlaceholder')} className="form-control" />
+                                    <input value={form.province} onChange={e => handleChange('province', e.target.value)} placeholder={t('profile.provincePlaceholder')} className="form-control" />
+                                    <input value={form.country} onChange={e => handleChange('country', e.target.value)} placeholder={t('profile.countryPlaceholder')} className="form-control" />
                                 </div>
                             ) : (
-                                <span>{[adminUser?.city, adminUser?.province, adminUser?.country].filter(Boolean).join(', ') || 'No configurado'}</span>
+                                <span>{[adminUser?.city, adminUser?.province, adminUser?.country].filter(Boolean).join(', ') || t('profile.notConfigured')}</span>
                             )}
                         </div>
                     </div>
 
                     <div className="detail-row">
-                        <div className="detail-icon"><FileText size={18} /></div>
+                        <div className="detail-icon"><FontAwesomeIcon icon={faFileLines} style={{ fontSize: 18 }} /></div>
                         <div className="detail-content">
-                            <label>Bio</label>
+                            <label>{t('profile.bioLabel')}</label>
                             {editing ? (
-                                <textarea value={form.bio} onChange={e => handleChange('bio', e.target.value)} placeholder="Escribe algo sobre ti..." className="form-control" rows={3} />
+                                <textarea value={form.bio} onChange={e => handleChange('bio', e.target.value)} placeholder={t('profile.bioPlaceholder')} className="form-control" rows={3} />
                             ) : (
-                                <span>{adminUser?.bio || 'Sin biografía'}</span>
+                                <span>{adminUser?.bio || t('profile.noBio')}</span>
                             )}
                         </div>
                     </div>
@@ -200,13 +203,26 @@ export default function ProfilePage() {
                 <div className="profile-actions">
                     {editing ? (
                         <>
-                            <button className="btn-secondary" onClick={() => setEditing(false)}>Cancelar</button>
+                            <button className="btn-secondary" onClick={() => setEditing(false)}>{t('profile.cancel')}</button>
                             <button className="btn-primary" onClick={handleSave} disabled={saving}>
-                                <Save size={16} /> {saving ? 'Guardando...' : 'Guardar'}
+                                <FontAwesomeIcon icon={faFloppyDisk} style={{ fontSize: 16 }} /> {saving ? t('profile.saving') : t('profile.save')}
                             </button>
                         </>
                     ) : (
-                        <button className="btn-primary" onClick={() => setEditing(true)}>Editar Perfil</button>
+                        <button className="btn-primary" onClick={() => {
+                            setForm({
+                                fullName: adminUser?.fullName || '',
+                                firstName: adminUser?.firstName || '',
+                                lastName: adminUser?.lastName || '',
+                                email: adminUser?.email || '',
+                                phone: adminUser?.phone || '',
+                                bio: adminUser?.bio || '',
+                                city: adminUser?.city || '',
+                                province: adminUser?.province || '',
+                                country: adminUser?.country || '',
+                            });
+                            setEditing(true);
+                        }}>{t('profile.editProfile')}</button>
                     )}
                 </div>
             </div>

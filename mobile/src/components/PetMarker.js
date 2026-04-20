@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { View, Image, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { Marker, Callout } from 'react-native-maps';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 
 const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
     const isCaregiver = user.role === 'caregiver';
@@ -16,8 +16,9 @@ const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
+        let animation;
         if (isMatch || !isCaregiver) { // Owners in group walk also pulse
-            Animated.loop(
+            animation = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, {
                         toValue: 1.25,
@@ -30,11 +31,13 @@ const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
                         useNativeDriver: true,
                     }),
                 ])
-            ).start();
+            );
+            animation.start();
         } else {
             pulseAnim.stopAnimation();
             pulseAnim.setValue(1);
         }
+        return () => { if (animation) animation.stop(); };
     }, [isMatch, isCaregiver]);
 
     const avatarUri = user.avatar || 'https://via.placeholder.com/80';
@@ -80,7 +83,7 @@ const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
                         <Image source={{ uri: avatarUri }} style={styles.avatar} />
                     ) : (
                         <View style={styles.ownerIconContainer}>
-                            <Ionicons name="paw" size={24} color="#3B82F6" />
+                            <Icon name="paw" size={24} color="#3B82F6" />
                         </View>
                     )}
                 </View>
@@ -111,7 +114,7 @@ const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
                         {isCaregiver ? 'Cuidador' : 'Paseo en Grupo'} • {distanceText}
                     </Text>
                     <View style={styles.calloutButton}>
-                        <Ionicons name="chatbubble-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Icon name="chatbubble-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
                         <Text style={styles.calloutButtonText}>Enviar Mensaje</Text>
                     </View>
                 </View>

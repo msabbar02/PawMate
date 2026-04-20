@@ -1,36 +1,32 @@
-import React, { useState, useContext, useEffect } from 'react';
+﻿import React, { useState, useContext, useEffect } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     TextInput, Alert, ActivityIndicator, Platform, Switch,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
-
-const SERVICES = [
-    { value: 'walking', label: 'Paseo', icon: 'walk-outline', emoji: '🚶' },
-    { value: 'hotel', label: 'Hotel', icon: 'home-outline', emoji: '🏨' },
-    { value: 'daycare', label: 'Guardería', icon: 'sunny-outline', emoji: '☀️' },
-    { value: 'grooming', label: 'Peluquería', icon: 'cut-outline', emoji: '✂️' },
-    { value: 'training', label: 'Entrenamiento', icon: 'fitness-outline', emoji: '🏋️' },
-];
-
-const SPECIES = [
-    { value: 'perro', label: '🐶 Perros' },
-    { value: 'gato', label: '🐱 Gatos' },
-    { value: 'ave', label: '🐦 Aves' },
-    { value: 'reptil', label: '🦎 Reptiles' },
-    { value: 'otro', label: '🐾 Otros' },
-];
-
-const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+import { useTranslation } from '../context/LanguageContext';
 
 export default function CaregiverSetupScreen({ navigation }) {
     const { user, userData, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
+    const { t } = useTranslation();
+
+    const SERVICES = [
+        { value: 'walking', label: t('services.walking'), icon: 'walk-outline', emoji: '🚶' },
+        { value: 'hotel', label: t('services.hotel'), icon: 'home-outline', emoji: '🏨' },
+    ];
+
+    const SPECIES = [
+        { value: 'perro', label: '🐶 ' + t('species.dogs') },
+        { value: 'gato', label: '🐱 ' + t('species.cats') },
+    ];
+
+    const DAYS = [t('days.monday'), t('days.tuesday'), t('days.wednesday'), t('days.thursday'), t('days.friday'), t('days.saturday'), t('days.sunday')];
 
     const [saving, setSaving] = useState(false);
     const [bio, setBio] = useState(userData?.bio || '');
@@ -94,19 +90,19 @@ export default function CaregiverSetupScreen({ navigation }) {
 
     const handleSave = async () => {
         if (!price || parseFloat(price) <= 0) {
-            Alert.alert('Error', 'Introduce un precio válido por hora.');
+            Alert.alert(t('common.error'), t('caregiverSetup.priceError'));
             return;
         }
         if (selectedServices.length === 0) {
-            Alert.alert('Error', 'Selecciona al menos un servicio.');
+            Alert.alert(t('common.error'), t('caregiverSetup.serviceRequired'));
             return;
         }
         if (acceptedSpecies.length === 0) {
-            Alert.alert('Error', 'Selecciona al menos un tipo de mascota.');
+            Alert.alert(t('common.error'), t('caregiverSetup.speciesRequired'));
             return;
         }
         if (!iban.trim()) {
-            Alert.alert('Error', 'Introduce tu IBAN para recibir pagos.');
+            Alert.alert(t('common.error'), t('caregiverSetup.ibanRequired'));
             return;
         }
 
@@ -127,10 +123,10 @@ export default function CaregiverSetupScreen({ navigation }) {
 
             if (error) throw error;
             await refreshUserData();
-            Alert.alert('✅ Guardado', 'Tu perfil de cuidador se ha actualizado.');
+            Alert.alert(t('caregiverSetup.saved'), t('caregiverSetup.savedMsg'));
         } catch (e) {
             console.error(e);
-            Alert.alert('Error', 'No se pudo guardar. Intenta de nuevo.');
+            Alert.alert(t('common.error'), t('caregiverSetup.saveError'));
         } finally {
             setSaving(false);
         }
@@ -143,15 +139,15 @@ export default function CaregiverSetupScreen({ navigation }) {
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+                    <Icon name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>Mi Perfil de Cuidador</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{t('caregiverSetup.title')}</Text>
                 <TouchableOpacity
                     style={[styles.saveBtn, { backgroundColor: COLORS.primary, opacity: saving ? 0.6 : 1 }]}
                     onPress={handleSave}
                     disabled={saving}
                 >
-                    {saving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveBtnText}>Guardar</Text>}
+                    {saving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveBtnText}>{t('common.save')}</Text>}
                 </TouchableOpacity>
             </View>
 
@@ -160,14 +156,14 @@ export default function CaregiverSetupScreen({ navigation }) {
                 {/* Bio */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="person-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Sobre mí</Text>
+                        <Icon name="person-outline" size={20} color={COLORS.primary} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.aboutMe')}</Text>
                     </View>
                     <TextInput
                         style={[styles.textArea, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                         value={bio}
                         onChangeText={setBio}
-                        placeholder="Cuéntales a los dueños por qué eres el mejor cuidador..."
+                        placeholder={t('caregiverSetup.aboutMePlaceholder')}
                         placeholderTextColor={theme.textSecondary}
                         multiline
                         maxLength={300}
@@ -178,13 +174,13 @@ export default function CaregiverSetupScreen({ navigation }) {
                 {/* Precio y experiencia */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Tarifa y Experiencia</Text>
+                        <Icon name="cash-outline" size={20} color={COLORS.primary} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.rateAndExperience')}</Text>
                     </View>
 
                     <View style={styles.row}>
                         <View style={styles.fieldHalf}>
-                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Precio/hora (€)</Text>
+                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('caregiverSetup.priceHour')}</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                                 value={price}
@@ -195,7 +191,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                             />
                         </View>
                         <View style={styles.fieldHalf}>
-                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Experiencia</Text>
+                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('caregiverSetup.experienceLabel')}</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                                 value={experience}
@@ -208,7 +204,7 @@ export default function CaregiverSetupScreen({ navigation }) {
 
                     <View style={styles.row}>
                         <View style={styles.fieldHalf}>
-                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Radio (km)</Text>
+                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('caregiverSetup.radiusKm')}</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                                 value={serviceRadius}
@@ -219,7 +215,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                             />
                         </View>
                         <View style={styles.fieldHalf}>
-                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Máx. paseos</Text>
+                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('caregiverSetup.maxWalks')}</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                                 value={maxWalks}
@@ -235,11 +231,11 @@ export default function CaregiverSetupScreen({ navigation }) {
                 {/* IBAN */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="card-outline" size={20} color="#8B5CF6" />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Datos de pago</Text>
+                        <Icon name="card-outline" size={20} color="#8B5CF6" />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.paymentData')}</Text>
                     </View>
                     <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 6 }]}>
-                        IBAN (obligatorio para recibir pagos)
+                        {t('caregiverSetup.ibanLabel')}
                     </Text>
                     <TextInput
                         style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
@@ -255,8 +251,8 @@ export default function CaregiverSetupScreen({ navigation }) {
                 {/* Servicios */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="briefcase-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Servicios que ofrezco</Text>
+                        <Icon name="briefcase-outline" size={20} color={COLORS.primary} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.servicesOffered')}</Text>
                     </View>
                     <View style={styles.chipsWrap}>
                         {SERVICES.map(s => {
@@ -269,7 +265,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                                 >
                                     <Text style={{ fontSize: 16 }}>{s.emoji}</Text>
                                     <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{s.label}</Text>
-                                    {active && <Ionicons name="checkmark-circle" size={16} color="#FFF" />}
+                                    {active && <Icon name="checkmark-circle" size={16} color="#FFF" />}
                                 </TouchableOpacity>
                             );
                         })}
@@ -279,8 +275,8 @@ export default function CaregiverSetupScreen({ navigation }) {
                 {/* Mascotas aceptadas */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="paw-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Mascotas que acepto</Text>
+                        <Icon name="paw-outline" size={20} color={COLORS.primary} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.acceptedPets')}</Text>
                     </View>
                     <View style={styles.chipsWrap}>
                         {SPECIES.map(s => {
@@ -292,7 +288,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                                     onPress={() => toggleSpecies(s.value)}
                                 >
                                     <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{s.label}</Text>
-                                    {active && <Ionicons name="checkmark-circle" size={16} color="#FFF" />}
+                                    {active && <Icon name="checkmark-circle" size={16} color="#FFF" />}
                                 </TouchableOpacity>
                             );
                         })}
@@ -302,8 +298,8 @@ export default function CaregiverSetupScreen({ navigation }) {
                 {/* Horario semanal */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Horario semanal</Text>
+                        <Icon name="calendar-outline" size={20} color={COLORS.primary} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.weeklySchedule')}</Text>
                     </View>
                     {DAYS.map(day => {
                         const dayData = schedule[day] || { available: false, from: '09:00', to: '18:00' };

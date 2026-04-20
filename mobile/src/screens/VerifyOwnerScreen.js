@@ -1,32 +1,30 @@
-import React, { useState, useContext } from 'react';
+﻿import React, { useState, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, TextInput, Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
 import { uploadVerificationDoc } from '../utils/storageHelpers';
-
-const SPECIES_OPTIONS = [
-    { value: 'dog',    label: '🐕 Perro' },
-    { value: 'cat',    label: '🐈 Gato' },
-    { value: 'bird',   label: '🐦 Ave' },
-    { value: 'rabbit', label: '🐇 Conejo' },
-    { value: 'other',  label: '🐾 Otro' },
-];
-
-const SERVICE_OPTIONS = [
-    { value: 'walking', label: '🚶 Paseos' },
-    { value: 'hotel',   label: '🏨 Hotel' },
-    { value: 'daycare', label: '☀️ Guardería' },
-];
+import { useTranslation } from '../context/LanguageContext';
 
 export default function VerifyOwnerScreen({ navigation }) {
     const { user, userData } = useContext(AuthContext);
+    const { t } = useTranslation();
+
+    const SPECIES_OPTIONS = [
+        { value: 'dog',    label: t('verify.speciesDog') },
+        { value: 'cat',    label: t('verify.speciesCat') },
+    ];
+
+    const SERVICE_OPTIONS = [
+        { value: 'walking', label: t('verify.serviceWalking') },
+        { value: 'hotel',   label: t('verify.serviceHotel') },
+    ];
     const [step, setStep] = useState(1); // 1: choose role, 2: upload docs, 3: success
     const [targetRole, setTargetRole] = useState('owner'); // 'owner' | 'caregiver'
     const [submitting, setSubmitting] = useState(false);
@@ -67,13 +65,13 @@ export default function VerifyOwnerScreen({ navigation }) {
     // ─────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!idFront || !idBack || !selfie) {
-            return Alert.alert('Documentos requeridos', 'Sube el DNI (frente y dorso) y el selfie.');
+            return Alert.alert(t('verify.docsRequired'), t('verify.docsRequiredMsg'));
         }
         if (targetRole === 'caregiver') {
             if (acceptedSpecies.length === 0)
-                return Alert.alert('Error', 'Selecciona al menos una especie que aceptas.');
+                return Alert.alert(t('common.error'), t('verify.speciesRequired'));
             if (serviceTypes.length === 0)
-                return Alert.alert('Error', 'Selecciona al menos un tipo de servicio.');
+                return Alert.alert(t('common.error'), t('verify.serviceRequired'));
         }
 
         setSubmitting(true);
@@ -115,7 +113,7 @@ export default function VerifyOwnerScreen({ navigation }) {
             setStep(3);
         } catch (e) {
             console.error('Verification submit error:', e);
-            Alert.alert('Error', 'No se pudo enviar la solicitud. Inténtalo de nuevo.');
+            Alert.alert(t('common.error'), t('verify.submitError'));
         } finally {
             setSubmitting(false);
         }
@@ -126,9 +124,9 @@ export default function VerifyOwnerScreen({ navigation }) {
     // ─────────────────────────────────────────────────
     const renderStep1 = () => (
         <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Elige tu rol en PawMate</Text>
+            <Text style={styles.stepTitle}>{t('verify.chooseRole')}</Text>
             <Text style={styles.stepDesc}>
-                Al verificarte obtienes una insignia ✓ en tu perfil y acceso a funciones avanzadas.
+                {t('verify.chooseRoleDesc')}
             </Text>
 
             <TouchableOpacity
@@ -140,16 +138,16 @@ export default function VerifyOwnerScreen({ navigation }) {
                 </View>
                 <View style={{ flex: 1, marginLeft: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={styles.roleCardTitle}>Dueño Verificado</Text>
+                        <Text style={styles.roleCardTitle}>{t('verify.ownerVerified')}</Text>
                         <View style={styles.verifiedBadge}>
-                            <Text style={styles.verifiedBadgeText}>✓ Dueño</Text>
+                            <Text style={styles.verifiedBadgeText}>{t('verify.ownerTag')}</Text>
                         </View>
                     </View>
                     <Text style={styles.roleCardDesc}>
-                        Accede a reservas, servicios de cuidado y muestra tu insignia ✓ en el perfil.
+                        {t('verify.ownerDesc')}
                     </Text>
                 </View>
-                <Ionicons
+                <Icon
                     name={targetRole === 'owner' ? 'radio-button-on' : 'radio-button-off'}
                     size={24} color={COLORS.primary}
                 />
@@ -164,24 +162,24 @@ export default function VerifyOwnerScreen({ navigation }) {
                 </View>
                 <View style={{ flex: 1, marginLeft: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={styles.roleCardTitle}>Cuidador Verificado</Text>
+                        <Text style={styles.roleCardTitle}>{t('verify.caregiverVerified')}</Text>
                         <View style={[styles.verifiedBadge, { backgroundColor: COLORS.secondaryLight }]}>
-                            <Text style={[styles.verifiedBadgeText, { color: COLORS.secondary }]}>🛡️ Pro</Text>
+                            <Text style={[styles.verifiedBadgeText, { color: COLORS.secondary }]}>{t('verify.caregiverTag')}</Text>
                         </View>
                     </View>
                     <Text style={styles.roleCardDesc}>
-                        Ofrece servicios de paseo, hotel y guardería. Gana dinero cuidando mascotas.
+                        {t('verify.caregiverDesc')}
                     </Text>
                 </View>
-                <Ionicons
+                <Icon
                     name={targetRole === 'caregiver' ? 'radio-button-on' : 'radio-button-off'}
                     size={24} color={COLORS.primary}
                 />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(2)}>
-                <Text style={styles.nextBtnText}>Continuar</Text>
-                <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                <Text style={styles.nextBtnText}>{t('verify.continue')}</Text>
+                <Icon name="arrow-forward" size={20} color="#FFF" />
             </TouchableOpacity>
         </View>
     );
@@ -192,30 +190,30 @@ export default function VerifyOwnerScreen({ navigation }) {
     const renderStep2 = () => (
         <View style={styles.stepContainer}>
             <TouchableOpacity onPress={() => setStep(1)} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={20} color={COLORS.text} />
-                <Text style={styles.backBtnText}>Volver</Text>
+                <Icon name="arrow-back" size={20} color={COLORS.text} />
+                <Text style={styles.backBtnText}>{t('common.back')}</Text>
             </TouchableOpacity>
 
-            <Text style={styles.stepTitle}>Verificación de identidad</Text>
+            <Text style={styles.stepTitle}>{t('verify.identityVerification')}</Text>
             <Text style={styles.stepDesc}>
-                Sube una foto de tu DNI/pasaporte y un selfie. Nuestro equipo revisará tu solicitud en 24-48h.
+                {t('verify.identityDesc')}
             </Text>
 
             {/* Document uploads */}
             <DocUploadItem
-                label="📄 DNI / Pasaporte — Frente"
+                label={t('verify.dniFront')}
                 uri={idFront}
                 onPress={() => pickPhoto(setIdFront)}
                 required
             />
             <DocUploadItem
-                label="📄 DNI / Pasaporte — Dorso"
+                label={t('verify.dniBack')}
                 uri={idBack}
                 onPress={() => pickPhoto(setIdBack)}
                 required
             />
             <DocUploadItem
-                label="🤳 Selfie con DNI"
+                label={t('verify.selfie')}
                 uri={selfie}
                 onPress={() => pickPhoto(setSelfie)}
                 required
@@ -225,16 +223,16 @@ export default function VerifyOwnerScreen({ navigation }) {
             {targetRole === 'caregiver' && (
                 <>
                     <DocUploadItem
-                        label="📋 Certificado / Formación (opcional)"
+                        label={t('verify.certificate')}
                         uri={certDoc}
                         onPress={() => pickPhoto(setCertDoc)}
                     />
 
                     <View style={styles.sectionDivider}>
-                        <Text style={styles.sectionLabel}>Configuración de servicios</Text>
+                        <Text style={styles.sectionLabel}>{t('verify.serviceConfig')}</Text>
                     </View>
 
-                    <Text style={styles.configLabel}>Especies que aceptas</Text>
+                    <Text style={styles.configLabel}>{t('verify.speciesAccepted')}</Text>
                     <View style={styles.multiSelect}>
                         {SPECIES_OPTIONS.map(sp => (
                             <TouchableOpacity
@@ -249,7 +247,7 @@ export default function VerifyOwnerScreen({ navigation }) {
                         ))}
                     </View>
 
-                    <Text style={styles.configLabel}>Tipos de servicio</Text>
+                    <Text style={styles.configLabel}>{t('verify.serviceTypes')}</Text>
                     <View style={styles.multiSelect}>
                         {SERVICE_OPTIONS.map(sv => (
                             <TouchableOpacity
@@ -264,19 +262,19 @@ export default function VerifyOwnerScreen({ navigation }) {
                         ))}
                     </View>
 
-                    <Text style={styles.configLabel}>Radio de servicio (km)</Text>
+                    <Text style={styles.configLabel}>{t('verify.serviceRadius')}</Text>
                     <TextInput
                         style={styles.configInput}
                         keyboardType="numeric"
                         value={serviceRadius}
                         onChangeText={setServiceRadius}
-                        placeholder="Ej. 5"
+                        placeholder={t('verify.radiusPlaceholder')}
                         placeholderTextColor={COLORS.textLight}
                     />
 
                     <View style={{ flexDirection: 'row', gap: 12 }}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.configLabel}>Máx. paseos simultáneos</Text>
+                            <Text style={styles.configLabel}>{t('verify.maxWalks')}</Text>
                             <TextInput
                                 style={styles.configInput}
                                 keyboardType="numeric"
@@ -287,7 +285,7 @@ export default function VerifyOwnerScreen({ navigation }) {
                             />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.configLabel}>Máx. hotel simultáneo</Text>
+                            <Text style={styles.configLabel}>{t('verify.maxHotel')}</Text>
                             <TextInput
                                 style={styles.configInput}
                                 keyboardType="numeric"
@@ -310,8 +308,8 @@ export default function VerifyOwnerScreen({ navigation }) {
                     <ActivityIndicator color="#FFF" />
                 ) : (
                     <>
-                        <Text style={styles.nextBtnText}>Enviar solicitud</Text>
-                        <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                        <Text style={styles.nextBtnText}>{t('verify.submitRequest')}</Text>
+                        <Icon name="checkmark-circle" size={20} color="#FFF" />
                     </>
                 )}
             </TouchableOpacity>
@@ -324,18 +322,17 @@ export default function VerifyOwnerScreen({ navigation }) {
     const renderStep3 = () => (
         <View style={[styles.stepContainer, { alignItems: 'center', justifyContent: 'center', flex: 1 }]}>
             <Text style={{ fontSize: 80, marginBottom: 20 }}>🎉</Text>
-            <Text style={styles.successTitle}>¡Solicitud enviada!</Text>
+            <Text style={styles.successTitle}>{t('verify.requestSent')}</Text>
             <Text style={styles.successDesc}>
-                Nuestro equipo revisará tus documentos en las próximas 24-48 horas.
-                Recibirás una notificación cuando tu cuenta esté verificada.
+                {t('verify.requestSentMsg')}
             </Text>
             <View style={styles.pendingBadge}>
-                <Ionicons name="time-outline" size={16} color={COLORS.warning} />
-                <Text style={styles.pendingBadgeText}>En revisión</Text>
+                <Icon name="time-outline" size={16} color={COLORS.warning} />
+                <Text style={styles.pendingBadgeText}>{t('verify.inReview')}</Text>
             </View>
             {navigation && (
                 <TouchableOpacity style={styles.nextBtn} onPress={() => navigation.goBack()}>
-                    <Text style={styles.nextBtnText}>Volver al inicio</Text>
+                    <Text style={styles.nextBtnText}>{t('verify.backToHome')}</Text>
                 </TouchableOpacity>
             )}
         </View>
@@ -349,9 +346,9 @@ export default function VerifyOwnerScreen({ navigation }) {
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 30 }]}>
                 <StatusBar style="dark" />
                 <Text style={{ fontSize: 60 }}>⏳</Text>
-                <Text style={[styles.successTitle, { marginTop: 20 }]}>Solicitud en revisión</Text>
+                <Text style={[styles.successTitle, { marginTop: 20 }]}>{t('verify.pending')}</Text>
                 <Text style={styles.successDesc}>
-                    Tu documentación ya fue enviada. Nuestro equipo la revisará pronto.
+                    {t('verify.pendingMsg')}
                 </Text>
             </View>
         );
@@ -363,9 +360,9 @@ export default function VerifyOwnerScreen({ navigation }) {
                 <StatusBar style="dark" />
                 <Text style={{ fontSize: 60 }}>✅</Text>
                 <Text style={[styles.successTitle, { marginTop: 20 }]}>
-                    Ya eres {userData.role === 'caregiver' ? 'Cuidador Verificado 🛡️' : 'Dueño Verificado ✓'}
+                    {userData.role === 'caregiver' ? t('verify.alreadyCaregiver') : t('verify.alreadyOwner')}
                 </Text>
-                <Text style={styles.successDesc}>Tu cuenta ya tiene verificación activa.</Text>
+                <Text style={styles.successDesc}>{t('verify.alreadyVerified')}</Text>
             </View>
         );
     }
@@ -391,24 +388,27 @@ export default function VerifyOwnerScreen({ navigation }) {
 // ─────────────────────────────────────────────────
 // Mini component: Document Upload Item
 // ─────────────────────────────────────────────────
-const DocUploadItem = ({ label, uri, onPress, required }) => (
-    <TouchableOpacity style={styles.docItem} onPress={onPress}>
-        {uri ? (
-            <Image source={{ uri }} style={styles.docThumb} />
-        ) : (
-            <View style={styles.docPlaceholder}>
-                <Ionicons name="cloud-upload-outline" size={24} color={COLORS.primary} />
+const DocUploadItem = ({ label, uri, onPress, required }) => {
+    const { t } = useTranslation();
+    return (
+        <TouchableOpacity style={styles.docItem} onPress={onPress}>
+            {uri ? (
+                <Image source={{ uri }} style={styles.docThumb} />
+            ) : (
+                <View style={styles.docPlaceholder}>
+                    <Icon name="cloud-upload-outline" size={24} color={COLORS.primary} />
+                </View>
+            )}
+            <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={styles.docLabel}>{label}</Text>
+                <Text style={styles.docStatus}>
+                    {uri ? t('verify.docUploaded') : required ? t('verify.docRequired') : t('common.optional')}
+                </Text>
             </View>
-        )}
-        <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={styles.docLabel}>{label}</Text>
-            <Text style={styles.docStatus}>
-                {uri ? '✅ Cargado' : required ? '⚠️ Requerido' : '(opcional)'}
-            </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
-    </TouchableOpacity>
-);
+            <Icon name="chevron-forward" size={18} color={COLORS.textLight} />
+        </TouchableOpacity>
+    );
+};
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.surface },

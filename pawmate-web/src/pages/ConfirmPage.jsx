@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, ArrowRight, Smartphone } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCircleCheck, faArrowRight, faMobileScreenButton } from '@fortawesome/free-solid-svg-icons';
 import '../App.css';
 
 export default function ConfirmPage() {
-  const [dark, setDark] = useState(() => {
+  const { t } = useTranslation();
+  const [dark] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('pawmate-theme') === 'dark';
     }
@@ -18,40 +21,37 @@ export default function ConfirmPage() {
     <div className="confirm-page">
       <div className="confirm-card">
         <div className="confirm-icon-wrap">
-          <CheckCircle2 size={64} className="confirm-check-icon" />
+          <FontAwesomeIcon icon={faCircleCheck} style={{ fontSize: 64 }} className="confirm-check-icon" />
         </div>
 
         <div className="confirm-paw">🐾</div>
 
-        <h1 className="confirm-title">¡Cuenta Confirmada!</h1>
-        <p className="confirm-desc">
-          Tu correo electrónico ha sido verificado correctamente.
-          Tu cuenta de <strong>PawMate</strong> ya está lista para usar.
-        </p>
+        <h1 className="confirm-title">{t('confirm.title')}</h1>
+        <p className="confirm-desc" dangerouslySetInnerHTML={{ __html: t('confirm.desc1') + '<br/>' + t('confirm.desc2') }} />
 
         <div className="confirm-steps">
           <div className="confirm-step">
             <div className="confirm-step-num">1</div>
-            <span>Abre la app de <strong>PawMate</strong> en tu móvil</span>
+            <span dangerouslySetInnerHTML={{ __html: t('confirm.step1') }} />
           </div>
           <div className="confirm-step">
             <div className="confirm-step-num">2</div>
-            <span>Inicia sesión con tu correo y contraseña</span>
+            <span dangerouslySetInnerHTML={{ __html: t('confirm.step2') }} />
           </div>
           <div className="confirm-step">
             <div className="confirm-step-num">3</div>
-            <span>¡Empieza a cuidar de tus mascotas!</span>
+            <span dangerouslySetInnerHTML={{ __html: t('confirm.step3') }} />
           </div>
         </div>
 
         <a href="/" className="confirm-home-btn">
-          <ArrowRight size={18} />
-          Ir a la página principal
+          <FontAwesomeIcon icon={faArrowRight} style={{ fontSize: 18 }} />
+          {t('confirm.goHome')}
         </a>
 
         <p className="confirm-footer-text">
-          <Smartphone size={14} />
-          Ya puedes cerrar esta ventana e ir a la app
+          <FontAwesomeIcon icon={faMobileScreenButton} style={{ fontSize: 14 }} />
+          {t('confirm.canClose')}
         </p>
       </div>
     </div>

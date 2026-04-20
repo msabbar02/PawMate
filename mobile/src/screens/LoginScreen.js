@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     StyleSheet,
     View,
@@ -13,11 +13,12 @@ import {
     ScrollView,
     Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../context/LanguageContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -26,7 +27,7 @@ const { width } = Dimensions.get('window');
 const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error }) => (
     <View style={styles.inputWrapper}>
         <View style={[styles.inputContainer, error && styles.inputError]}>
-            <Ionicons name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
+            <Icon name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
             <TextInput
                 style={styles.input}
                 placeholder={placeholder}
@@ -42,7 +43,7 @@ const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPa
                     style={styles.eyeBtn}
                     onPress={onTogglePassword}
                 >
-                    <Ionicons name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
+                    <Icon name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
                 </TouchableOpacity>
             )}
         </View>
@@ -51,6 +52,7 @@ const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPa
 );
 
 export default function LoginScreen({ navigation }) {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -67,15 +69,15 @@ export default function LoginScreen({ navigation }) {
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!formData.email.trim()) {
-            newErrors.email = 'El email es requerido.';
+            newErrors.email = t('login.emailRequired');
             isValid = false;
         } else if (!emailRegex.test(formData.email)) {
-            newErrors.email = 'Ingresa un email válido.';
+            newErrors.email = t('login.invalidEmail');
             isValid = false;
         }
 
         if (!formData.password) {
-            newErrors.password = 'La contraseña es requerida.';
+            newErrors.password = t('login.passwordRequired');
             isValid = false;
         }
 
@@ -100,11 +102,11 @@ export default function LoginScreen({ navigation }) {
             // El onAuthStateChanged general se encargará de la redirección
         } catch (error) {
             console.error("Supabase Login Error:", error.message);
-            let errorMsg = 'Ocurrió un error. Intenta de nuevo.';
+            let errorMsg = t('login.genericError');
             if (error.message.includes('Invalid login credentials')) {
-                errorMsg = 'Correo o contraseña incorrectos.';
+                errorMsg = t('login.invalidCredentials');
             } else if (error.message.includes('FetchError') || error.message.includes('Network request failed')) {
-                errorMsg = 'Error de red. Revisa tu conexión a internet.';
+                errorMsg = t('login.networkError');
             }
             setErrors({ form: errorMsg });
         } finally {
@@ -114,7 +116,7 @@ export default function LoginScreen({ navigation }) {
 
     const handleResetPassword = async () => {
         if (!formData.email.trim()) {
-            setErrors({ email: 'Ingresa tu correo para restablecer la contraseña.' });
+            setErrors({ email: t('login.forgotPasswordPrompt') });
             return;
         }
         setLoading(true);
@@ -123,9 +125,9 @@ export default function LoginScreen({ navigation }) {
                 redirectTo: 'https://apppawmate.com/reset-password',
             });
             if (error) throw error;
-            Alert.alert('¡Enlace enviado! ✉️', 'Revisa tu correo para cambiar la contraseña.');
+            Alert.alert(t('login.linkSent'), t('login.checkEmail'));
         } catch (error) {
-            Alert.alert('Error', error.message);
+            Alert.alert(t('common.error'), error.message);
         } finally {
             setLoading(false);
         }
@@ -176,7 +178,7 @@ export default function LoginScreen({ navigation }) {
             }
         } catch (error) {
             console.error('Google login error:', error);
-            Alert.alert('Error', error.message || 'No se pudo iniciar sesión con Google.');
+            Alert.alert(t('common.error'), error.message || t('login.googleError'));
         } finally {
             setLoading(false);
         }
@@ -184,16 +186,16 @@ export default function LoginScreen({ navigation }) {
 
     const handleMagicLink = async () => {
         if (!formData.email.trim()) {
-            setErrors({ email: 'Ingresa un correo para mandar el Magic Link.' });
+            setErrors({ email: t('login.magicLinkPrompt') });
             return;
         }
         setLoading(true);
         try {
             const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
             if (error) throw error;
-            Alert.alert('¡Magic Link enviado! 🪄', 'Pide a tu compi que revise su correo para entrar.');
+            Alert.alert(t('login.magicLinkSent'), t('login.magicLinkCheck'));
         } catch (error) {
-            Alert.alert('Error', error.message);
+            Alert.alert(t('common.error'), error.message);
         } finally {
             setLoading(false);
         }
@@ -219,16 +221,16 @@ export default function LoginScreen({ navigation }) {
 
                         <View style={styles.header}>
                             <View style={styles.logoContainer}>
-                                <Ionicons name="paw" size={40} color={COLORS.background} />
+                                <Icon name="paw" size={40} color={COLORS.background} />
                             </View>
-                            <Text style={styles.title}>Iniciar Sesión</Text>
-                            <Text style={styles.subtitle}>Bienvenido de vuelta a PawMate</Text>
+                            <Text style={styles.title}>{t('login.title')}</Text>
+                            <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
                         </View>
 
                         <View style={styles.formContainer}>
                             <InputField
                                 icon="mail-outline"
-                                placeholder="Correo Electrónico"
+                                placeholder={t('login.email')}
                                 value={formData.email}
                                 fieldName="email"
                                 error={errors.email}
@@ -240,7 +242,7 @@ export default function LoginScreen({ navigation }) {
 
                             <InputField
                                 icon="lock-closed-outline"
-                                placeholder="Contraseña"
+                                placeholder={t('login.password')}
                                 value={formData.password}
                                 fieldName="password"
                                 secureTextEntry={!showPassword}
@@ -254,7 +256,7 @@ export default function LoginScreen({ navigation }) {
                             />
 
                             <TouchableOpacity style={styles.forgotPassword} onPress={handleResetPassword}>
-                                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                                <Text style={styles.forgotPasswordText}>{t('login.forgotPassword')}</Text>
                             </TouchableOpacity>
 
                             {errors.form && <Text style={styles.serverError}>{errors.form}</Text>}
@@ -267,7 +269,7 @@ export default function LoginScreen({ navigation }) {
                                 {loading ? (
                                     <ActivityIndicator color={COLORS.background} />
                                 ) : (
-                                    <Text style={styles.submitButtonText}>Entrar</Text>
+                                    <Text style={styles.submitButtonText}>{t('login.enter')}</Text>
                                 )}
                             </TouchableOpacity>
 
@@ -279,31 +281,31 @@ export default function LoginScreen({ navigation }) {
                                 {loading ? (
                                     <ActivityIndicator color={COLORS.primary} />
                                 ) : (
-                                    <Text style={[styles.submitButtonText, { color: COLORS.primary }]}>Mandar Magic Link 🪄</Text>
+                                    <Text style={[styles.submitButtonText, { color: COLORS.primary }]}>{t('login.sendMagicLink')}</Text>
                                 )}
                             </TouchableOpacity>
 
                             <View style={styles.switchFlow}>
-                                <Text style={styles.switchText}>¿No tienes cuenta? </Text>
+                                <Text style={styles.switchText}>{t('login.noAccount')} </Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                                    <Text style={styles.switchLink}>Regístrate aquí</Text>
+                                    <Text style={styles.switchLink}>{t('login.signupHere')}</Text>
                                 </TouchableOpacity>
                             </View>
 
                             <View style={styles.oauthSection}>
                                 <View style={styles.oauthDivider}>
                                     <View style={styles.line} />
-                                    <Text style={styles.oauthText}>O continúa con</Text>
+                                    <Text style={styles.oauthText}>{t('login.continueWith')}</Text>
                                     <View style={styles.line} />
                                 </View>
 
                                 <View style={styles.oauthButtonsRow}>
                                     <TouchableOpacity style={styles.oauthBtn} onPress={handleGoogleLogin} disabled={loading}>
-                                        <Ionicons name="logo-google" size={20} color="#DB4437" />
+                                        <Icon name="logo-google" size={20} color="#DB4437" />
                                         <Text style={styles.oauthBtnText}>Google</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.oauthBtn} disabled>
-                                        <Ionicons name="logo-apple" size={20} color="#000000" />
+                                        <Icon name="logo-apple" size={20} color="#000000" />
                                         <Text style={styles.oauthBtnText}>Apple</Text>
                                     </TouchableOpacity>
                                 </View>

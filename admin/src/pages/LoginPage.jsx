@@ -1,7 +1,9 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext';
-import { ShieldAlert, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShieldHalved, faLock, faUser, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -11,6 +13,7 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
     const { login } = useContext(AuthContext);
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -21,7 +24,7 @@ export default function LoginPage() {
         if (result.success) {
             navigate('/');
         } else {
-            setError(result.message || 'Credenciales incorrectas o acceso denegado');
+            setError(result.message || t('login.errorDefault'));
         }
         setIsLoggingIn(false);
     };
@@ -30,19 +33,19 @@ export default function LoginPage() {
         <div className="login-container">
             <div className="login-card glass-panel">
                 <div className="login-header">
-                    <ShieldAlert size={48} className="login-icon" />
-                    <h1>PawMate Admin</h1>
-                    <p>Panel de Administración</p>
+                    <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 48 }} className="login-icon" />
+                    <h1>{t('login.title')}</h1>
+                    <p>{t('login.subtitle')}</p>
                 </div>
                 
                 {error && <div className="login-error">{error}</div>}
                 
                 <form onSubmit={handleSubmit} className="login-form">
                     <div className="input-group">
-                        <User size={20} className="input-icon" />
+                        <FontAwesomeIcon icon={faUser} style={{ fontSize: 20 }} className="input-icon" />
                         <input 
                             type="email" 
-                            placeholder="Email Administrador" 
+                            placeholder={t('login.emailPlaceholder')} 
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
@@ -50,10 +53,10 @@ export default function LoginPage() {
                     </div>
                     
                     <div className="input-group">
-                        <Lock size={20} className="input-icon" />
+                        <FontAwesomeIcon icon={faLock} style={{ fontSize: 20 }} className="input-icon" />
                         <input 
                             type={showPassword ? "text" : "password"} 
-                            placeholder="Contraseña" 
+                            placeholder={t('login.passwordPlaceholder')} 
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
@@ -62,14 +65,14 @@ export default function LoginPage() {
                             type="button" 
                             className="toggle-password-btn"
                             onClick={() => setShowPassword(!showPassword)}
-                            title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                            title={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                         >
-                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            {showPassword ? <FontAwesomeIcon icon={faEyeSlash} style={{ fontSize: 18 }} /> : <FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} />}
                         </button>
                     </div>
                     
                     <button type="submit" className="login-button" disabled={isLoggingIn}>
-                        {isLoggingIn ? 'Iniciando sesión...' : 'Acceder al sistema'}
+                        {isLoggingIn ? t('login.loggingIn') : t('login.submit')}
                     </button>
                 </form>
             </div>

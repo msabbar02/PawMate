@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+﻿import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity,
     Image, ActivityIndicator, Platform, Modal, Animated,
@@ -6,13 +6,14 @@ import {
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { logActivity, logSystemAction } from '../utils/logger';
+import { useTranslation } from '../context/LanguageContext';
 
 const DARK_MAP_STYLE = [
     { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
@@ -47,6 +48,7 @@ const formatDuration = (secs) => {
 export default function HomeScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = useContext(ThemeContext);
+    const { t } = useTranslation();
 
     const [location, setLocation] = useState(null);
     const [cityName, setCityName] = useState('');
@@ -221,7 +223,7 @@ export default function HomeScreen({ navigation }) {
 
     const handleStartWalk = () => {
         if (isWalking || userData?.isWalking) {
-            Alert.alert('Paseo activo', 'Ya tienes un paseo en curso. Termínalo antes de iniciar otro.');
+            Alert.alert(t('home.activeWalk'), t('home.activeWalkMsg'));
             return;
         }
         // Fetch dogs and show picker
@@ -230,7 +232,7 @@ export default function HomeScreen({ navigation }) {
             const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).eq('species', 'dog');
             const dogs = data || [];
             if (dogs.length === 0) {
-                Alert.alert('Sin perros', 'Primero registra un perro en Mis Mascotas.');
+                Alert.alert(t('home.noDogs'), t('home.noDogsMsg'));
                 return;
             }
             setMyDogs(dogs);
@@ -242,7 +244,7 @@ export default function HomeScreen({ navigation }) {
         setShowDogPicker(false);
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Error', 'Permiso GPS denegado');
+            Alert.alert(t('common.error'), t('home.gpsPermission'));
             return;
         }
         setWalkingPet(pet);
@@ -293,17 +295,17 @@ export default function HomeScreen({ navigation }) {
             const newActivity = { ...(walkingPet.activity || {}), km: newTotal };
             await supabase.from('pets').update({ activity: newActivity }).eq('id', walkingPet.id);
 
-            logActivity(user?.id, 'Paseo Completado', `${totalKm} km con ${walkingPet?.name}`, 'walk', 'walk').catch(() => {});
-            logSystemAction(user?.id, userData?.email || 'Desconocido', 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: walkingPet?.name }).catch(() => {});
+            logActivity(user?.id, t('home.walkCompletedTitle'), `${totalKm} km con ${walkingPet?.name}`, 'walk', 'walk').catch(() => {});
+            logSystemAction(user?.id, userData?.email || t('common.unknown'), 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: walkingPet?.name }).catch(() => {});
 
-            Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas con ${walkingPet?.name}`);
+            Alert.alert(t('home.walkCompleted'), `${totalKm} km · ${calories} kcal · ${walkingPet?.name}`);
         } catch (e) {
-            Alert.alert('Error', 'No se pudo guardar el paseo');
+            Alert.alert(t('common.error'), t('home.walkSaveError'));
         }
         setWalkingPet(null);
     };
 
-    const firstName = userData?.fullName?.split(' ')[0] || userData?.email?.split('@')[0] || 'amigo';
+    const firstName = userData?.fullName?.split(' ')[0] || userData?.email?.split('@')[0] || t('common.friend');
     const userPhoto = userData?.avatar || userData?.photoURL || user?.photoURL || null;
     const userInitials = (userData?.fullName || userData?.email || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
@@ -338,7 +340,7 @@ export default function HomeScreen({ navigation }) {
                                     <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 3, borderColor: '#f97316', overflow: 'hidden', backgroundColor: '#FFF' }}>
                                         <Image source={{ uri: u.avatar || u.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
                                     </View>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>🐾 Manada</Text>
+                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>{t('home.pack')}</Text>
                                 </View>
                             </Marker>
                         ))}
@@ -349,7 +351,7 @@ export default function HomeScreen({ navigation }) {
                 ) : (
                     <View style={[styles.map, styles.mapLoading, { backgroundColor: isDarkMode ? '#1d2c4d' : '#f8fafc' }]}>
                         <ActivityIndicator size="large" color={COLORS.primary} />
-                        <Text style={[styles.mapLoadingText, { color: theme.textSecondary }]}>Adquiriendo señal GPS...</Text>
+                        <Text style={[styles.mapLoadingText, { color: theme.textSecondary }]}>{t('home.acquiringGPS')}</Text>
                     </View>
                 )}
 
@@ -364,14 +366,14 @@ export default function HomeScreen({ navigation }) {
                         </TouchableOpacity>
 
                         <View style={styles.greetingWrap}>
-                            <Text style={[styles.greetHello, { color: theme.text }]} numberOfLines={1}>¡Hola, {firstName}!</Text>
+                            <Text style={[styles.greetHello, { color: theme.text }]} numberOfLines={1}>{t('home.greeting', { name: firstName })}</Text>
                             <View style={styles.weatherRow}>
-                                <Ionicons name={weatherData.icon} size={13} color="#f59e0b" />
+                                <Icon name={weatherData.icon} size={13} color="#f59e0b" />
                                 <Text style={styles.weatherText}>{weatherData.temp}°C</Text>
                                 {cityName ? (
                                     <>
                                         <Text style={styles.weatherDot}>·</Text>
-                                        <Ionicons name="location" size={12} color="#f43f5e" />
+                                        <Icon name="location" size={12} color="#f43f5e" />
                                         <Text style={styles.cityText}>{cityName}</Text>
                                     </>
                                 ) : null}
@@ -379,7 +381,7 @@ export default function HomeScreen({ navigation }) {
                         </View>
 
                         <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }]} onPress={() => navigation.navigate('Notifications')}>
-                            <Ionicons name="notifications-outline" size={20} color={theme.text} />
+                            <Icon name="notifications-outline" size={20} color={theme.text} />
                             {unreadNotifCount > 0 && (
                                 <View style={styles.notifDot}>
                                     <Text style={styles.notifDotText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
@@ -391,7 +393,7 @@ export default function HomeScreen({ navigation }) {
 
                 {/* BOTÓN GPS */}
                 <TouchableOpacity style={[styles.gpsBtn, isLeftHanded ? { left: 16 } : { right: 16 }]} onPress={centerOnUser}>
-                    <Ionicons name="locate" size={20} color={COLORS.primary} />
+                    <Icon name="locate" size={20} color={COLORS.primary} />
                 </TouchableOpacity>
 
                 {/* CURVA INFERIOR DEL MAPA */}
@@ -412,16 +414,16 @@ export default function HomeScreen({ navigation }) {
                 <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF', marginTop: 4, position: 'relative', top: 0, left: 16, right: 16 }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
-                            <Ionicons name="chatbubbles" size={22} color="#0ea5e9" />
+                            <Icon name="chatbubbles" size={22} color="#0ea5e9" />
                         </View>
-                        <Text style={[styles.actionBtnText, { color: theme.text }]}>Mensajes</Text>
+                        <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.messages')}</Text>
                     </TouchableOpacity>
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Reservas')}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'Reservas' })}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                            <Ionicons name="calendar" size={22} color="#f59e0b" />
+                            <Icon name="calendar" size={22} color="#f59e0b" />
                         </View>
-                        <Text style={[styles.actionBtnText, { color: theme.text }]}>Reservas</Text>
+                        <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.bookings')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -432,8 +434,8 @@ export default function HomeScreen({ navigation }) {
                             style={{ flex: 1, backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 }}
                             onPress={handleStartWalk}
                         >
-                            <Ionicons name="walk" size={22} color="#FFF" style={{ marginRight: 8 }} />
-                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>Iniciar Paseo</Text>
+                            <Icon name="walk" size={22} color="#FFF" style={{ marginRight: 8 }} />
+                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>{t('home.startWalk')}</Text>
                         </TouchableOpacity>
                     )}
                     {!isCaregiver && isWalking && (
@@ -448,7 +450,7 @@ export default function HomeScreen({ navigation }) {
                                 style={{ backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}
                                 onPress={stopWalk}
                             >
-                                <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>■ Terminar</Text>
+                                <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>{'■ ' + t('home.endWalk')}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -458,7 +460,7 @@ export default function HomeScreen({ navigation }) {
                             onPress={handleToggleGroupWalk}
                         >
                             <Text style={{ fontSize: 16, marginRight: 6 }}>🐾</Text>
-                            <Text style={{ color: isGroupWalking ? '#FFF' : '#f97316', fontSize: 13, fontWeight: '800' }}>{isGroupWalking ? 'En Manada' : 'Modo Manada'}</Text>
+                            <Text style={{ color: isGroupWalking ? '#FFF' : '#f97316', fontSize: 13, fontWeight: '800' }}>{isGroupWalking ? t('home.packMode') : t('home.packModeLabel')}</Text>
                         </TouchableOpacity>
                     )}
                     {isCaregiver && (
@@ -467,7 +469,7 @@ export default function HomeScreen({ navigation }) {
                             onPress={handleToggleOnline}
                         >
                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: userData?.isOnline ? '#FFF' : '#22c55e', marginRight: 8 }} />
-                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 14, fontWeight: '800' }}>{userData?.isOnline ? 'Online ✓' : 'Activar Online'}</Text>
+                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 14, fontWeight: '800' }}>{userData?.isOnline ? t('home.online') : t('home.goOnline')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -484,12 +486,12 @@ export default function HomeScreen({ navigation }) {
                                     <Image source={{ uri: selectedCaregiver?.avatar || selectedCaregiver?.photoURL || 'https://via.placeholder.com/60' }} style={{ width: '100%', height: '100%' }} />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>{selectedCaregiver?.fullName || 'Cuidador'}</Text>
+                                    <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>{selectedCaregiver?.fullName || t('roles.caregiver')}</Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                                        <Ionicons name="star" size={14} color="#f59e0b" />
-                                        <Text style={{ fontSize: 13, color: theme.textSecondary, marginLeft: 4 }}>{selectedCaregiver?.rating ? Number(selectedCaregiver.rating).toFixed(1) : 'Nuevo'}</Text>
+                                        <Icon name="star" size={14} color="#f59e0b" />
+                                        <Text style={{ fontSize: 13, color: theme.textSecondary, marginLeft: 4 }}>{selectedCaregiver?.rating ? Number(selectedCaregiver.rating).toFixed(1) : t('common.new')}</Text>
                                         <View style={{ marginLeft: 10, backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                                            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>🟢 Online</Text>
+                                            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>{'🟢 ' + t('common.online')}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -498,7 +500,7 @@ export default function HomeScreen({ navigation }) {
                                 style={{ backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, alignItems: 'center' }}
                                 onPress={() => { setSelectedCaregiver(null); navigation.navigate('CaregiverProfile', { caregiverId: selectedCaregiver?.id }); }}
                             >
-                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>Ver Perfil</Text>
+                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{t('home.viewProfile')}</Text>
                             </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
@@ -508,8 +510,8 @@ export default function HomeScreen({ navigation }) {
                 <Modal visible={showDogPicker} animationType="fade" transparent>
                     <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setShowDogPicker(false)}>
                         <View style={{ backgroundColor: theme.cardBackground, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 28, maxHeight: '60%' }}>
-                            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.text, marginBottom: 6 }}>🐕 Elige tu perro</Text>
-                            <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 16 }}>¿Con quién vas a pasear?</Text>
+                            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.text, marginBottom: 6 }}>{t('home.chooseDog')}</Text>
+                            <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 16 }}>{t('home.chooseDogSub')}</Text>
                             <FlatList
                                 data={myDogs}
                                 keyExtractor={item => item.id}
@@ -528,13 +530,13 @@ export default function HomeScreen({ navigation }) {
                                         )}
                                         <View style={{ flex: 1, marginLeft: 14 }}>
                                             <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>{item.name}</Text>
-                                            <Text style={{ fontSize: 13, color: theme.textSecondary }}>{item.breed || 'Perro'}{item.weight ? ` · ${item.weight} kg` : ''}</Text>
+                                            <Text style={{ fontSize: 13, color: theme.textSecondary }}>{item.breed || t('home.dog')}{item.weight ? ` · ${item.weight} kg` : ''}</Text>
                                         </View>
-                                        <Ionicons name="play-circle" size={28} color={COLORS.primary} />
+                                        <Icon name="play-circle" size={28} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 )}
                                 ListEmptyComponent={
-                                    <Text style={{ textAlign: 'center', color: theme.textSecondary, marginTop: 20 }}>No tienes perros registrados</Text>
+                                    <Text style={{ textAlign: 'center', color: theme.textSecondary, marginTop: 20 }}>{t('home.noDogsRegistered')}</Text>
                                 }
                             />
                         </View>

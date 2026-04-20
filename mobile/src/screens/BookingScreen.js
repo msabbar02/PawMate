@@ -1,10 +1,10 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+﻿import React, { useState, useContext, useEffect, useRef } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView, FlatList,
     TextInput, ActivityIndicator, Alert, KeyboardAvoidingView,
     Platform, Modal, Image, Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
@@ -14,25 +14,24 @@ import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { createNotification, generateUniqueId } from '../utils/notificationHelpers';
 import { useSafeStripe, SafePlatformPay } from '../config/stripe';
-
-const SERVER_URL = 'https://api.apppawmate.com';
+import { useTranslation } from '../context/LanguageContext';
+import { API_BASE_URL } from '../config/api';
 
 // ─────────────────────────────────────────────────
 // STATUS CONFIG
 // ─────────────────────────────────────────────────
 const STATUS = {
-    pendiente:    { label: 'Pendiente',    bg: '#FEF3C7', color: '#D97706', icon: 'time-outline' },
-    aceptada:     { label: 'Aceptada',     bg: '#DCFCE7', color: '#16A34A', icon: 'checkmark-circle-outline' },
-    activa:       { label: 'Activa',       bg: '#ECFDF5', color: '#1a7a4c', icon: 'radio-button-on-outline' },
-    in_progress:  { label: 'En progreso',  bg: '#DBEAFE', color: '#2563EB', icon: 'pulse-outline' },
-    cancelada:    { label: 'Cancelada',    bg: '#F3F4F6', color: '#9CA3AF', icon: 'close-circle-outline' },
-    completada:   { label: 'Completada',   bg: '#E0F2FE', color: '#0891b2', icon: 'ribbon-outline' },
+    pendiente:    { labelKey: 'bookings.pending',    bg: '#FEF3C7', color: '#D97706', icon: 'time-outline' },
+    aceptada:     { labelKey: 'bookings.accepted',   bg: '#DCFCE7', color: '#16A34A', icon: 'checkmark-circle-outline' },
+    activa:       { labelKey: 'bookings.active',     bg: '#ECFDF5', color: '#1a7a4c', icon: 'radio-button-on-outline' },
+    in_progress:  { labelKey: 'bookings.inProgress', bg: '#DBEAFE', color: '#2563EB', icon: 'pulse-outline' },
+    cancelada:    { labelKey: 'bookings.cancelled',  bg: '#F3F4F6', color: '#9CA3AF', icon: 'close-circle-outline' },
+    completada:   { labelKey: 'bookings.completed',  bg: '#E0F2FE', color: '#0891b2', icon: 'ribbon-outline' },
 };
 
 const SERVICE_TYPES = [
-    { value: 'walking', label: '🚶 Paseo',     icon: 'walk-outline' },
-    { value: 'hotel',   label: '🏨 Hotel',     icon: 'home-outline' },
-    { value: 'daycare', label: '☀️ Guardería', icon: 'sunny-outline' },
+    { value: 'walking', labelKey: 'services.walking', emoji: '🚶', icon: 'walk-outline' },
+    { value: 'hotel',   labelKey: 'services.hotel',   emoji: '🏨', icon: 'home-outline' },
 ];
 
 const MAX_WALK  = 5;
@@ -41,6 +40,7 @@ const MAX_HOTEL = 3;
 export default function BookingScreen() {
     const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
+    const { t } = useTranslation();
     const { initPaymentSheet, presentPaymentSheet, confirmPlatformPayPayment, isPlatformPaySupported } = useSafeStripe();
 
     const [activeTab, setActiveTab]           = useState('reservations');
@@ -161,7 +161,7 @@ export default function BookingScreen() {
             const hasCapacity = await checkCapacity(user.id, reservation.serviceType);
             if (!hasCapacity) {
                 const limit = reservation.serviceType === 'walking' ? MAX_WALK : MAX_HOTEL;
-                Alert.alert('Sin capacidad', `Ya tienes ${limit} reservas activas de este tipo.`);
+                Alert.alert(t('bookings.noCapacity'), t('bookings.noCapacityMsg').replace('{count}', limit));
                 return;
             }
             await supabase.from('reservations').update({
@@ -170,13 +170,13 @@ export default function BookingScreen() {
             await createNotification(reservation.ownerId, {
                 type: 'booking_confirmed',
                 bookingId: reservation.id,
-                title: '¡Reserva aceptada! 🎉',
-                body: `${userData?.fullName || 'El cuidador'} aceptó tu reserva. ¡Completa el pago!`,
+                title: t('bookings.notifAcceptedTitle'),
+                body: t('bookings.notifAcceptedBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
                 icon: 'checkmark-circle-outline',
                 iconBg: '#DCFCE7', iconColor: '#16A34A',
             });
-            Alert.alert('¡Reserva aceptada! 🎉');
-        } catch { Alert.alert('Error', 'No se pudo aceptar la reserva.'); }
+            Alert.alert(t('bookings.bookingAccepted'));
+        } catch { Alert.alert(t('common.error'), t('bookings.acceptError')); }
     };
 
     // ─────────────────────────────────────────────────
@@ -184,7 +184,7 @@ export default function BookingScreen() {
     // ─────────────────────────────────────────────────
     const handlePayment = async (reservation) => {
         const price = reservation.totalPrice ?? 0;
-        if (price <= 0) { Alert.alert('Error', 'El precio de la reserva no es válido.'); return; }
+        if (price <= 0) { Alert.alert(t('common.error'), t('bookings.invalidPrice')); return; }
 
         try {
             // Check if Google Pay / Apple Pay is available
@@ -193,7 +193,7 @@ export default function BookingScreen() {
             // Get payment intent from server
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
-            const response = await fetch(`${SERVER_URL}/api/payments/payment-intent`, {
+            const response = await fetch(`${API_BASE_URL}/api/payments/payment-intent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -204,9 +204,9 @@ export default function BookingScreen() {
             const { clientSecret, success } = await response.json();
 
             if (!success || !clientSecret) {
-                Alert.alert('⚠️ Modo demo', `¿Simular pago de €${price.toFixed(2)}?`, [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Simular', onPress: () => confirmPayment(reservation) },
+                Alert.alert(t('bookings.demoMode'), t('bookings.simulatePayment').replace('{price}', price.toFixed(2)), [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('bookings.simulate'), onPress: () => confirmPayment(reservation) },
                 ]);
                 return;
             }
@@ -237,25 +237,25 @@ export default function BookingScreen() {
                 });
 
                 if (error) {
-                    if (error.code !== 'Canceled') Alert.alert('Pago fallido', error.message);
+                    if (error.code !== 'Canceled') Alert.alert(t('bookings.payFailed'), error.message);
                     return;
                 }
                 await confirmPayment(reservation);
             } else {
                 // Fallback: device doesn't support Google Pay / Apple Pay
                 Alert.alert(
-                    'Método de pago no disponible',
-                    `Este dispositivo no soporta ${Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}. ¿Simular pago de €${price.toFixed(2)}?`,
+                    t('bookings.payFailed'),
+                    t('bookings.payUnavailableMsg').replace('{method}', Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay').replace('{price}', price.toFixed(2)),
                     [
-                        { text: 'Cancelar', style: 'cancel' },
-                        { text: 'Simular', onPress: () => confirmPayment(reservation) },
+                        { text: t('common.cancel'), style: 'cancel' },
+                        { text: t('bookings.simulate'), onPress: () => confirmPayment(reservation) },
                     ]
                 );
             }
         } catch {
-            Alert.alert('⚠️ Sin conexión', `¿Simular pago de €${price.toFixed(2)}?`, [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Simular', onPress: () => confirmPayment(reservation) },
+            Alert.alert(t('bookings.noConnection'), t('bookings.simulatePayment').replace('{price}', price.toFixed(2)), [
+                { text: t('common.cancel'), style: 'cancel' },
+                { text: t('bookings.simulate'), onPress: () => confirmPayment(reservation) },
             ]);
         }
     };
@@ -269,25 +269,25 @@ export default function BookingScreen() {
             await createNotification(reservation.caregiverId, {
                 type: 'booking_active',
                 bookingId: reservation.id,
-                title: '📱 Reserva activa — escanea el QR',
-                body: `${reservation.ownerName} ha pagado. Escanea el QR cuando llegue.`,
+                title: t('bookings.notifActiveTitle'),
+                body: t('bookings.notifActiveBody', { name: reservation.ownerName || t('bookings.ownerFallback') }),
                 icon: 'qr-code-outline',
                 iconBg: '#ECFDF5', iconColor: '#1a7a4c',
             });
             setQrBooking({ ...reservation, status: 'activa', qrCode });
             setIsQrModalVisible(true);
             setDetailRes(null);
-        } catch { Alert.alert('Error', 'No se pudo activar la reserva.'); }
+        } catch { Alert.alert(t('common.error'), t('bookings.activateError')); }
     };
 
     // ─────────────────────────────────────────────────
     // COMPLETE SERVICE
     // ─────────────────────────────────────────────────
     const handleComplete = async (reservation) => {
-        Alert.alert('Marcar como completado', '¿Confirmas que el servicio ha finalizado?', [
-            { text: 'No', style: 'cancel' },
+        Alert.alert(t('bookings.completeConfirm'), t('bookings.completeMsg'), [
+            { text: t('common.no'), style: 'cancel' },
             {
-                text: 'Sí, completado',
+                text: t('bookings.yesCompleted'),
                 onPress: async () => {
                     try {
                         await supabase.from('reservations').update({
@@ -296,13 +296,13 @@ export default function BookingScreen() {
                         await createNotification(reservation.ownerId, {
                             type: 'booking_completed',
                             bookingId: reservation.id,
-                            title: '✅ Servicio completado',
-                            body: `${userData?.fullName || 'El cuidador'} marcó el servicio como completado.`,
+                            title: t('bookings.notifCompletedTitle'),
+                            body: t('bookings.notifCompletedBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
                             icon: 'ribbon-outline',
                             iconBg: '#E0F2FE', iconColor: '#0891b2',
                         });
                         setDetailRes(null);
-                    } catch { Alert.alert('Error', 'No se pudo completar la reserva.'); }
+                    } catch { Alert.alert(t('common.error'), t('bookings.completeError')); }
                 },
             },
         ]);
@@ -329,13 +329,13 @@ export default function BookingScreen() {
                 await createNotification(res.ownerId, {
                     type: 'checkin_confirmed',
                     bookingId: res.id,
-                    title: '✅ Check-in confirmado',
-                    body: `${userData?.fullName || 'El cuidador'} ha confirmado el check-in. El servicio está en marcha.`,
+                    title: t('bookings.notifCheckinTitle'),
+                    body: t('bookings.notifCheckinBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
                     icon: 'checkmark-circle-outline',
                     iconBg: '#DCFCE7', iconColor: '#16A34A',
                 });
                 setIsScannerVisible(false);
-                Alert.alert('✅ Check-in confirmado', 'El servicio está en marcha. Escanea de nuevo cuando termine.');
+                Alert.alert(t('bookings.checkInConfirm'), t('bookings.checkInMsg'));
                 return;
             }
 
@@ -359,22 +359,22 @@ export default function BookingScreen() {
                 await createNotification(res.ownerId, {
                     type: 'booking_completed',
                     bookingId: res.id,
-                    title: '🏁 Servicio completado',
-                    body: `${userData?.fullName || 'El cuidador'} ha finalizado el servicio. ¡Deja una reseña!`,
+                    title: t('bookings.notifServiceDoneTitle'),
+                    body: t('bookings.notifServiceDoneBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
                     icon: 'ribbon-outline',
                     iconBg: '#E0F2FE', iconColor: '#0891b2',
                 });
                 setIsScannerVisible(false);
-                Alert.alert('🏁 Servicio completado', '¡El servicio ha finalizado y el pago ha sido liberado!');
+                Alert.alert(t('bookings.serviceCompleted'), t('bookings.serviceCompletedMsg'));
                 return;
             }
 
-            Alert.alert('QR inválido', 'No se encontró ninguna reserva activa o en progreso.', [
+            Alert.alert(t('bookings.invalidQR'), t('bookings.invalidQRMsg'), [
                 { text: 'OK', onPress: () => setCameraScanned(false) },
             ]);
         } catch (e) {
             console.error('QR scan error:', e);
-            Alert.alert('Error', 'No se pudo procesar el código QR.');
+            Alert.alert(t('common.error'), t('bookings.qrError'));
         } finally {
             setCameraScanned(false);
         }
@@ -390,17 +390,17 @@ export default function BookingScreen() {
         const startDate = resObj?.startDate ? new Date(resObj.startDate) : null;
         const now = new Date();
         const hoursUntilStart = startDate ? (startDate - now) / (1000 * 60 * 60) : 999;
-        const hasPenalty = hoursUntilStart < 24 && resObj?.totalPrice > 0 && resObj?.status !== 'pendiente';
+        const hasPenalty = hoursUntilStart < 24 && resObj?.totalPrice > 0 && !['pendiente', 'completada'].includes(resObj?.status);
         const penaltyAmount = hasPenalty ? (resObj.totalPrice * 0.5).toFixed(2) : 0;
 
         const message = hasPenalty
-            ? `Faltan menos de 24h para el servicio. Se aplicará una penalización del 50% (€${penaltyAmount}).`
-            : '¿Estás seguro de que quieres cancelar esta reserva?';
+            ? t('bookings.penaltyMsg').replace('{amount}', penaltyAmount)
+            : t('bookings.cancelMsg');
 
-        Alert.alert('Cancelar reserva', message, [
-            { text: 'No', style: 'cancel' },
+        Alert.alert(t('bookings.cancelConfirm'), message, [
+            { text: t('common.no'), style: 'cancel' },
             {
-                text: hasPenalty ? `Cancelar (−€${penaltyAmount})` : 'Sí, cancelar',
+                text: hasPenalty ? t('bookings.cancelWithPenalty').replace('{amount}', penaltyAmount) : t('bookings.yesCancel'),
                 style: 'destructive',
                 onPress: async () => {
                     try {
@@ -414,29 +414,29 @@ export default function BookingScreen() {
                             await createNotification(notifyId, {
                                 type: 'booking_cancelled',
                                 bookingId: resId,
-                                title: '❌ Reserva cancelada',
-                                body: `${userData?.fullName || 'El usuario'} ha cancelado la reserva.${hasPenalty ? ` Penalización: €${penaltyAmount}` : ''}`,
+                                title: t('bookings.notifCancelledTitle'),
+                                body: t('bookings.notifCancelledBody', { name: userData?.fullName || t('bookings.userFallback'), penalty: hasPenalty ? ` ${t('bookings.penaltyLabel')}: €${penaltyAmount}` : '' }),
                                 icon: 'close-circle-outline',
                                 iconBg: '#FEE2E2', iconColor: '#EF4444',
                             });
                         }
                         setDetailRes(null);
-                    } catch { Alert.alert('Error', 'No se pudo cancelar.'); }
+                    } catch { Alert.alert(t('common.error'), t('bookings.cancelError')); }
                 },
             },
         ]);
     };
 
     const handleDeleteReservation = (reservationId) => {
-        Alert.alert('Eliminar reserva', '¿Eliminar definitivamente?', [
-            { text: 'No', style: 'cancel' },
+        Alert.alert(t('bookings.deleteConfirm'), t('bookings.deleteForever'), [
+            { text: t('common.no'), style: 'cancel' },
             {
-                text: 'Eliminar', style: 'destructive',
+                text: t('common.delete'), style: 'destructive',
                 onPress: async () => {
                     try {
                         await supabase.from('reservations').delete().eq('id', reservationId);
                         setDetailRes(null);
-                    } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+                    } catch { Alert.alert(t('common.error'), t('bookings.deleteError')); }
                 },
             },
         ]);
@@ -454,18 +454,18 @@ export default function BookingScreen() {
                 .single();
 
             if (!caregiver?.latitude || !caregiver?.longitude) {
-                Alert.alert('Ubicación no disponible', 'El cuidador aún no ha activado el seguimiento del paseo.');
+                Alert.alert(t('bookings.locationUnavailable'), t('bookings.caregiverNotTracking'));
                 return;
             }
 
-            const petNames = reservation.petNames?.join(', ') || 'tu mascota';
+            const petNames = reservation.petNames?.join(', ') || t('species.pet');
             Alert.alert(
-                `📍 Ubicación de ${petNames}`,
-                `${caregiver.fullName || 'El cuidador'} está ${caregiver.isOnline ? 'online' : 'offline'}.\n¿Abrir en el mapa?`,
+                t('bookings.petLocation').replace('{pets}', petNames),
+                t('bookings.caregiverStatus').replace('{name}', caregiver.fullName || t('roles.caregiver')).replace('{status}', caregiver.isOnline ? t('common.online') : 'offline'),
                 [
-                    { text: 'Cancelar', style: 'cancel' },
+                    { text: t('common.cancel'), style: 'cancel' },
                     {
-                        text: 'Abrir mapa',
+                        text: t('bookings.openMap'),
                         onPress: () => {
                             const url = Platform.OS === 'ios'
                                 ? `maps:0,0?q=${caregiver.latitude},${caregiver.longitude}`
@@ -478,7 +478,7 @@ export default function BookingScreen() {
                 ]
             );
         } catch {
-            Alert.alert('Error', 'No se pudo obtener la ubicación del cuidador.');
+            Alert.alert(t('common.error'), t('bookings.locationError'));
         }
     };
 
@@ -493,7 +493,7 @@ export default function BookingScreen() {
             if (newVal) {
                 const { status } = await Location.requestForegroundPermissionsAsync();
                 if (status !== 'granted') {
-                    Alert.alert('Permiso necesario', 'Necesitamos acceso a tu ubicación para el seguimiento.');
+                    Alert.alert(t('bookings.permissionNeeded'), t('bookings.locationPermissionMsg'));
                     return;
                 }
                 const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -523,7 +523,7 @@ export default function BookingScreen() {
                 });
             }
         } catch {
-            Alert.alert('Error', 'No se pudo actualizar el estado del paseo.');
+            Alert.alert(t('common.error'), t('bookings.walkUpdateError'));
         }
     };
 
@@ -556,8 +556,8 @@ export default function BookingScreen() {
             setReviewTarget(null);
             setReviewText('');
             setReviewRating(5);
-            Alert.alert('¡Gracias! 🌟', 'Tu reseña ha sido publicada.');
-        } catch { Alert.alert('Error', 'No se pudo enviar la reseña.'); }
+            Alert.alert(t('bookings.reviewThanks'), t('bookings.reviewThanksMsg'));
+        } catch { Alert.alert(t('common.error'), t('bookings.reviewError')); }
         finally { setSubmittingReview(false); }
     };
 
@@ -600,7 +600,7 @@ export default function BookingScreen() {
             }
         } catch (e) {
             console.error('Error opening chat:', e);
-            Alert.alert('Error', 'No se pudo abrir el chat.');
+            Alert.alert(t('common.error'), t('bookings.chatError'));
         }
     };
 
@@ -641,7 +641,7 @@ export default function BookingScreen() {
 
             setMessageInput('');
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-        } catch { Alert.alert('Error', 'No se pudo enviar el mensaje.'); }
+        } catch { Alert.alert(t('common.error'), t('bookings.messageError')); }
     };
 
     // ─────────────────────────────────────────────────
@@ -650,7 +650,7 @@ export default function BookingScreen() {
     const DetailRow = ({ icon, label, value }) => (
         <View style={s.detailRow}>
             <View style={[s.detailIconWrap, { backgroundColor: theme.primaryBg }]}>
-                <Ionicons name={icon} size={16} color={theme.primary} />
+                <Icon name={icon} size={16} color={theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={[s.detailLabel, { color: theme.textSecondary }]}>{label}</Text>
@@ -665,7 +665,8 @@ export default function BookingScreen() {
     const renderReservationCard = ({ item: res }) => {
         const st = STATUS[res.status] || STATUS.pendiente;
         const isCaregiver = userData?.role === 'caregiver';
-        const serviceLbl = SERVICE_TYPES.find(s => s.value === res.serviceType)?.label || res.serviceType;
+        const svc = SERVICE_TYPES.find(sv => sv.value === res.serviceType);
+        const serviceLbl = svc ? `${svc.emoji} ${t(svc.labelKey)}` : res.serviceType;
         const isCancelled = res.status === 'cancelada';
         const otherName = isCaregiver ? res.ownerName : res.caregiverName;
         const otherAvatar = isCaregiver ? res.ownerAvatar : res.caregiverAvatar;
@@ -697,8 +698,8 @@ export default function BookingScreen() {
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                         <View style={[s.statusChip, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg }]}>
-                            <Ionicons name={st.icon} size={12} color={isDarkMode ? theme.primary : st.color} />
-                            <Text style={[s.statusLabel, { color: isDarkMode ? theme.primary : st.color }]}>{st.label}</Text>
+                            <Icon name={st.icon} size={12} color={isDarkMode ? theme.primary : st.color} />
+                            <Text style={[s.statusLabel, { color: isDarkMode ? theme.primary : st.color }]}>{t(st.labelKey)}</Text>
                         </View>
                         {res.totalPrice > 0 && (
                             <Text style={{ fontSize: 16, fontWeight: '900', color: theme.primary, marginTop: 6 }}>€{res.totalPrice.toFixed(2)}</Text>
@@ -707,14 +708,14 @@ export default function BookingScreen() {
                 </View>
 
                 <View style={s.resDatesRow}>
-                    <Ionicons name="calendar-outline" size={13} color={theme.textSecondary} />
+                    <Icon name="calendar-outline" size={13} color={theme.textSecondary} />
                     <Text style={[s.resDateText, { color: theme.textSecondary }]}>
                         {res.startDate}{res.endDate && res.endDate !== res.startDate ? ` → ${res.endDate}` : ''}
                     </Text>
                     {res.petNames?.length > 0 && (
                         <>
                             <Text style={{ color: theme.textSecondary, marginHorizontal: 4 }}>·</Text>
-                            <Ionicons name="paw-outline" size={13} color={theme.textSecondary} />
+                            <Icon name="paw-outline" size={13} color={theme.textSecondary} />
                             <Text style={[s.resDateText, { color: theme.textSecondary }]}>{res.petNames.join(', ')}</Text>
                         </>
                     )}
@@ -727,7 +728,7 @@ export default function BookingScreen() {
                             style={[s.quickBtn, { backgroundColor: theme.primaryBg }]}
                             onPress={() => openChat(res)}
                         >
-                            <Ionicons name="chatbubble-outline" size={14} color={theme.primary} />
+                            <Icon name="chatbubble-outline" size={14} color={theme.primary} />
                             <Text style={[s.quickBtnText, { color: theme.primary }]}>Chat</Text>
                         </TouchableOpacity>
                     )}
@@ -737,7 +738,7 @@ export default function BookingScreen() {
                             style={[s.quickBtn, { backgroundColor: '#E0F2FE' }]}
                             onPress={() => handleTrackPet(res)}
                         >
-                            <Ionicons name="locate-outline" size={14} color="#0891b2" />
+                            <Icon name="locate-outline" size={14} color="#0891b2" />
                             <Text style={[s.quickBtnText, { color: '#0891b2' }]}>Track</Text>
                         </TouchableOpacity>
                     )}
@@ -747,9 +748,9 @@ export default function BookingScreen() {
                             style={[s.quickBtn, { backgroundColor: res.walkActive ? '#DCFCE7' : '#FEF3C7' }]}
                             onPress={() => handleToggleWalk(res)}
                         >
-                            <Ionicons name={res.walkActive ? 'pause-circle-outline' : 'play-circle-outline'} size={14} color={res.walkActive ? '#16A34A' : '#D97706'} />
+                            <Icon name={res.walkActive ? 'pause-circle-outline' : 'play-circle-outline'} size={14} color={res.walkActive ? '#16A34A' : '#D97706'} />
                             <Text style={[s.quickBtnText, { color: res.walkActive ? '#16A34A' : '#D97706' }]}>
-                                {res.walkActive ? 'Pausar' : 'Activar paseo'}
+                                {res.walkActive ? t('bookings.pause') : t('bookings.activateWalk')}
                             </Text>
                         </TouchableOpacity>
                     )}
@@ -758,11 +759,11 @@ export default function BookingScreen() {
                             style={[s.quickBtn, { backgroundColor: '#FEE2E2' }]}
                             onPress={() => handleDeleteReservation(res.id)}
                         >
-                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                            <Text style={[s.quickBtnText, { color: '#EF4444' }]}>Eliminar</Text>
+                            <Icon name="trash-outline" size={14} color="#EF4444" />
+                            <Text style={[s.quickBtnText, { color: '#EF4444' }]}>{t('bookings.deleteBtn')}</Text>
                         </TouchableOpacity>
                     )}
-                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} style={{ marginLeft: 'auto' }} />
+                    <Icon name="chevron-forward" size={16} color={theme.textSecondary} style={{ marginLeft: 'auto' }} />
                 </View>
             </TouchableOpacity>
         );
@@ -784,7 +785,7 @@ export default function BookingScreen() {
                             </Text>
                         )}
                         {isMe && (
-                            <Ionicons
+                            <Icon
                                 name={item.read ? 'checkmark-done' : 'checkmark'}
                                 size={14}
                                 color={item.read ? '#34d399' : 'rgba(255,255,255,0.5)'}
@@ -816,10 +817,10 @@ export default function BookingScreen() {
 
             {/* Header */}
             <View style={[s.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                <Text style={[s.headerTitle, { color: theme.text }]}>Reservas</Text>
+                <Text style={[s.headerTitle, { color: theme.text }]}>{t('bookings.title')}</Text>
                 <View style={[s.roleChip, { backgroundColor: theme.primaryBg }]}>
                     <Text style={[s.roleChipText, { color: theme.primary }]}>
-                        {userData?.role === 'caregiver' ? '🛡️ Cuidador' : '🐾 Dueño'}
+                        {userData?.role === 'caregiver' ? '🛡️ ' + t('roles.caregiver') : '🐾 ' + t('roles.owner')}
                     </Text>
                 </View>
             </View>
@@ -827,8 +828,8 @@ export default function BookingScreen() {
             {/* Tab Bar */}
             <View style={[s.tabBar, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 {[
-                    { key: 'reservations', label: '📅 Reservas' },
-                    { key: 'messages',     label: '💬 Mensajes' },
+                    { key: 'reservations', label: t('bookings.reservationsTab') },
+                    { key: 'messages',     label: t('bookings.messagesTab') },
                 ].map(tab => (
                     <TouchableOpacity
                         key={tab.key}
@@ -853,11 +854,11 @@ export default function BookingScreen() {
                     ListEmptyComponent={
                         <View style={s.emptyState}>
                             <Text style={{ fontSize: 56 }}>📅</Text>
-                            <Text style={[s.emptyTitle, { color: theme.text }]}>Sin reservas</Text>
+                            <Text style={[s.emptyTitle, { color: theme.text }]}>{t('bookings.noBookings')}</Text>
                             <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>
                                 {userData?.role === 'caregiver'
-                                    ? 'Cuando los dueños te contacten, sus solicitudes aparecerán aquí.'
-                                    : 'Toca un cuidador en el mapa y solicita una reserva.'
+                                    ? t('bookings.noBookingsCaregiver')
+                                    : t('bookings.noBookingsOwner')
                                 }
                             </Text>
                         </View>
@@ -875,12 +876,12 @@ export default function BookingScreen() {
                     ListEmptyComponent={
                         <View style={s.emptyState}>
                             <Text style={{ fontSize: 56 }}>💬</Text>
-                            <Text style={[s.emptyTitle, { color: theme.text }]}>Sin mensajes</Text>
-                            <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>Los chats por reserva aparecerán aquí.</Text>
+                            <Text style={[s.emptyTitle, { color: theme.text }]}>{t('bookings.noMessages')}</Text>
+                            <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>{t('bookings.noMessagesDesc')}</Text>
                         </View>
                     }
                     renderItem={({ item: res }) => {
-                        const serviceLbl = SERVICE_TYPES.find(s => s.value === res.serviceType)?.label || res.serviceType;
+                        const serviceLbl = (() => { const sv = SERVICE_TYPES.find(s => s.value === res.serviceType); return sv ? `${sv.emoji} ${t(sv.labelKey)}` : res.serviceType; })();
                         const isCaregiver = userData?.role === 'caregiver';
                         const cName = isCaregiver ? res.ownerName : res.caregiverName;
                         const cAvatar = isCaregiver ? res.ownerAvatar : res.caregiverAvatar;
@@ -903,7 +904,7 @@ export default function BookingScreen() {
                                         {serviceLbl} · {res.startDate}
                                     </Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                                <Icon name="chevron-forward" size={18} color={theme.textSecondary} />
                             </TouchableOpacity>
                         );
                     }}
@@ -922,7 +923,7 @@ export default function BookingScreen() {
                 {detailRes && (() => {
                     const isCaregiver = userData?.role === 'caregiver';
                     const st = STATUS[detailRes.status] || STATUS.pendiente;
-                    const serviceLbl = SERVICE_TYPES.find(s => s.value === detailRes.serviceType)?.label || detailRes.serviceType;
+                    const serviceLbl = (() => { const sv = SERVICE_TYPES.find(s => s.value === detailRes.serviceType); return sv ? `${sv.emoji} ${t(sv.labelKey)}` : detailRes.serviceType; })();
                     const isCancelled = detailRes.status === 'cancelada';
                     const otherName = isCaregiver ? detailRes.ownerName : detailRes.caregiverName;
                     const otherAvatar = isCaregiver ? detailRes.ownerAvatar : detailRes.caregiverAvatar;
@@ -933,9 +934,9 @@ export default function BookingScreen() {
                             {/* Header */}
                             <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                                 <TouchableOpacity onPress={() => setDetailRes(null)}>
-                                    <Ionicons name="close" size={24} color={theme.text} />
+                                    <Icon name="close" size={24} color={theme.text} />
                                 </TouchableOpacity>
-                                <Text style={[s.modalTitle, { color: theme.text }]}>Detalle de reserva</Text>
+                                <Text style={[s.modalTitle, { color: theme.text }]}>{t('bookings.detailTitle')}</Text>
                                 <View style={{ width: 28 }} />
                             </View>
 
@@ -961,34 +962,34 @@ export default function BookingScreen() {
                                         )}
                                     </View>
                                     <View style={[s.statusBanner, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg, marginBottom: 0 }]}>
-                                        <Ionicons name={st.icon} size={18} color={isDarkMode ? theme.primary : st.color} />
-                                        <Text style={[s.statusBannerText, { color: isDarkMode ? theme.primary : st.color, fontSize: 14 }]}>{st.label}</Text>
+                                        <Icon name={st.icon} size={18} color={isDarkMode ? theme.primary : st.color} />
+                                        <Text style={[s.statusBannerText, { color: isDarkMode ? theme.primary : st.color, fontSize: 14 }]}>{t(st.labelKey)}</Text>
                                     </View>
                                 </View>
 
                                 {/* Info card */}
                                 <View style={[s.infoCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                                    <DetailRow icon="person-outline"    label="Participante"
+                                    <DetailRow icon="person-outline"    label={t('bookings.participant')}
                                         value={isCaregiver ? detailRes.ownerName : detailRes.caregiverName} />
                                     <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
-                                    <DetailRow icon="paw-outline"       label="Servicio"     value={serviceLbl} />
+                                    <DetailRow icon="paw-outline"       label={t('bookings.service')}     value={serviceLbl} />
                                     <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
-                                    <DetailRow icon="calendar-outline"  label="Fecha inicio" value={detailRes.startDate || '—'} />
+                                    <DetailRow icon="calendar-outline"  label={t('bookings.startDate')} value={detailRes.startDate || '—'} />
                                     {detailRes.endDate && detailRes.endDate !== detailRes.startDate && <>
                                         <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
-                                        <DetailRow icon="calendar-outline" label="Fecha fin" value={detailRes.endDate} />
+                                        <DetailRow icon="calendar-outline" label={t('bookings.endDate')} value={detailRes.endDate} />
                                     </>}
                                     {detailRes.totalPrice > 0 && <>
                                         <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
-                                        <DetailRow icon="card-outline" label="Precio total" value={`€${detailRes.totalPrice.toFixed(2)}`} />
+                                        <DetailRow icon="card-outline" label={t('bookings.totalPrice')} value={`€${detailRes.totalPrice.toFixed(2)}`} />
                                     </>}
                                     {detailRes.petNames?.length > 0 && <>
                                         <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
-                                        <DetailRow icon="heart-outline" label="Mascotas" value={detailRes.petNames.join(', ')} />
+                                        <DetailRow icon="heart-outline" label={t('bookings.petsLabel')} value={detailRes.petNames.join(', ')} />
                                     </>}
                                     {detailRes.notes ? <>
                                         <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
-                                        <DetailRow icon="document-text-outline" label="Notas" value={detailRes.notes} />
+                                        <DetailRow icon="document-text-outline" label={t('bookings.notes')} value={detailRes.notes} />
                                     </> : null}
                                 </View>
 
@@ -998,8 +999,8 @@ export default function BookingScreen() {
                                         style={[s.actionBtn, { backgroundColor: '#FEE2E2', marginTop: 20 }]}
                                         onPress={() => handleDeleteReservation(detailRes.id)}
                                     >
-                                        <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                                        <Text style={[s.actionBtnText, { color: '#EF4444' }]}>Eliminar reserva</Text>
+                                        <Icon name="trash-outline" size={18} color="#EF4444" />
+                                        <Text style={[s.actionBtnText, { color: '#EF4444' }]}>{t('bookings.deleteBooking')}</Text>
                                     </TouchableOpacity>
                                 )}
 
@@ -1014,8 +1015,8 @@ export default function BookingScreen() {
                                                 openChat(detailRes);
                                             }}
                                         >
-                                            <Ionicons name="chatbubble-outline" size={18} color={theme.primary} />
-                                            <Text style={[s.actionBtnText, { color: theme.primary }]}>Abrir chat</Text>
+                                            <Icon name="chatbubble-outline" size={18} color={theme.primary} />
+                                            <Text style={[s.actionBtnText, { color: theme.primary }]}>{t('bookings.openChat')}</Text>
                                         </TouchableOpacity>
 
                                         {/* CAREGIVER: pending → accept/reject */}
@@ -1025,14 +1026,14 @@ export default function BookingScreen() {
                                                     style={[s.actionBtn, { flex: 1, backgroundColor: theme.primary }]}
                                                     onPress={() => { handleAcceptReservation(detailRes); setDetailRes(null); }}
                                                 >
-                                                    <Ionicons name="checkmark" size={18} color="#FFF" />
-                                                    <Text style={[s.actionBtnText, { color: '#FFF' }]}>Aceptar</Text>
+                                                    <Icon name="checkmark" size={18} color="#FFF" />
+                                                    <Text style={[s.actionBtnText, { color: '#FFF' }]}>{t('common.accept')}</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={[s.actionBtn, { flex: 1, backgroundColor: '#FEE2E2' }]}
                                                     onPress={() => handleCancelReservation(detailRes)}
                                                 >
-                                                    <Text style={[s.actionBtnText, { color: '#EF4444' }]}>Rechazar</Text>
+                                                    <Text style={[s.actionBtnText, { color: '#EF4444' }]}>{t('common.reject')}</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         )}
@@ -1043,8 +1044,8 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: '#0891b2' }]}
                                                 onPress={() => { setCameraScanned(false); setIsScannerVisible(true); setDetailRes(null); }}
                                             >
-                                                <Ionicons name="qr-code-outline" size={18} color="#FFF" />
-                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Escanear QR — Check-in</Text>
+                                                <Icon name="qr-code-outline" size={18} color="#FFF" />
+                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>{t('bookings.scanCheckIn')}</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -1054,8 +1055,8 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: '#16A34A' }]}
                                                 onPress={() => { setCameraScanned(false); setIsScannerVisible(true); setDetailRes(null); }}
                                             >
-                                                <Ionicons name="qr-code-outline" size={18} color="#FFF" />
-                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>Escanear QR — Check-out</Text>
+                                                <Icon name="qr-code-outline" size={18} color="#FFF" />
+                                                <Text style={[s.actionBtnText, { color: '#FFF' }]}>{t('bookings.scanCheckOut')}</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -1065,7 +1066,7 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: '#FEE2E2' }]}
                                                 onPress={() => handleCancelReservation(detailRes)}
                                             >
-                                                <Text style={[s.actionBtnText, { color: '#EF4444' }]}>Cancelar reserva</Text>
+                                                <Text style={[s.actionBtnText, { color: '#EF4444' }]}>{t('bookings.cancelBooking')}</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -1075,9 +1076,9 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: '#16A34A' }]}
                                                 onPress={() => handlePayment(detailRes)}
                                             >
-                                                <Ionicons name={Platform.OS === 'ios' ? 'logo-apple' : 'logo-google'} size={18} color="#FFF" />
+                                                <Icon name={Platform.OS === 'ios' ? 'logo-apple' : 'logo-google'} size={18} color="#FFF" />
                                                 <Text style={[s.actionBtnText, { color: '#FFF' }]}>
-                                                    {Platform.OS === 'ios' ? 'Pagar con Apple Pay' : 'Pagar con Google Pay'}
+                                                    {Platform.OS === 'ios' ? t('bookings.payApple') : t('bookings.payGoogle')}
                                                 </Text>
                                             </TouchableOpacity>
                                         )}
@@ -1088,8 +1089,8 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: theme.primaryBg, borderWidth: 1.5, borderColor: theme.primary }]}
                                                 onPress={() => { setQrBooking(detailRes); setIsQrModalVisible(true); setDetailRes(null); }}
                                             >
-                                                <Ionicons name="qr-code-outline" size={18} color={theme.primary} />
-                                                <Text style={[s.actionBtnText, { color: theme.primary }]}>Ver mi QR</Text>
+                                                <Icon name="qr-code-outline" size={18} color={theme.primary} />
+                                                <Text style={[s.actionBtnText, { color: theme.primary }]}>{t('bookings.viewQR')}</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -1099,8 +1100,8 @@ export default function BookingScreen() {
                                                 style={[s.actionBtn, { backgroundColor: '#DBEAFE' }]}
                                                 onPress={() => { handleTrackPet(detailRes); }}
                                             >
-                                                <Ionicons name="locate-outline" size={18} color="#2563EB" />
-                                                <Text style={[s.actionBtnText, { color: '#2563EB' }]}>Seguir ubicación</Text>
+                                                <Icon name="locate-outline" size={18} color="#2563EB" />
+                                                <Text style={[s.actionBtnText, { color: '#2563EB' }]}>{t('bookings.trackLocation')}</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -1116,14 +1117,14 @@ export default function BookingScreen() {
                                                     setDetailRes(null);
                                                 }}
                                             >
-                                                <Ionicons name="star-outline" size={18} color="#D97706" />
-                                                <Text style={[s.actionBtnText, { color: '#D97706' }]}>Dejar reseña</Text>
+                                                <Icon name="star-outline" size={18} color="#D97706" />
+                                                <Text style={[s.actionBtnText, { color: '#D97706' }]}>{t('bookings.leaveReview')}</Text>
                                             </TouchableOpacity>
                                         )}
                                         {!isCaregiver && detailRes.status === 'completada' && detailRes.reviewedByOwner && (
                                             <View style={[s.actionBtn, { backgroundColor: '#E0F2FE' }]}>
-                                                <Ionicons name="star" size={18} color="#0891b2" />
-                                                <Text style={[s.actionBtnText, { color: '#0891b2' }]}>Ya has dejado reseña ✅</Text>
+                                                <Icon name="star" size={18} color="#0891b2" />
+                                                <Text style={[s.actionBtnText, { color: '#0891b2' }]}>{t('bookings.reviewDone')}</Text>
                                             </View>
                                         )}
                                     </View>
@@ -1140,9 +1141,9 @@ export default function BookingScreen() {
             <Modal visible={isQrModalVisible} animationType="fade" transparent>
                 <View style={s.qrOverlay}>
                     <View style={[s.qrSheet, { backgroundColor: theme.cardBackground }]}>
-                        <Text style={[s.qrTitle, { color: theme.text }]}>📱 Tu código QR</Text>
+                        <Text style={[s.qrTitle, { color: theme.text }]}>{t('bookings.qrTitle')}</Text>
                         <Text style={[s.qrDesc, { color: theme.textSecondary }]}>
-                            Muéstraselo al cuidador para activar el servicio
+                            {t('bookings.qrDesc')}
                         </Text>
                         {qrBooking?.qrCode && (
                             <View style={[s.qrBox, { backgroundColor: '#FFF' }]}>
@@ -1150,11 +1151,11 @@ export default function BookingScreen() {
                             </View>
                         )}
                         <Text style={[s.qrMeta, { color: theme.textSecondary }]}>
-                            {SERVICE_TYPES.find(s => s.value === qrBooking?.serviceType)?.label}
+                            {(() => { const sv = SERVICE_TYPES.find(s => s.value === qrBooking?.serviceType); return sv ? `${sv.emoji} ${t(sv.labelKey)}` : ''; })()}
                             {'  ·  '}{qrBooking?.startDate}
                         </Text>
                         <TouchableOpacity style={[s.closeQrBtn, { backgroundColor: theme.primary }]} onPress={() => setIsQrModalVisible(false)}>
-                            <Text style={s.closeQrBtnText}>Cerrar</Text>
+                            <Text style={s.closeQrBtnText}>{t('common.close')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1167,9 +1168,9 @@ export default function BookingScreen() {
                 <View style={{ flex: 1, backgroundColor: '#000' }}>
                     <View style={s.scannerHeader}>
                         <TouchableOpacity onPress={() => setIsScannerVisible(false)}>
-                            <Ionicons name="close" size={28} color="#FFF" />
+                            <Icon name="close" size={28} color="#FFF" />
                         </TouchableOpacity>
-                        <Text style={s.scannerTitle}>Escanear QR del dueño</Text>
+                        <Text style={s.scannerTitle}>{t('bookings.scannerTitle')}</Text>
                         <View style={{ width: 28 }} />
                     </View>
                     {permission?.granted ? (
@@ -1181,10 +1182,10 @@ export default function BookingScreen() {
                         />
                     ) : (
                         <View style={s.permissionBox}>
-                            <Ionicons name="camera-outline" size={60} color="#FFF" />
-                            <Text style={s.permissionText}>Se necesita acceso a la cámara</Text>
+                            <Icon name="camera-outline" size={60} color="#FFF" />
+                            <Text style={s.permissionText}>{t('bookings.cameraNeeded')}</Text>
                             <TouchableOpacity style={[s.permissionBtn, { backgroundColor: theme.primary }]} onPress={requestPermission}>
-                                <Text style={s.permissionBtnText}>Permitir cámara</Text>
+                                <Text style={s.permissionBtnText}>{t('bookings.allowCamera')}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -1203,9 +1204,9 @@ export default function BookingScreen() {
                 <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                     <View style={[s.modalHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setIsReviewModalVisible(false)}>
-                            <Ionicons name="close" size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
-                        <Text style={[s.modalTitle, { color: theme.text }]}>Dejar reseña</Text>
+                        <Text style={[s.modalTitle, { color: theme.text }]}>{t('bookings.leaveReview')}</Text>
                         <View style={{ width: 28 }} />
                     </View>
 
@@ -1216,7 +1217,7 @@ export default function BookingScreen() {
                         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12 }}>
                             {[1, 2, 3, 4, 5].map(star => (
                                 <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
-                                    <Ionicons
+                                    <Icon
                                         name={star <= reviewRating ? 'star' : 'star-outline'}
                                         size={38} color={star <= reviewRating ? '#F59E0B' : theme.textSecondary}
                                     />
@@ -1224,14 +1225,14 @@ export default function BookingScreen() {
                             ))}
                         </View>
                         <Text style={{ textAlign: 'center', color: theme.textSecondary, fontSize: 14 }}>
-                            {['', '🙁 Pésimo', '😐 Regular', '🙂 Bueno', '😄 Muy bueno', '🌟 Excelente'][reviewRating]}
+                            {['', t('bookings.reviewBad'), t('bookings.reviewOk'), t('bookings.reviewGood'), t('bookings.reviewGreat'), t('bookings.reviewExcellent')][reviewRating]}
                         </Text>
                         <TextInput
                             style={[s.reviewInput, { backgroundColor: theme.cardBackground, color: theme.text, borderColor: theme.border }]}
                             multiline
                             value={reviewText}
                             onChangeText={setReviewText}
-                            placeholder="Escribe tu comentario (opcional)..."
+                            placeholder={t('bookings.reviewPlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                         />
                         <TouchableOpacity
@@ -1242,8 +1243,8 @@ export default function BookingScreen() {
                             {submittingReview
                                 ? <ActivityIndicator color="#FFF" />
                                 : <>
-                                    <Ionicons name="star" size={18} color="#FFF" />
-                                    <Text style={[s.actionBtnText, { color: '#FFF' }]}>Publicar reseña</Text>
+                                    <Icon name="star" size={18} color="#FFF" />
+                                    <Text style={[s.actionBtnText, { color: '#FFF' }]}>{t('bookings.publishReview')}</Text>
                                 </>
                             }
                         </TouchableOpacity>
@@ -1259,7 +1260,7 @@ export default function BookingScreen() {
                 <View style={{ flex: 1, backgroundColor: theme.background }}>
                     <View style={[s.chatHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <TouchableOpacity onPress={() => setIsChatVisible(false)}>
-                            <Ionicons name="chevron-back" size={24} color={theme.text} />
+                            <Icon name="chevron-back" size={24} color={theme.text} />
                         </TouchableOpacity>
                         {(() => {
                             const chatName = userData?.role === 'caregiver' ? activeConversation?.ownerName : activeConversation?.caregiverName;
@@ -1284,7 +1285,7 @@ export default function BookingScreen() {
                                     : activeConversation?.caregiverName}
                             </Text>
                             <Text style={[s.chatSubtitle, { color: theme.textSecondary }]}>
-                                {SERVICE_TYPES.find(s => s.value === activeConversation?._serviceType)?.label}
+                                {(() => { const sv = SERVICE_TYPES.find(s => s.value === activeConversation?._serviceType); return sv ? `${sv.emoji} ${t(sv.labelKey)}` : ''; })()}
                                 {activeConversation?._startDate ? ` · ${activeConversation._startDate}` : ''}
                             </Text>
                         </View>
@@ -1299,7 +1300,7 @@ export default function BookingScreen() {
                         ListEmptyComponent={
                             <View style={{ alignItems: 'center', marginTop: 60 }}>
                                 <Text style={{ fontSize: 44 }}>💬</Text>
-                                <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>Empieza la conversación</Text>
+                                <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>{t('bookings.startConversation')}</Text>
                             </View>
                         }
                     />
@@ -1308,12 +1309,12 @@ export default function BookingScreen() {
                             style={[s.chatInput, { backgroundColor: theme.background, color: theme.text }]}
                             value={messageInput}
                             onChangeText={setMessageInput}
-                            placeholder="Escribe un mensaje..."
+                            placeholder={t('bookings.typeMessage')}
                             placeholderTextColor={theme.textSecondary}
                             multiline
                         />
                         <TouchableOpacity style={[s.sendBtn, { backgroundColor: theme.primary }]} onPress={sendMessage}>
-                            <Ionicons name="send" size={20} color="#FFF" />
+                            <Icon name="send" size={20} color="#FFF" />
                         </TouchableOpacity>
                     </View>
                 </View>

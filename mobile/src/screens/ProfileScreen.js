@@ -1,10 +1,10 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+﻿import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, TextInput, Platform,
     Switch, KeyboardAvoidingView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -14,13 +14,14 @@ import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { uploadImageToStorage, saveAvatarToFirestore } from '../utils/storageHelpers';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../context/LanguageContext';
 
 // ─── helpers ─────────────────────────────────────────────────
-const formatDate = (d) => {
+const formatDate = (d, lang = 'es') => {
     if (!d) return '';
     if (typeof d === 'string') return d;
     const date = d?.toDate ? d.toDate() : new Date(d);
-    return date.toLocaleDateString('es-ES');
+    return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-ES');
 };
 
 const sectionLabel = (text, theme) => (
@@ -51,6 +52,7 @@ const Field = ({ label, value, onChangeText, placeholder, keyboardType, editable
 export default function ProfileScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
+    const { t, lang } = useTranslation();
 
     // ── Editable fields state (initialized from userData)
     // NOTE: Firestore uses 'avatar' for photo, 'address' sub-object for location
@@ -126,8 +128,8 @@ export default function ProfileScreen({ navigation }) {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 Alert.alert(
-                    'Permiso de ubicación',
-                    'Para detectar tu ciudad necesitamos acceso a tu ubicación. Sin él tampoco podrás hacer reservas.',
+                    t('profile.locationPermission'),
+                    t('profile.locationPermissionMsg'),
                     [{ text: 'OK' }]
                 );
                 return;
@@ -144,7 +146,7 @@ export default function ProfileScreen({ navigation }) {
                 setCountry(     geo.country      || 'España');
             }
         } catch (e) {
-            Alert.alert('Error', 'No se pudo obtener la ubicación.');
+            Alert.alert(t('common.error'), t('profile.locationError'));
         } finally {
             setFetchingCity(false);
         }
@@ -154,7 +156,7 @@ export default function ProfileScreen({ navigation }) {
     const handleChangePhoto = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permiso necesario', 'Necesitamos acceso a tu galería para cambiar la foto.');
+            Alert.alert(t('profile.galleryPermission'), t('profile.galleryPermissionMsg'));
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -177,7 +179,7 @@ export default function ProfileScreen({ navigation }) {
             // Revert to previous photo on failure
             const prev = rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null;
             setPhotoUri(prev);
-            Alert.alert('Error al subir foto', e?.message || 'Error desconocido');
+            Alert.alert(t('profile.photoUploadError'), e?.message || t('common.unknownError'));
         } finally {
             setUploadingPhoto(false);
         }
@@ -198,7 +200,7 @@ export default function ProfileScreen({ navigation }) {
 
     // ── Save All Profile Data ──────────────────────────────
     const handleSave = async () => {
-        if (!firstName.trim()) return Alert.alert('Error', 'El nombre no puede estar vacío.');
+        if (!firstName.trim()) return Alert.alert(t('common.error'), t('profile.nameRequired'));
         setSaving(true);
         try {
             await supabase.from('users').update({
@@ -221,11 +223,11 @@ export default function ProfileScreen({ navigation }) {
                 saveLocation,
             }).eq('id', user.id);
             await refreshUserData();
-            Alert.alert('✅ Guardado', 'Tu perfil ha sido actualizado.', [
+            Alert.alert(t('profile.saved'), t('profile.savedMsg'), [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
         } catch (e) {
-            Alert.alert('Error', 'No se pudo guardar. Inténtalo de nuevo.');
+            Alert.alert(t('common.error'), t('profile.saveError'));
         } finally {
             setSaving(false);
         }
@@ -233,9 +235,9 @@ export default function ProfileScreen({ navigation }) {
 
     // ── Sign Out ───────────────────────────────────────────
     const handleSignOut = () => {
-        Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Salir', style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
+        Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('profile.signOutBtn'), style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
         ]);
     };
 
@@ -253,13 +255,13 @@ export default function ProfileScreen({ navigation }) {
             {/* ── HEADER ── */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+                    <Icon name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>Mi Perfil</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{t('profile.title')}</Text>
                 <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerBtn}>
                     {saving
                         ? <ActivityIndicator size="small" color={COLORS.primary} />
-                        : <Text style={[styles.saveText, { color: COLORS.primary }]}>Guardar</Text>
+                        : <Text style={[styles.saveText, { color: COLORS.primary }]}>{t('common.save')}</Text>
                     }
                 </TouchableOpacity>
             </View>
@@ -284,32 +286,32 @@ export default function ProfileScreen({ navigation }) {
                         <View style={[styles.cameraBadge, { backgroundColor: COLORS.primary, borderColor: theme.cardBackground }]}>
                             {uploadingPhoto
                                 ? <ActivityIndicator size="small" color="#FFF" />
-                                : <Ionicons name="camera" size={15} color="#FFF" />
+                                : <Icon name="camera" size={15} color="#FFF" />
                             }
                         </View>
                     </TouchableOpacity>
 
                     <Text style={[styles.heroName, { color: theme.text }]}>
-                        {[userData?.firstName, userData?.lastName].filter(Boolean).join(' ') || userData?.fullName || user?.email?.split('@')[0] || 'Usuario'}
+                        {[userData?.firstName, userData?.lastName].filter(Boolean).join(' ') || userData?.fullName || user?.email?.split('@')[0] || t('common.user')}
                     </Text>
                     <Text style={[styles.heroEmail, { color: theme.textSecondary }]}>{user?.email}</Text>
 
                     {/* Role badge */}
                     {role === 'caregiver' ? (
                         <View style={[styles.roleBadge, { backgroundColor: COLORS.secondaryLight }]}>
-                            <Text style={[styles.roleBadgeText, { color: COLORS.secondary }]}>🛡️ Cuidador Verificado</Text>
+                            <Text style={[styles.roleBadgeText, { color: COLORS.secondary }]}>{t('profile.caregiverVerified')}</Text>
                         </View>
                     ) : role === 'owner' ? (
                         <View style={[styles.roleBadge, { backgroundColor: COLORS.primaryBg }]}>
-                            <Text style={[styles.roleBadgeText, { color: COLORS.primary }]}>🐾 Dueño Verificado ✓</Text>
+                            <Text style={[styles.roleBadgeText, { color: COLORS.primary }]}>{t('profile.ownerVerified')}</Text>
                         </View>
                     ) : isPending ? (
                         <View style={[styles.roleBadge, { backgroundColor: COLORS.warningLight }]}>
-                            <Text style={[styles.roleBadgeText, { color: COLORS.warning }]}>⏳ Verificación en revisión</Text>
+                            <Text style={[styles.roleBadgeText, { color: COLORS.warning }]}>{t('profile.verificationPending')}</Text>
                         </View>
                     ) : (
                         <View style={[styles.roleBadge, { backgroundColor: theme.background }]}>
-                            <Text style={[styles.roleBadgeText, { color: theme.textSecondary }]}>👤 Usuario</Text>
+                            <Text style={[styles.roleBadgeText, { color: theme.textSecondary }]}>{t('profile.userBadge')}</Text>
                         </View>
                     )}
                 </View>
@@ -317,12 +319,12 @@ export default function ProfileScreen({ navigation }) {
                 {/* ── STATS ROW ── */}
                 <View style={styles.statsRow}>
                     {[
-                        { icon: 'walk-outline',     value: totalWalks,      label: 'Paseos' },
-                        { icon: 'navigate-outline', value: distanceLabel,   label: 'Distancia' },
-                        { icon: 'time-outline',     value: timeLabel,       label: 'Tiempo' },
+                        { icon: 'walk-outline',     value: totalWalks,      label: t('profile.walks') },
+                        { icon: 'navigate-outline', value: distanceLabel,   label: t('profile.distance') },
+                        { icon: 'time-outline',     value: timeLabel,       label: t('profile.time') },
                     ].map((s, i) => (
                         <View key={i} style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
-                            <Ionicons name={s.icon} size={20} color={COLORS.primary} />
+                            <Icon name={s.icon} size={20} color={COLORS.primary} />
                             <Text style={[styles.statValue, { color: theme.text }]}>{s.value}</Text>
                             <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{s.label}</Text>
                         </View>
@@ -332,9 +334,9 @@ export default function ProfileScreen({ navigation }) {
                 {/* ── CAREGIVER BADGE (only for caregivers) ── */}
                 {userData?.role === 'caregiver' && (() => {
                     const TIERS = [
-                        { min: 0,  label: 'Bronce',   emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
-                        { min: 5,  label: 'Plata',    emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
-                        { min: 20, label: 'Oro',      emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                        { min: 0,  label: t('profile.badgeBronze'), emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
+                        { min: 5,  label: t('profile.badgeSilver'), emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
+                        { min: 20, label: t('profile.badgeGold'),   emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
                     ];
                     const completed = userData?.completedServices || 0;
                     let badge = TIERS[0];
@@ -347,8 +349,8 @@ export default function ProfileScreen({ navigation }) {
                             <View style={[styles.completionCard, { backgroundColor: theme.cardBackground }]}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                     <Text style={{ fontSize: 24 }}>{badge.emoji}</Text>
-                                    <Text style={[styles.completionTitle, { color: badge.color }]}>Cuidador {badge.label}</Text>
-                                    <Text style={{ color: theme.textSecondary, fontSize: 13, marginLeft: 'auto' }}>{completed} servicios</Text>
+                                    <Text style={[styles.completionTitle, { color: badge.color }]}>{t('roles.caregiver')} {badge.label}</Text>
+                                    <Text style={{ color: theme.textSecondary, fontSize: 13, marginLeft: 'auto' }}>{completed} {t('profile.servicesText')}</Text>
                                 </View>
                                 {next ? (
                                     <>
@@ -356,11 +358,11 @@ export default function ProfileScreen({ navigation }) {
                                             <View style={[styles.completionFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: badge.color }]} />
                                         </View>
                                         <Text style={[styles.completionHint, { color: theme.textSecondary }]}>
-                                            {next.min - completed} servicios más para {next.emoji} {next.label}
+                                            {next.min - completed} {t('profile.servicesMore')} {next.emoji} {next.label}
                                         </Text>
                                     </>
                                 ) : (
-                                    <Text style={[styles.completionHint, { color: badge.color, fontWeight: '800' }]}>🏆 ¡Nivel máximo alcanzado!</Text>
+                                    <Text style={[styles.completionHint, { color: badge.color, fontWeight: '800' }]}>{t('profile.maxLevel')}</Text>
                                 )}
                             </View>
                         </View>
@@ -370,10 +372,10 @@ export default function ProfileScreen({ navigation }) {
                 {/* ── PROFILE COMPLETION ── */}
                 {completionPercent < 100 && (() => {
                     const steps = [
-                        { done: !!photoUri,      icon: 'camera-outline',  label: 'Foto de perfil' },
-                        { done: !!phone.trim(),  icon: 'call-outline',    label: 'Teléfono' },
-                        { done: !!city.trim(),   icon: 'location-outline',label: 'Ciudad' },
-                        { done: !!firstName.trim(), icon: 'person-outline', label: 'Nombre' },
+                        { done: !!photoUri,      icon: 'camera-outline',  label: t('profile.profilePhoto') },
+                        { done: !!phone.trim(),  icon: 'call-outline',    label: t('profile.phone') },
+                        { done: !!city.trim(),   icon: 'location-outline',label: t('profile.city') },
+                        { done: !!firstName.trim(), icon: 'person-outline', label: t('profile.firstName') },
                     ];
                     const doneCount = steps.filter(s => s.done).length;
                     return (
@@ -382,9 +384,9 @@ export default function ProfileScreen({ navigation }) {
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' }}>
-                                            <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
+                                            <Icon name="shield-checkmark-outline" size={20} color={COLORS.primary} />
                                         </View>
-                                        <Text style={[styles.completionTitle, { color: theme.text }]}>Completa tu perfil</Text>
+                                        <Text style={[styles.completionTitle, { color: theme.text }]}>{t('profile.completeProfile')}</Text>
                                     </View>
                                     <View style={{ backgroundColor: COLORS.primaryBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
                                         <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.primary }}>{doneCount}/{steps.length}</Text>
@@ -397,7 +399,7 @@ export default function ProfileScreen({ navigation }) {
                                     {steps.map((step, i) => (
                                         <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                             <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: step.done ? '#dcfce7' : (isDarkMode ? '#1e293b' : '#f1f5f9'), justifyContent: 'center', alignItems: 'center' }}>
-                                                <Ionicons name={step.done ? 'checkmark' : step.icon} size={14} color={step.done ? '#16a34a' : theme.textSecondary} />
+                                                <Icon name={step.done ? 'checkmark' : step.icon} size={14} color={step.done ? '#16a34a' : theme.textSecondary} />
                                             </View>
                                             <Text style={{ fontSize: 14, fontWeight: '600', color: step.done ? '#16a34a' : theme.textSecondary, textDecorationLine: step.done ? 'line-through' : 'none' }}>
                                                 {step.label}
@@ -412,21 +414,21 @@ export default function ProfileScreen({ navigation }) {
 
                 {/* ── PERSONAL DATA ── */}
                 <View style={styles.section}>
-                    {sectionLabel('DATOS PERSONALES', theme)}
+                    {sectionLabel(t('profile.personalData'), theme)}
 
-                    <Field label="Nombre"    value={firstName}  onChangeText={setFirstName}  theme={theme} />
-                    <Field label="Apellidos" value={lastName}   onChangeText={setLastName}   theme={theme} />
-                    <Field label="Email"     value={user?.email || ''} theme={theme} editable={false} />
-                    <Field label="Teléfono"  value={phone}      onChangeText={setPhone}      theme={theme} keyboardType="phone-pad" />
+                    <Field label={t('profile.firstName')}    value={firstName}  onChangeText={setFirstName}  theme={theme} />
+                    <Field label={t('profile.lastName')} value={lastName}   onChangeText={setLastName}   theme={theme} />
+                    <Field label={t('profile.email')}     value={user?.email || ''} theme={theme} editable={false} />
+                    <Field label={t('profile.phone')}  value={phone}      onChangeText={setPhone}      theme={theme} keyboardType="phone-pad" />
 
                     {/* Date of birth */}
                     <TouchableOpacity
                         style={[styles.fieldRow, { backgroundColor: theme.cardBackground }]}
                         onPress={() => setShowDatePicker(true)}
                     >
-                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Fecha nacimiento</Text>
-                        <Text style={[styles.fieldValue, { color: theme.text }]}>{formatDate(birthDate)}</Text>
-                        <Ionicons name="calendar-outline" size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('profile.birthdate')}</Text>
+                        <Text style={[styles.fieldValue, { color: theme.text }]}>{formatDate(birthDate, lang)}</Text>
+                        <Icon name="calendar-outline" size={18} color={theme.textSecondary} style={{ marginLeft: 8 }} />
                     </TouchableOpacity>
 
                     {showDatePicker && (
@@ -446,46 +448,46 @@ export default function ProfileScreen({ navigation }) {
 
                 {/* ── LOCATION ── */}
                 <View style={styles.section}>
-                    {sectionLabel('UBICACIÓN', theme)}
+                    {sectionLabel(t('profile.location'), theme)}
 
                     {/* City with GPS button */}
                     <View style={[styles.fieldRow, { backgroundColor: theme.cardBackground }]}>
-                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Ciudad</Text>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('profile.city')}</Text>
                         <TextInput
                             style={[styles.fieldInput, { color: theme.text, flex: 1 }]}
                             value={city}
                             onChangeText={setCity}
-                            placeholder="Tu ciudad"
+                            placeholder={t('profile.cityPlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                         />
                         <TouchableOpacity onPress={fetchCityFromLocation} disabled={fetchingCity} style={styles.gpsBtn}>
                             {fetchingCity
                                 ? <ActivityIndicator size="small" color={COLORS.primary} />
-                                : <Ionicons name="locate" size={18} color={COLORS.primary} />
+                                : <Icon name="locate" size={18} color={COLORS.primary} />
                             }
                         </TouchableOpacity>
                     </View>
 
-                    <Field label="Código postal" value={postalCode} onChangeText={setPostalCode} theme={theme} keyboardType="numeric" />
-                    <Field label="Provincia"     value={province}   onChangeText={setProvince}   theme={theme} />
-                    <Field label="País"          value={country}    onChangeText={setCountry}    theme={theme} />
+                    <Field label={t('profile.postalCode')} value={postalCode} onChangeText={setPostalCode} theme={theme} keyboardType="numeric" />
+                    <Field label={t('profile.province')}     value={province}   onChangeText={setProvince}   theme={theme} />
+                    <Field label={t('profile.country')}          value={country}    onChangeText={setCountry}    theme={theme} />
 
                     <View style={[styles.locationNote, { backgroundColor: COLORS.primaryBg }]}>
-                        <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
+                        <Icon name="information-circle-outline" size={16} color={COLORS.primary} />
                         <Text style={[styles.locationNoteText, { color: COLORS.primary }]}>
-                            La ubicación GPS se usa para mostrarte cuidadores cercanos. Sin permiso de ubicación no podrás hacer reservas.
+                            {t('profile.locationGPSDesc')}
                         </Text>
                     </View>
                 </View>
 
                 {/* ── PRIVACY & TRACKING ── */}
                 <View style={styles.section}>
-                    {sectionLabel('PRIVACIDAD', theme)}
+                    {sectionLabel(t('profile.privacy'), theme)}
 
                     <View style={[styles.toggleRow, { backgroundColor: theme.cardBackground }]}>
                         <View style={{ flex: 1, marginRight: 12 }}>
-                            <Text style={[styles.toggleTitle, { color: theme.text }]}>Guardar historial de paseos</Text>
-                            <Text style={[styles.toggleSub, { color: theme.textSecondary }]}>Tus paseos se guardan para estadísticas</Text>
+                            <Text style={[styles.toggleTitle, { color: theme.text }]}>{t('profile.saveWalkHistory')}</Text>
+                            <Text style={[styles.toggleSub, { color: theme.textSecondary }]}>{t('profile.saveWalkHistoryDesc')}</Text>
                         </View>
                         <Switch
                             value={saveWalks}
@@ -497,8 +499,8 @@ export default function ProfileScreen({ navigation }) {
 
                     <View style={[styles.toggleRow, { backgroundColor: theme.cardBackground }]}>
                         <View style={{ flex: 1, marginRight: 12 }}>
-                            <Text style={[styles.toggleTitle, { color: theme.text }]}>Compartir ubicación en vivo</Text>
-                            <Text style={[styles.toggleSub, { color: theme.textSecondary }]}>Visible solo durante un paseo activo</Text>
+                            <Text style={[styles.toggleTitle, { color: theme.text }]}>{t('profile.shareLiveLocation')}</Text>
+                            <Text style={[styles.toggleSub, { color: theme.textSecondary }]}>{t('profile.shareLiveLocationDesc')}</Text>
                         </View>
                         <Switch
                             value={saveLocation}
@@ -512,9 +514,9 @@ export default function ProfileScreen({ navigation }) {
                 {/* ── ROLE CHANGE (normal users only) ── */}
                 {isNormal && !isPending && (
                     <View style={styles.section}>
-                        {sectionLabel('VERIFICAR CUENTA', theme)}
+                        {sectionLabel(t('profile.verifyAccount'), theme)}
                         <Text style={[styles.verifyDesc, { color: theme.textSecondary }]}>
-                            Verifica tu identidad con DNI/NIE/Pasaporte para desbloquear funciones de dueño o cuidador.
+                            {t('profile.verifyIdentity')}
                         </Text>
 
                         <TouchableOpacity
@@ -525,10 +527,10 @@ export default function ProfileScreen({ navigation }) {
                                 <Text style={{ fontSize: 22 }}>🐾</Text>
                             </View>
                             <View style={{ flex: 1, marginLeft: 14 }}>
-                                <Text style={[styles.roleBtnTitle, { color: COLORS.primary }]}>Hacerse Dueño Verificado</Text>
-                                <Text style={[styles.roleBtnSub, { color: COLORS.primary }]}>Accede a reservas y cuidadores</Text>
+                                <Text style={[styles.roleBtnTitle, { color: COLORS.primary }]}>{t('profile.becomeOwner')}</Text>
+                                <Text style={[styles.roleBtnSub, { color: COLORS.primary }]}>{t('profile.becomeOwnerDesc')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                            <Icon name="chevron-forward" size={20} color={COLORS.primary} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -539,10 +541,10 @@ export default function ProfileScreen({ navigation }) {
                                 <Text style={{ fontSize: 22 }}>🛡️</Text>
                             </View>
                             <View style={{ flex: 1, marginLeft: 14 }}>
-                                <Text style={[styles.roleBtnTitle, { color: COLORS.secondary }]}>Hacerse Cuidador Verificado</Text>
-                                <Text style={[styles.roleBtnSub, { color: COLORS.secondary }]}>Ofrece servicios y gana dinero</Text>
+                                <Text style={[styles.roleBtnTitle, { color: COLORS.secondary }]}>{t('profile.becomeCaregiver')}</Text>
+                                <Text style={[styles.roleBtnSub, { color: COLORS.secondary }]}>{t('profile.becomeCaregiverDesc')}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
+                            <Icon name="chevron-forward" size={20} color={COLORS.secondary} />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -557,8 +559,8 @@ export default function ProfileScreen({ navigation }) {
                         {saving
                             ? <ActivityIndicator color="#FFF" />
                             : <>
-                                <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" />
-                                <Text style={styles.saveBtnText}>Guardar cambios</Text>
+                                <Icon name="checkmark-circle-outline" size={20} color="#FFF" />
+                                <Text style={styles.saveBtnText}>{t('profile.saveChanges')}</Text>
                               </>
                         }
                     </TouchableOpacity>
@@ -570,8 +572,8 @@ export default function ProfileScreen({ navigation }) {
                         style={[styles.logoutBtn, { borderColor: COLORS.danger }]}
                         onPress={handleSignOut}
                     >
-                        <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-                        <Text style={[styles.logoutBtnText, { color: COLORS.danger }]}>Cerrar sesión</Text>
+                        <Icon name="log-out-outline" size={20} color={COLORS.danger} />
+                        <Text style={[styles.logoutBtnText, { color: COLORS.danger }]}>{t('profile.signOut')}</Text>
                     </TouchableOpacity>
                 </View>
 

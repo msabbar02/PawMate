@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
-import { Search, MessageSquare, X, User } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMagnifyingGlass, faCommentDots, faXmark, faUser } from '@fortawesome/free-solid-svg-icons';
 import './UsersPage.css'; // Inheriting shared list styles
 
 export default function MessagesPage() {
+    const { t } = useTranslation();
     const [threads, setThreads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -20,11 +23,11 @@ export default function MessagesPage() {
             
             const threadsData = convos.map(convo => ({
                 id: convo.id,
-                lastMessage: convo.lastMessage || 'Sin mensajes visibles',
-                ownerName: convo.ownerName || 'Usuario 1',
-                caregiverName: convo.caregiverName || 'Usuario 2',
+                lastMessage: convo.lastMessage || t('messages.noVisibleMessages'),
+                ownerName: convo.ownerName || t('messages.user1Fallback'),
+                caregiverName: convo.caregiverName || t('messages.user2Fallback'),
                 status: 'activa',
-                serviceType: 'Conversación'
+                serviceType: t('messages.conversationType')
             }));
             
             setThreads(threadsData);
@@ -63,7 +66,7 @@ export default function MessagesPage() {
             if (msgs) setMessages(msgs);
         } catch (error) {
             console.error("Error fetching messages:", error);
-            alert("No se pudieron cargar los mensajes.");
+            alert(t('messages.errorLoadMessages'));
         } finally {
             setLoadingMessages(false);
         }
@@ -94,15 +97,15 @@ export default function MessagesPage() {
     return (
         <div className="page-container">
             <div className="page-header">
-                <h1 className="page-title">Gestión de Mensajes (Solo lectura)</h1>
+                <h1 className="page-title">{t('messages.pageTitle')}</h1>
             </div>
 
             <div className="filters-bar glass-panel">
                 <div className="search-box">
-                    <Search size={18} className="search-icon" />
+                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: 18 }} className="search-icon" />
                     <input 
                         type="text" 
-                        placeholder="Buscar por dueño, cuidador o ID..." 
+                        placeholder={t('messages.searchPlaceholder')} 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -110,23 +113,23 @@ export default function MessagesPage() {
             </div>
 
             {loading ? (
-                <div className="loading-state"><div className="spinner"></div><p>Cargando conversaciones...</p></div>
+                <div className="loading-state"><div className="spinner"></div><p>{t('messages.loading')}</p></div>
             ) : (
                 <div className="table-container glass-panel">
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                <th>ID Reserva</th>
-                                <th>Participantes</th>
-                                <th>Servicio / Estado</th>
-                                <th>Último Mensaje</th>
-                                <th>Acción</th>
+                                <th>{t('messages.colReservationId')}</th>
+                                <th>{t('messages.colParticipants')}</th>
+                                <th>{t('messages.colServiceStatus')}</th>
+                                <th>{t('messages.colLastMessage')}</th>
+                                <th>{t('messages.colAction')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredThreads.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="empty-cell">No se encontraron conversaciones</td>
+                                    <td colSpan="5" className="empty-cell">{t('messages.noConversationsFound')}</td>
                                 </tr>
                             ) : (
                                 filteredThreads.map(thread => (
@@ -138,8 +141,8 @@ export default function MessagesPage() {
                                         </td>
                                         <td>
                                             <div className="contact-info">
-                                                <span><strong>D:</strong> {thread.ownerName}</span>
-                                                <span><strong>C:</strong> {thread.caregiverName}</span>
+                                                <span><strong>{t('messages.ownerPrefix')}</strong> {thread.ownerName}</span>
+                                                <span><strong>{t('messages.caregiverPrefix')}</strong> {thread.caregiverName}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -155,7 +158,7 @@ export default function MessagesPage() {
                                         </td>
                                         <td>
                                             <button className="btn-secondary" onClick={() => openThreadModal(thread)} style={{ padding: '6px 12px', fontSize: '13px' }}>
-                                                Ver Chat
+                                                {t('messages.viewChat')}
                                             </button>
                                         </td>
                                     </tr>
@@ -172,10 +175,10 @@ export default function MessagesPage() {
                     <div className="modal-content glass-panel" style={{ maxWidth: '600px', height: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <div>
-                                <h2 style={{ fontSize: '16px' }}>Chat de Reserva</h2>
+                                <h2 style={{ fontSize: '16px' }}>{t('messages.chatTitle')}</h2>
                                 <p className="text-muted" style={{ fontSize: '13px' }}>{selectedThread.ownerName} & {selectedThread.caregiverName}</p>
                             </div>
-                            <button className="close-btn" onClick={() => setSelectedThread(null)}><X size={24} /></button>
+                            <button className="close-btn" onClick={() => setSelectedThread(null)}><FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} /></button>
                         </div>
                         
                         <div className="modal-body" style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--surface-color)', padding: '20px' }}>
@@ -183,8 +186,8 @@ export default function MessagesPage() {
                                 <div className="loading-state"><div className="spinner"></div></div>
                             ) : messages.length === 0 ? (
                                 <div className="empty-state">
-                                    <MessageSquare size={40} />
-                                    <p>No hay mensajes en esta conversación.</p>
+                                    <FontAwesomeIcon icon={faCommentDots} style={{ fontSize: 40 }} />
+                                    <p>{t('messages.noMessages')}</p>
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -199,7 +202,7 @@ export default function MessagesPage() {
                                                 maxWidth: '85%',
                                                 border: '1px solid var(--border-color)'
                                             }}>
-                                                {!isSystem && <div style={{ fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600, marginBottom: '4px' }}>{msg.senderName || 'Usuario'}</div>}
+                                                {!isSystem && <div style={{ fontSize: '11px', color: 'var(--primary-color)', fontWeight: 600, marginBottom: '4px' }}>{msg.senderName || t('messages.userFallback')}</div>}
                                                 <div style={{ fontSize: '14px', color: 'var(--text-main)' }}>{msg.text}</div>
                                                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'right' }}>
                                                     {msg.created_at ? new Date(msg.created_at).toLocaleString('es-ES') : ''}
@@ -213,7 +216,7 @@ export default function MessagesPage() {
 
                         <div className="modal-footer" style={{ justifyContent: 'center', backgroundColor: 'var(--bg-color)', borderTop: 'none' }}>
                             <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Nota: Como administrador solo tienes acceso de lectura a los mensajes para moderación y soporte.
+                                {t('messages.readOnlyNote')}
                             </p>
                         </div>
                     </div>

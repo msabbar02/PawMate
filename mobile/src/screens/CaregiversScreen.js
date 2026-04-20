@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+﻿import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
     StyleSheet, View, Text, FlatList, Image, TouchableOpacity,
     ActivityIndicator, TextInput, Platform, RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
-
-const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel', daycare: '☀️ Guardería', grooming: '✂️ Peluquería', training: '🏋️ Entreno' };
+import { useTranslation } from '../context/LanguageContext';
 
 export default function CaregiversScreen({ navigation }) {
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { user, userData } = useContext(AuthContext);
+    const { t } = useTranslation();
+    const SERVICE_LABELS = { walking: '🚶 ' + t('services.walking'), hotel: '🏨 ' + t('services.hotel') };
     
     const [caregivers, setCaregivers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -64,8 +65,8 @@ export default function CaregiversScreen({ navigation }) {
                 const { data: newConvo, error } = await supabase.from('conversations').insert({
                     ownerId: user.id,
                     caregiverId: caregiver.id,
-                    ownerName: userData?.fullName || 'Dueño',
-                    caregiverName: caregiver.fullName || 'Cuidador',
+                    ownerName: userData?.fullName || t('roles.owner'),
+                    caregiverName: caregiver.fullName || t('roles.caregiver'),
                     ownerAvatar: userData?.avatar || null,
                     caregiverAvatar: caregiver.avatar || null,
                 }).select().single();
@@ -104,41 +105,41 @@ export default function CaregiversScreen({ navigation }) {
                     <View style={styles.infoCol}>
                         <View style={styles.nameRow}>
                             <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
-                                {item.fullName || item.firstName || 'Cuidador'}
+                                {item.fullName || item.firstName || t('roles.caregiver')}
                             </Text>
                             {item.verificationStatus === 'verified' && (
                                 <View style={styles.verifiedTag}>
-                                    <Ionicons name="shield-checkmark" size={12} color="#F5A623" />
+                                    <Icon name="shield-checkmark" size={12} color="#F5A623" />
                                 </View>
                             )}
                         </View>
                         
                         {(item.rating > 0 || item.reviewCount > 0) && (
                             <View style={styles.ratingRow}>
-                                <Ionicons name="star" size={14} color="#F5A623" />
+                                <Icon name="star" size={14} color="#F5A623" />
                                 <Text style={[styles.ratingText, { color: theme.text }]}>{item.rating?.toFixed(1) || '0.0'}</Text>
-                                <Text style={styles.reviewText}>({item.reviewCount || 0} reseñas)</Text>
+                                <Text style={styles.reviewText}>({item.reviewCount || 0} {t('caregivers.reviews')})</Text>
                             </View>
                         )}
 
                         {item.experience ? (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                                <Ionicons name="time-outline" size={12} color={theme.textSecondary} />
+                                <Icon name="time-outline" size={12} color={theme.textSecondary} />
                                 <Text style={[styles.cityText, { color: theme.textSecondary }]}>{item.experience}</Text>
                             </View>
                         ) : null}
 
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Ionicons name="location-outline" size={12} color={theme.textSecondary} />
+                            <Icon name="location-outline" size={12} color={theme.textSecondary} />
                             <Text style={[styles.cityText, { color: theme.textSecondary }]} numberOfLines={1}>
-                                {item.city || 'Sin ubicación'}
+                                {item.city || t('caregivers.noLocation')}
                             </Text>
                         </View>
 
                         {hasPrice && (
                             <View style={styles.priceRow}>
                                 <Text style={styles.priceText}>{item.price}€</Text>
-                                <Text style={[styles.priceUnit, { color: theme.textSecondary }]}>/hora</Text>
+                                <Text style={[styles.priceUnit, { color: theme.textSecondary }]}>{t('caregivers.perHour')}</Text>
                             </View>
                         )}
                     </View>
@@ -163,7 +164,7 @@ export default function CaregiversScreen({ navigation }) {
                         {species.map(sp => (
                             <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE' }]}>
                                 <Text style={{ fontSize: 11, color: '#0891b2', fontWeight: '700' }}>
-                                    {sp === 'perro' ? '🐶 Perros' : sp === 'gato' ? '🐱 Gatos' : sp === 'ave' ? '🐦 Aves' : sp === 'reptil' ? '🦎 Reptiles' : '🐾 ' + sp}
+                                    {sp === 'perro' ? '🐶 ' + t('species.dogs') : sp === 'gato' ? '🐱 ' + t('species.cats') : '🐾 ' + sp}
                                 </Text>
                             </View>
                         ))}
@@ -172,15 +173,15 @@ export default function CaregiversScreen({ navigation }) {
 
                 <View style={[styles.cardActions, { borderTopColor: theme.border }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => handleMessage(item)}>
-                        <Ionicons name="chatbubble-outline" size={17} color={theme.textSecondary} />
-                        <Text style={[styles.actionText, { color: theme.textSecondary }]}>Mensaje</Text>
+                        <Icon name="chatbubble-outline" size={17} color={theme.textSecondary} />
+                        <Text style={[styles.actionText, { color: theme.textSecondary }]}>{t('caregivers.message')}</Text>
                     </TouchableOpacity>
 
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
 
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('CaregiverProfile', { caregiverId: item.id })}>
-                        <Ionicons name="calendar-outline" size={17} color={COLORS.primary} />
-                        <Text style={[styles.actionText, { color: COLORS.primary, fontWeight: '800' }]}>Reservar</Text>
+                        <Icon name="calendar-outline" size={17} color={COLORS.primary} />
+                        <Text style={[styles.actionText, { color: COLORS.primary, fontWeight: '800' }]}>{t('caregivers.book')}</Text>
                     </TouchableOpacity>
                 </View>
             </TouchableOpacity>
@@ -193,14 +194,14 @@ export default function CaregiversScreen({ navigation }) {
 
             {/* Header & Search */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>Cuidadores</Text>
-                <Text style={[styles.headerSub, { color: theme.textSecondary }]}>Encuentra al mejor cuidador para tu mascota</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{t('caregivers.title')}</Text>
+                <Text style={[styles.headerSub, { color: theme.textSecondary }]}>{t('caregivers.subtitle')}</Text>
 
                 <View style={[styles.searchBox, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                    <Ionicons name="search" size={20} color={theme.textSecondary} style={{ marginLeft: 15 }} />
+                    <Icon name="search" size={20} color={theme.textSecondary} style={{ marginLeft: 15 }} />
                     <TextInput
                         style={[styles.searchInput, { color: theme.text }]}
-                        placeholder="Buscar por nombre o ciudad..."
+                        placeholder={t('caregivers.searchPlaceholder')}
                         placeholderTextColor={COLORS.textLight}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -223,8 +224,8 @@ export default function CaregiversScreen({ navigation }) {
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                     ListEmptyComponent={
                         <View style={styles.emptyBox}>
-                            <Ionicons name="search-outline" size={60} color={COLORS.textLight} />
-                            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No se encontraron cuidadores.</Text>
+                            <Icon name="search-outline" size={60} color={COLORS.textLight} />
+                            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{t('caregivers.noCaregiversFound')}</Text>
                         </View>
                     }
                 />

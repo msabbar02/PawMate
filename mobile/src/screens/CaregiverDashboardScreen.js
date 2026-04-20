@@ -1,9 +1,9 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+﻿import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, Platform, Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,36 +13,39 @@ import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
 import { uploadGalleryPhoto } from '../utils/storageHelpers';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../context/LanguageContext';
 
-// ── Badge tiers ──────────────────────────────────────────────
-const BADGE_TIERS = [
-    { min: 0,  label: 'Bronce',   emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
-    { min: 5,  label: 'Plata',    emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
-    { min: 20, label: 'Oro',      emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
-    { min: 50, label: 'Platino',  emoji: '💎', color: '#0ea5e9', bg: '#E0F2FE' },
-    { min: 100,label: 'Leyenda',  emoji: '👑', color: '#8B5CF6', bg: '#EDE9FE' },
-];
-
-function getBadge(completedCount) {
-    let badge = BADGE_TIERS[0];
-    for (const tier of BADGE_TIERS) {
-        if (completedCount >= tier.min) badge = tier;
-    }
-    return badge;
-}
-
-function getNextBadge(completedCount) {
-    for (const tier of BADGE_TIERS) {
-        if (completedCount < tier.min) return tier;
-    }
-    return null;
-}
-
-const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel', daycare: '☀️ Guardería', grooming: '✂️ Peluquería', training: '🏋️ Entreno' };
+// ── Badge tiers & service labels moved inside component for i18n ──
 
 export default function CaregiverDashboardScreen({ navigation }) {
     const { user, userData, refreshUserData, updateUserOptimistic } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
+    const { t } = useTranslation();
+
+    const BADGE_TIERS = [
+        { min: 0,  label: t('caregiverDashboard.badgeBronze'),   emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
+        { min: 5,  label: t('caregiverDashboard.badgeSilver'),   emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
+        { min: 20, label: t('caregiverDashboard.badgeGold'),     emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+        { min: 50, label: t('caregiverDashboard.badgePlatinum'), emoji: '💎', color: '#0ea5e9', bg: '#E0F2FE' },
+        { min: 100,label: t('caregiverDashboard.badgeLegend'),   emoji: '👑', color: '#8B5CF6', bg: '#EDE9FE' },
+    ];
+
+    function getBadge(completedCount) {
+        let badge = BADGE_TIERS[0];
+        for (const tier of BADGE_TIERS) {
+            if (completedCount >= tier.min) badge = tier;
+        }
+        return badge;
+    }
+
+    function getNextBadge(completedCount) {
+        for (const tier of BADGE_TIERS) {
+            if (completedCount < tier.min) return tier;
+        }
+        return null;
+    }
+
+    const SERVICE_LABELS = { walking: '🚶 ' + t('services.walking'), hotel: '🏨 ' + t('services.hotel') };
 
     const [stats, setStats] = useState({ completed: 0, active: 0, pending: 0, earnings: 0 });
     const [reviews, setReviews] = useState([]);
@@ -104,7 +107,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
     const handleAddPhoto = async () => {
         try {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') { Alert.alert('Permiso necesario', 'Necesitamos acceso a la galería.'); return; }
+            if (status !== 'granted') { Alert.alert(t('caregiverDashboard.galleryPermission'), t('caregiverDashboard.galleryPermissionMsg')); return; }
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 quality: 0.7,
@@ -117,18 +120,18 @@ export default function CaregiverDashboardScreen({ navigation }) {
             await supabase.from('users').update({ galleryPhotos: updatedPhotos }).eq('id', user.id);
             setPhotos(updatedPhotos);
             if (refreshUserData) refreshUserData();
-            Alert.alert('✅ Foto guardada', 'La foto se ha añadido a tu galería correctamente.');
+            Alert.alert(t('caregiverDashboard.photoSaved'), t('caregiverDashboard.photoSavedMsg'));
         } catch (e) {
-            Alert.alert('Error', 'No se pudo subir la foto.');
+            Alert.alert(t('common.error'), t('caregiverDashboard.photoUploadError'));
         } finally {
             setUploadingPhoto(false);
         }
     };
 
     const handleRemovePhoto = (index) => {
-        Alert.alert('Eliminar foto', '¿Eliminar esta foto de tu galería?', [
-            { text: 'No', style: 'cancel' },
-            { text: 'Eliminar', style: 'destructive', onPress: async () => {
+        Alert.alert(t('caregiverDashboard.deletePhoto'), t('caregiverDashboard.deletePhotoConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.delete'), style: 'destructive', onPress: async () => {
                 const updatedPhotos = photos.filter((_, i) => i !== index);
                 await supabase.from('users').update({ galleryPhotos: updatedPhotos }).eq('id', user.id);
                 setPhotos(updatedPhotos);
@@ -156,22 +159,22 @@ export default function CaregiverDashboardScreen({ navigation }) {
         } catch (e) {
             // Revert on error
             updateUserOptimistic({ isOnline: !newVal });
-            Alert.alert('Error', 'No se pudo cambiar el estado online.');
+            Alert.alert(t('common.error'), t('caregiverDashboard.onlineError'));
         }
     };
 
     // Emergency: send location to all active booking owners
     const handleEmergency = async () => {
         Alert.alert(
-            '🚨 Emergencia',
-            'Se enviará tu ubicación exacta a todos los dueños con reserva activa. ¿Continuar?',
+            t('caregiverDashboard.emergencyTitle'),
+            t('caregiverDashboard.emergencyMsg'),
             [
-                { text: 'Cancelar', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Enviar', style: 'destructive', onPress: async () => {
+                    text: t('common.send'), style: 'destructive', onPress: async () => {
                         try {
                             const { status } = await Location.requestForegroundPermissionsAsync();
-                            if (status !== 'granted') { Alert.alert('Error', 'Se necesita permiso de ubicación.'); return; }
+                            if (status !== 'granted') { Alert.alert(t('common.error'), t('caregiverDashboard.locationPermission')); return; }
                             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
                             const { latitude, longitude } = loc.coords;
 
@@ -183,8 +186,8 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                 if (res.ownerId) {
                                     await createNotification(res.ownerId, {
                                         type: 'emergency_location',
-                                        title: '🚨 Alerta del cuidador',
-                                        body: `${userData?.fullName || 'El cuidador'} ha enviado una alerta de emergencia. Toca para ver su ubicación.`,
+                                        title: t('caregiverDashboard.emergencyAlert'),
+                                        body: t('caregiverDashboard.emergencyBody', { name: userData?.fullName || t('caregiverDashboard.fallbackName') }),
                                         icon: 'warning-outline',
                                         iconBg: '#FEE2E2',
                                         iconColor: '#EF4444',
@@ -193,9 +196,9 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                     });
                                 }
                             }
-                            Alert.alert('✅ Enviado', 'Los dueños han recibido tu ubicación.');
+                            Alert.alert(t('caregiverDashboard.emergencySent'), t('caregiverDashboard.emergencySentMsg'));
                         } catch (e) {
-                            Alert.alert('Error', 'No se pudo enviar la ubicación.');
+                            Alert.alert(t('common.error'), t('caregiverDashboard.emergencyError'));
                         }
                     }
                 },
@@ -227,16 +230,16 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                 <Image source={{ uri: avatar }} style={s.heroAvatar} />
                             ) : (
                                 <View style={[s.heroAvatar, { backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' }]}>
-                                    <Ionicons name="person" size={28} color="#FFF" />
+                                    <Icon name="person" size={28} color="#FFF" />
                                 </View>
                             )}
                         </TouchableOpacity>
                         <View style={{ flex: 1, marginLeft: 14 }}>
-                            <Text style={s.heroName}>{userData?.fullName || 'Cuidador'}</Text>
+                            <Text style={s.heroName}>{userData?.fullName || t('caregiverDashboard.fallbackName')}</Text>
                             <View style={s.heroRatingRow}>
-                                <Ionicons name="star" size={14} color="#FFC107" />
+                                <Icon name="star" size={14} color="#FFC107" />
                                 <Text style={s.heroRating}>{userData?.rating?.toFixed(1) || '0.0'}</Text>
-                                <Text style={s.heroReviews}>({userData?.reviewCount || 0} reseñas)</Text>
+                                <Text style={s.heroReviews}>({userData?.reviewCount || 0} {t('caregiverDashboard.reviews')})</Text>
                             </View>
                         </View>
                         {/* Badge */}
@@ -253,7 +256,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                     >
                         <View style={[s.onlineDot, { backgroundColor: userData?.isOnline ? '#22c55e' : '#9CA3AF' }]} />
                         <Text style={s.onlineBtnText}>
-                            {userData?.isOnline ? 'Online — Visible en el mapa' : 'Offline — No visible'}
+                            {userData?.isOnline ? t('caregiverDashboard.online') : t('caregiverDashboard.offline')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -261,14 +264,14 @@ export default function CaregiverDashboardScreen({ navigation }) {
                 {/* ── STATS ROW ── */}
                 <View style={s.statsRow}>
                     {[
-                        { icon: 'checkmark-done', value: stats.completed, label: 'Completados', color: '#16A34A' },
-                        { icon: 'flash', value: stats.active, label: 'Activos', color: '#0ea5e9' },
-                        { icon: 'time', value: stats.pending, label: 'Pendientes', color: '#F5A623' },
-                        { icon: 'card', value: `€${stats.earnings.toFixed(0)}`, label: 'Ganado', color: '#8B5CF6' },
+                        { icon: 'checkmark-done', value: stats.completed, label: t('caregiverDashboard.completed'), color: '#16A34A' },
+                        { icon: 'flash', value: stats.active, label: t('caregiverDashboard.activeCount'), color: '#0ea5e9' },
+                        { icon: 'time', value: stats.pending, label: t('caregiverDashboard.pendingCount'), color: '#F5A623' },
+                        { icon: 'card', value: `€${stats.earnings.toFixed(0)}`, label: t('caregiverDashboard.earned'), color: '#8B5CF6' },
                     ].map((st, i) => (
                         <View key={i} style={[s.statCard, { backgroundColor: theme.cardBackground }]}>
                             <View style={[s.statIcon, { backgroundColor: st.color + '15' }]}>
-                                <Ionicons name={st.icon} size={18} color={st.color} />
+                                <Icon name={st.icon} size={18} color={st.color} />
                             </View>
                             <Text style={[s.statValue, { color: theme.text }]}>{st.value}</Text>
                             <Text style={[s.statLabel, { color: theme.textSecondary }]}>{st.label}</Text>
@@ -280,13 +283,13 @@ export default function CaregiverDashboardScreen({ navigation }) {
                 <View style={[s.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={s.sectionHeader}>
                         <Text style={{ fontSize: 22 }}>{badge.emoji}</Text>
-                        <Text style={[s.sectionTitle, { color: theme.text }]}>Cuidador {badge.label}</Text>
+                        <Text style={[s.sectionTitle, { color: theme.text }]}>{t('caregiverDashboard.caregiverTier', { tier: badge.label })}</Text>
                     </View>
                     {nextBadge ? (
                         <>
                             <View style={s.progressRow}>
                                 <Text style={[s.progressText, { color: theme.textSecondary }]}>
-                                    {stats.completed} / {nextBadge.min} servicios para {nextBadge.emoji} {nextBadge.label}
+                                    {t('caregiverDashboard.servicesFor', { count: stats.completed, total: nextBadge.min, emoji: nextBadge.emoji, label: nextBadge.label })}
                                 </Text>
                             </View>
                             <View style={[s.progressTrack, { backgroundColor: theme.border }]}>
@@ -295,7 +298,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         </>
                     ) : (
                         <Text style={[s.progressText, { color: badge.color, fontWeight: '800', marginTop: 8 }]}>
-                            🏆 ¡Has alcanzado el nivel máximo!
+                            {t('caregiverDashboard.maxLevelReached')}
                         </Text>
                     )}
                 </View>
@@ -307,19 +310,19 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         onPress={() => navigation.navigate('CaregiverSetup')}
                     >
                         <View style={[s.actionIconBox, { backgroundColor: COLORS.primaryBg }]}>
-                            <Ionicons name="settings-outline" size={22} color={COLORS.primary} />
+                            <Icon name="settings-outline" size={22} color={COLORS.primary} />
                         </View>
-                        <Text style={[s.actionBtnText, { color: theme.text }]}>Editar Perfil</Text>
+                        <Text style={[s.actionBtnText, { color: theme.text }]}>{t('caregiverDashboard.editProfile')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={[s.actionBtn, { backgroundColor: theme.cardBackground }]}
-                        onPress={() => navigation.navigate('Reservas')}
+                        onPress={() => navigation.navigate('MainTabs', { screen: 'Reservas' })}
                     >
                         <View style={[s.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="calendar-outline" size={22} color="#F5A623" />
+                            <Icon name="calendar-outline" size={22} color="#F5A623" />
                         </View>
-                        <Text style={[s.actionBtnText, { color: theme.text }]}>Reservas</Text>
+                        <Text style={[s.actionBtnText, { color: theme.text }]}>{t('caregiverDashboard.bookingsBtn')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -327,9 +330,9 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         onPress={handleEmergency}
                     >
                         <View style={[s.actionIconBox, { backgroundColor: '#FEE2E2' }]}>
-                            <Ionicons name="warning-outline" size={22} color="#EF4444" />
+                            <Icon name="warning-outline" size={22} color="#EF4444" />
                         </View>
-                        <Text style={[s.actionBtnText, { color: theme.text }]}>Emergencia</Text>
+                        <Text style={[s.actionBtnText, { color: theme.text }]}>{t('caregiverDashboard.emergency')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -337,14 +340,14 @@ export default function CaregiverDashboardScreen({ navigation }) {
                 {activeReservations.length > 0 && (
                     <View style={[s.section, { backgroundColor: theme.cardBackground }]}>
                         <View style={s.sectionHeader}>
-                            <Ionicons name="flash-outline" size={20} color={COLORS.primary} />
-                            <Text style={[s.sectionTitle, { color: theme.text }]}>Reservas Activas</Text>
+                            <Icon name="flash-outline" size={20} color={COLORS.primary} />
+                            <Text style={[s.sectionTitle, { color: theme.text }]}>{t('caregiverDashboard.activeBookings')}</Text>
                         </View>
                         {activeReservations.map(res => (
                             <TouchableOpacity
                                 key={res.id}
                                 style={[s.activeResCard, { borderColor: theme.border }]}
-                                onPress={() => navigation.navigate('Reservas')}
+                                onPress={() => navigation.navigate('MainTabs', { screen: 'Reservas' })}
                             >
                                 <View style={{ flex: 1 }}>
                                     <Text style={[s.activeResName, { color: theme.text }]}>{res.ownerName}</Text>
@@ -354,7 +357,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                 </View>
                                 <View style={[s.activeResStatus, { backgroundColor: res.status === 'activa' ? '#DCFCE7' : '#FEF3C7' }]}>
                                     <Text style={{ fontSize: 11, fontWeight: '700', color: res.status === 'activa' ? '#16A34A' : '#D97706' }}>
-                                        {res.status === 'activa' ? 'Activa' : 'Aceptada'}
+                                        {res.status === 'activa' ? t('bookings.active') : t('bookings.accepted')}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
@@ -365,11 +368,11 @@ export default function CaregiverDashboardScreen({ navigation }) {
                 {/* ── REVIEWS ── */}
                 <View style={[s.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={s.sectionHeader}>
-                        <Ionicons name="star-outline" size={20} color="#F5A623" />
-                        <Text style={[s.sectionTitle, { color: theme.text }]}>Últimas Reseñas</Text>
+                        <Icon name="star-outline" size={20} color="#F5A623" />
+                        <Text style={[s.sectionTitle, { color: theme.text }]}>{t('caregiverDashboard.latestReviews')}</Text>
                         {userData?.rating > 0 && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto', gap: 4 }}>
-                                <Ionicons name="star" size={16} color="#F5A623" />
+                                <Icon name="star" size={16} color="#F5A623" />
                                 <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>{userData.rating.toFixed(1)}</Text>
                             </View>
                         )}
@@ -383,14 +386,14 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                     </Text>
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
-                                    <Text style={[s.reviewName, { color: theme.text }]}>{r.reviewerName || 'Usuario'}</Text>
+                                    <Text style={[s.reviewName, { color: theme.text }]}>{r.reviewerName || t('common.user')}</Text>
                                     <Text style={{ fontSize: 11, color: theme.textSecondary }}>
                                         {r.created_at ? new Date(r.created_at).toLocaleDateString('es-ES') : ''}
                                     </Text>
                                 </View>
                                 <View style={{ flexDirection: 'row', gap: 2 }}>
                                     {[1,2,3,4,5].map(star => (
-                                        <Ionicons key={star} name="star" size={12} color={star <= (r.rating || 5) ? '#F5A623' : '#E5E7EB'} />
+                                        <Icon key={star} name="star" size={12} color={star <= (r.rating || 5) ? '#F5A623' : '#E5E7EB'} />
                                     ))}
                                 </View>
                             </View>
@@ -398,8 +401,8 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         </View>
                     )) : (
                         <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                            <Ionicons name="chatbubble-outline" size={32} color={theme.textSecondary} />
-                            <Text style={[{ color: theme.textSecondary, marginTop: 8, fontSize: 14 }]}>Aún no hay reseñas</Text>
+                            <Icon name="chatbubble-outline" size={32} color={theme.textSecondary} />
+                            <Text style={[{ color: theme.textSecondary, marginTop: 8, fontSize: 14 }]}>{t('caregiverDashboard.noReviews')}</Text>
                         </View>
                     )}
                 </View>
@@ -410,9 +413,9 @@ export default function CaregiverDashboardScreen({ navigation }) {
                     onPress={() => navigation.navigate('CaregiverSetup')}
                 >
                     <View style={s.sectionHeader}>
-                        <Ionicons name="card-outline" size={20} color="#8B5CF6" />
-                        <Text style={[s.sectionTitle, { color: theme.text }]}>Datos de pago</Text>
-                        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 'auto' }} />
+                        <Icon name="card-outline" size={20} color="#8B5CF6" />
+                        <Text style={[s.sectionTitle, { color: theme.text }]}>{t('caregiverDashboard.paymentData')}</Text>
+                        <Icon name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 'auto' }} />
                     </View>
                     {userData?.iban ? (
                         <Text style={[{ color: theme.textSecondary, fontSize: 14 }]}>
@@ -420,9 +423,9 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         </Text>
                     ) : (
                         <View style={[s.ibanWarning, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="alert-circle" size={16} color="#D97706" />
+                            <Icon name="alert-circle" size={16} color="#D97706" />
                             <Text style={{ color: '#D97706', fontSize: 13, fontWeight: '600', flex: 1 }}>
-                                Añade tu IBAN para recibir pagos
+                                {t('caregiverDashboard.addIBAN')}
                             </Text>
                         </View>
                     )}

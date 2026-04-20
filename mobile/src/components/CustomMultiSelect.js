@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, TextInput } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
+import { useTranslation } from '../context/LanguageContext';
 
 const CustomMultiSelect = ({
     label,
@@ -12,6 +13,7 @@ const CustomMultiSelect = ({
 }) => {
     const [modalVisible, setModalVisible] = useState(false);
     const [customInput, setCustomInput] = useState('');
+    const { t } = useTranslation();
 
     const toggleSelection = (item) => {
         if (selectedValues.includes(item)) {
@@ -43,7 +45,7 @@ const CustomMultiSelect = ({
                     <View key={index} style={styles.chip}>
                         <Text style={styles.chipText}>{item}</Text>
                         <TouchableOpacity onPress={() => removeSelection(item)} style={styles.chipRemove}>
-                            <Ionicons name="close-circle" size={16} color={theme.primary} />
+                            <Icon name="close-circle" size={16} color={theme.primary} />
                         </TouchableOpacity>
                     </View>
                 ))}
@@ -52,8 +54,8 @@ const CustomMultiSelect = ({
                     style={styles.addBtn}
                     onPress={() => setModalVisible(true)}
                 >
-                    <Ionicons name="add" size={18} color={theme.textSecondary} />
-                    <Text style={styles.addBtnText}>Añadir</Text>
+                    <Icon name="add" size={18} color={theme.textSecondary} />
+                    <Text style={styles.addBtnText}>{t('components.addBtn')}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -66,9 +68,9 @@ const CustomMultiSelect = ({
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Seleccionar {label.toLowerCase()}</Text>
+                            <Text style={styles.modalTitle}>{t('components.selectLabel', { label: label.toLowerCase() })}</Text>
                             <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close" size={24} color={theme.text} />
+                                <Icon name="close" size={24} color={theme.text} />
                             </TouchableOpacity>
                         </View>
 
@@ -83,7 +85,7 @@ const CustomMultiSelect = ({
                                         onPress={() => toggleSelection(item)}
                                     >
                                         <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{item}</Text>
-                                        {isSelected && <Ionicons name="checkmark" size={20} color={theme.primary} />}
+                                        {isSelected && <Icon name="checkmark" size={20} color={theme.primary} />}
                                     </TouchableOpacity>
                                 );
                             }}
@@ -93,19 +95,19 @@ const CustomMultiSelect = ({
                             <View style={styles.customRow}>
                                 <TextInput
                                     style={styles.customInput}
-                                    placeholder="Otro (especificar...)"
+                                    placeholder={t('components.otherSpecify')}
                                     placeholderTextColor={theme.textSecondary}
                                     value={customInput}
                                     onChangeText={setCustomInput}
                                 />
                                 <TouchableOpacity style={styles.customAddBtn} onPress={addCustom}>
-                                    <Text style={styles.customAddBtnText}>Agregar</Text>
+                                    <Text style={styles.customAddBtnText}>{t('components.addCustom')}</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
 
                         <TouchableOpacity style={styles.doneBtn} onPress={() => setModalVisible(false)}>
-                            <Text style={styles.doneBtnText}>Hecho</Text>
+                            <Text style={styles.doneBtnText}>{t('components.done')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

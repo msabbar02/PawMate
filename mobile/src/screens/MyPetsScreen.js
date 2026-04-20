@@ -1,13 +1,10 @@
-import { useState, useMemo, useEffect, useRef, useContext } from 'react';
+﻿import { useState, useMemo, useEffect, useRef, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal,
     Image, Dimensions, Platform, TextInput, KeyboardAvoidingView,
     ActivityIndicator, Animated, Alert, Share
 } from 'react-native';
-import {
-    Flame, Clock, Plus, QrCode, X, PenSquare, Bell, Map,
-    Share2, ChevronRight, Phone, User, Trash2, StopCircle, Eye
-} from 'lucide-react-native';
+// Icons: using Ionicons consistently across the app
 import QRCode from 'react-native-qrcode-svg';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -16,25 +13,21 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import { AuthContext } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+import { SPECIES_OPTIONS as SHARED_SPECIES } from '../constants/appConstants';
 import { uploadPetImage } from '../utils/storageHelpers';
 import { logActivity, logSystemAction } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
 
-const SPECIES_OPTIONS = [
-    { value: 'dog', label: 'Perro', emoji: '🐕' },
-    { value: 'cat', label: 'Gato', emoji: '🐈' },
-    { value: 'bird', label: 'Ave', emoji: '🐦' },
-    { value: 'rabbit', label: 'Conejo', emoji: '🐇' },
-    { value: 'other', label: 'Otro', emoji: '🐾' },
-];
+const SPECIES_OPTIONS = SHARED_SPECIES;
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -52,19 +45,18 @@ const getSpeciesEmoji = (species) => {
     return sp ? sp.emoji : '🐾';
 };
 
-const getSpeciesLabel = (species) => {
-    const sp = SPECIES_OPTIONS.find(s => s.value === species);
-    return sp ? sp.label : 'Mascota';
+const getSpeciesLabel = (species, t) => {
+    return t ? t(`species.${species}`) : species;
 };
 
-const getAge = (birthdate) => {
+const getAge = (birthdate, t) => {
     if (!birthdate) return null;
     const birth = new Date(birthdate);
     const now = new Date();
     const years = now.getFullYear() - birth.getFullYear();
     const months = now.getMonth() - birth.getMonth();
-    if (years === 0) return `${Math.max(0, months)} meses`;
-    return `${years} año${years !== 1 ? 's' : ''}`;
+    if (years === 0) return `${Math.max(0, months)} ${t ? t('pets.months') : 'months'}`;
+    return `${years} ${years !== 1 ? (t ? t('pets.years') : 'years') : (t ? t('pets.year') : 'year')}`;
 };
 
 const formatDuration = (secs) => {
@@ -117,6 +109,10 @@ const EMPTY_FORM = {
 export default function PawMatePetsCenter() {
     const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = require('react').useContext(require('../context/ThemeContext').ThemeContext);
+    const { t } = useTranslation();
+
+    // ── Birthdate picker state ──
+    const [showBirthdatePicker, setShowBirthdatePicker] = useState(false);
 
     // ── Core State ──────────────────────────────────
     const [pets, setPets] = useState([]);
@@ -238,13 +234,13 @@ export default function PawMatePetsCenter() {
             name: selectedPet.name,
             species: getSpeciesLabel(selectedPet.species),
             breed: selectedPet.breed || '',
-            chip: selectedPet.chipId || 'Sin chip',
+            chip: selectedPet.chipId || t('pets.noChipPdf'),
             weight: selectedPet.weight ? `${selectedPet.weight} kg` : '',
-            gender: selectedPet.gender === 'female' ? 'Hembra' : 'Macho',
+            gender: selectedPet.gender === 'female' ? t('pets.femalePdf') : t('pets.malePdf'),
             color: selectedPet.color || '',
-            allergies: selectedPet.allergies || 'Ninguna',
-            medications: selectedPet.medications || 'Ninguna',
-            conditions: selectedPet.medicalConditions || 'Ninguna',
+            allergies: selectedPet.allergies || t('pets.noneAllergies'),
+            medications: selectedPet.medications || t('common.none'),
+            conditions: selectedPet.medicalConditions || t('common.none'),
             vet: selectedPet.vetName || '',
             vetPhone: selectedPet.vetPhone || '',
             owner: user?.email || '',
@@ -255,8 +251,8 @@ export default function PawMatePetsCenter() {
     const generatePawPortPDF = async () => {
         if (!selectedPet) return;
         try {
-            const age = getAge(selectedPet?.birthdate) || 'Desconocida';
-            const genderStr = selectedPet.gender === 'female' ? 'Hembra' : 'Macho';
+            const age = getAge(selectedPet?.birthdate, t) || t('common.notSpecified');
+            const genderStr = selectedPet.gender === 'female' ? t('pets.femalePdf') : t('pets.malePdf');
             const html = `
             <!DOCTYPE html>
             <html lang="es">
@@ -292,8 +288,8 @@ export default function PawMatePetsCenter() {
                 <div class="passport-container">
                     <div class="header">
                         <div>
-                            <h1>Paw-Port Biométrico</h1>
-                            <p>Documento de Identificación y Emergencia</p>
+                            <h1>${t('pets.pawPortTitle')}</h1>
+                            <p>${t('pets.pawPortSubtitle')}</p>
                         </div>
                         <div class="header-logo">🐾</div>
                     </div>
@@ -307,47 +303,46 @@ export default function PawMatePetsCenter() {
                             <div class="pet-tag">${getSpeciesLabel(selectedPet.species)}</div>
                         </div>
                         <div class="info-section">
-                            <h3 style="color: #166534; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 0;">Datos del Animal</h3>
+                            <h3 style="color: #166534; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 0;">${t('pets.animalData')}</h3>
                             <div class="info-grid">
-                                <div class="info-box"><div class="info-label">Raza</div><p class="info-val">${selectedPet.breed || '—'}</p></div>
-                                <div class="info-box"><div class="info-label">Sexo y Edad</div><p class="info-val">${genderStr} • ${age}</p></div>
-                                <div class="info-box"><div class="info-label">Nº Microchip</div><p class="info-val" style="font-family: monospace; letter-spacing: 1px;">${selectedPet.chipId || 'Sin registrar'}</p></div>
-                                <div class="info-box"><div class="info-label">Peso / Color</div><p class="info-val">${selectedPet.weight ? selectedPet.weight + ' kg' : '—'} • ${selectedPet.color || '—'}</p></div>
-                                <div class="info-box"><div class="info-label">Dueño Responsable</div><p class="info-val">${user?.email || '—'}</p></div>
-                                <div class="info-box"><div class="info-label">Teléfono del Dueño</div><p class="info-val">${userData?.phone || '—'}</p></div>
-                                <div class="info-box"><div class="info-label">Esterilizado</div><p class="info-val">${selectedPet.sterilized ? 'Sí' : 'No'}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.breed')}</div><p class="info-val">${selectedPet.breed || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.sexAndAge')}</div><p class="info-val">${genderStr} • ${age}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.chipNumber')}</div><p class="info-val" style="font-family: monospace; letter-spacing: 1px;">${selectedPet.chipId || t('pets.noChipPdf')}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.weightColor')}</div><p class="info-val">${selectedPet.weight ? selectedPet.weight + ' kg' : '—'} • ${selectedPet.color || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.ownerResponsible')}</div><p class="info-val">${user?.email || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.ownerPhone')}</div><p class="info-val">${userData?.phone || '—'}</p></div>
+                                <div class="info-box"><div class="info-label">${t('pets.sterilized')}</div><p class="info-val">${selectedPet.sterilized ? t('common.yes') : t('common.no')}</p></div>
                             </div>
                             
                             <div class="medical-section">
-                                <h3 class="medical-title">🏥 Información Médica y Emergencias</h3>
+                                <h3 class="medical-title">🏥 ${t('pets.medicalInfo')}</h3>
                                 <div class="medical-item">
-                                    <div class="medical-label">Alergias</div>
-                                    <p class="medical-val">${selectedPet.allergies || 'Ninguna documentada'}</p>
+                                    <div class="medical-label">${t('pets.allergies')}</div>
+                                    <p class="medical-val">${selectedPet.allergies || t('common.noneDoc')}</p>
                                 </div>
                                 <div class="medical-item">
-                                    <div class="medical-label">Medicamentos Actuales</div>
-                                    <p class="medical-val">${selectedPet.medications || 'Ninguno'}</p>
+                                    <div class="medical-label">${t('pets.currentMeds')}</div>
+                                    <p class="medical-val">${selectedPet.medications || t('common.none')}</p>
                                 </div>
                                 <div class="medical-item">
-                                    <div class="medical-label">Condiciones Médicas</div>
-                                    <p class="medical-val">${selectedPet.medicalConditions || 'Ninguna'}</p>
+                                    <div class="medical-label">${t('pets.medicalConditions')}</div>
+                                    <p class="medical-val">${selectedPet.medicalConditions || t('common.none')}</p>
                                 </div>
                                 <div style="display: flex; gap: 20px; margin-top: 20px; padding-top: 15px; border-top: 1px dashed #fca5a5;">
                                     <div style="flex: 1;">
-                                        <div class="medical-label">Veterinario Principal</div>
-                                        <p class="medical-val">${selectedPet.vetName || 'No especificado'}</p>
+                                        <div class="medical-label">${t('pets.mainVet')}</div>
+                                        <p class="medical-val">${selectedPet.vetName || t('common.notSpecified')}</p>
                                     </div>
                                     <div style="flex: 1;">
-                                        <div class="medical-label">Teléfono Emergencia</div>
-                                        <p class="medical-val">${selectedPet.vetPhone || 'No especificado'}</p>
+                                        <div class="medical-label">${t('pets.emergencyPhone')}</div>
+                                        <p class="medical-val">${selectedPet.vetPhone || t('common.notSpecified')}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="footer">
-                        Documento oficial generado por la aplicación <strong>PawMate</strong> en fecha ${new Date().toLocaleDateString('es-ES')}.<br/>
-                        En caso de encontrar esta mascota, por favor contactar de inmediato con su dueño o veterinario habitual.
+                        ${t('pets.pawPortFooter')}
                     </div>
                 </div>
             </body>
@@ -357,10 +352,10 @@ export default function PawMatePetsCenter() {
             if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(uri);
             } else {
-                Alert.alert('Error', 'Tu dispositivo no soporta compartir este archivo.');
+                Alert.alert(t('common.error'), t('pets.shareNotSupported'));
             }
         } catch (e) {
-            Alert.alert('Error', 'No se pudo generar el PDF del pasaporte.');
+            Alert.alert(t('common.error'), t('pets.pdfError'));
         }
     };
 
@@ -380,11 +375,11 @@ export default function PawMatePetsCenter() {
     // ─────────────────────────────────────────────────
     const startWalk = async () => {
         if (userData?.isWalking) {
-            Alert.alert('Paseo activo', 'Ya tienes un paseo en curso. Termínalo antes de iniciar otro.');
+            Alert.alert(t('pets.activeWalk'), t('pets.activeWalkAlert'));
             return;
         }
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return Alert.alert('Error', 'Permiso GPS denegado');
+        if (status !== 'granted') return Alert.alert(t('common.error'), t('pets.gpsPermission'));
         setWalkRoute([]); setWalkDistance(0); setWalkTimer(0); setIsWalking(true);
         await supabase.from('users').update({ isWalking: true, walkingPetId: selectedPet?.id }).eq('id', user.id);
         timerRef.current = setInterval(() => setWalkTimer(t => t + 1), 1000);
@@ -432,9 +427,9 @@ export default function PawMatePetsCenter() {
             await logActivity(user?.id, 'Paseo Completado', `${totalKm} km en la saca con ${selectedPet?.name}`, 'walk', 'walk');
             await logSystemAction(user?.id, userData?.email || 'Desconocido', 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: selectedPet?.name });
 
-            Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas`);
+            Alert.alert(t('pets.walkCompletedAlert'), `${totalKm} km · ${calories} kcal`);
         } catch (e) {
-            Alert.alert('Error', 'No se pudo guardar el paseo');
+            Alert.alert(t('common.error'), t('pets.walkSaveError'));
         }
     };
 
@@ -456,7 +451,7 @@ export default function PawMatePetsCenter() {
         try {
             await Share.share({ message, title: `Paseo de ${selectedPet?.name}` });
         } catch {
-            Alert.alert('Error', 'No se pudo compartir');
+            Alert.alert(t('common.error'), t('pets.shareError'));
         }
     };
 
@@ -466,10 +461,10 @@ export default function PawMatePetsCenter() {
     const scheduleReminder = async (title, body, triggerDate) => {
         try {
             await Notifications.scheduleNotificationAsync({
-                content: { title: `🐾 ${title}`, body: body || 'Abre PawMate', sound: true },
+                content: { title: `🐾 ${title}`, body: body || t('pets.openPawMate'), sound: true },
                 trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
             });
-            Alert.alert('Alarma lista', `Te avisaremos: "${title}"`);
+            Alert.alert(t('pets.alarmReady'), `${t('pets.weWillNotify')}: "${title}"`);
         } catch (e) { console.error(e); }
     };
 
@@ -477,7 +472,7 @@ export default function PawMatePetsCenter() {
     // PET CRUD
     // ─────────────────────────────────────────────────
     const handleSavePet = async () => {
-        if (!formParams.name.trim()) return Alert.alert('Error', 'El nombre es obligatorio');
+        if (!formParams.name.trim()) return Alert.alert(t('common.error'), t('pets.nameRequired'));
         try {
             // Upload all images
             const uploadedImages = [];
@@ -551,37 +546,37 @@ export default function PawMatePetsCenter() {
             }
         } catch (e) {
             console.error('handleSavePet error:', e);
-            Alert.alert('Error', 'No se pudo guardar la mascota');
+            Alert.alert(t('common.error'), t('pets.saveError'));
         }
     };
 
     const handleDeletePet = (petId) => {
-        Alert.alert('Eliminar mascota', '¿Seguro que quieres eliminar esta mascota? Esta acción es irreversible.', [
-            { text: 'Cancelar', style: 'cancel' },
+        Alert.alert(t('pets.deletePet'), t('pets.deletePetConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Eliminar', style: 'destructive',
+                text: t('common.delete'), style: 'destructive',
                 onPress: async () => {
                     try {
                         await supabase.from('pets').delete().eq('id', petId);
                         setPets(prev => prev.filter(p => p.id !== petId));
                         if (selectedPet?.id === petId) setViewMode('list');
-                        Alert.alert('Mascota eliminada');
-                    } catch (e) { Alert.alert('Error', 'No se pudo eliminar la mascota'); }
+                        Alert.alert(t('pets.petDeleted'));
+                    } catch (e) { Alert.alert(t('common.error'), t('pets.deleteError')); }
                 }
             }
         ]);
     };
 
     const handleDeleteWalk = (walkId) => {
-        Alert.alert('Eliminar paseo', '¿Seguro que quieres eliminar este paseo del historial?', [
-            { text: 'Cancelar', style: 'cancel' },
+        Alert.alert(t('pets.deleteWalk'), t('pets.deleteWalkConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Eliminar', style: 'destructive',
+                text: t('common.delete'), style: 'destructive',
                 onPress: async () => {
                     try {
                         await supabase.from('walks').delete().eq('id', walkId);
                         setWalks(prev => prev.filter(w => w.id !== walkId));
-                    } catch (e) { Alert.alert('Error', 'No se pudo eliminar el paseo'); }
+                    } catch (e) { Alert.alert(t('common.error'), t('pets.walkDeleteError')); }
                 }
             }
         ]);
@@ -670,7 +665,7 @@ export default function PawMatePetsCenter() {
     };
 
     const saveReminder = async () => {
-        if (!reminderForm.title.trim()) return Alert.alert('Error', 'Escribe un título');
+        if (!reminderForm.title.trim()) return Alert.alert(t('common.error'), t('pets.reminderTitle'));
         const triggerTime = new Date(reminderForm.eventTime);
         triggerTime.setMinutes(triggerTime.getMinutes() - reminderForm.notificationAdvance);
         const data = {
@@ -689,9 +684,9 @@ export default function PawMatePetsCenter() {
             if (triggerTime.getTime() > Date.now()) {
                 scheduleReminder(reminderForm.title, reminderForm.description, triggerTime);
             } else {
-                Alert.alert('Guardado', 'Recordatorio guardado (sin alarma, fecha en el pasado).');
+                Alert.alert(t('pets.reminderSaved'), t('pets.reminderSavedMsg'));
             }
-        } catch { Alert.alert('Error', 'No se pudo guardar el recordatorio'); }
+        } catch { Alert.alert(t('common.error'), t('pets.reminderSaveError')); }
     };
 
     const deleteReminder = async (id) => {
@@ -699,7 +694,7 @@ export default function PawMatePetsCenter() {
         try {
             await supabase.from('pets').update({ reminders: filtered }).eq('id', selectedPet.id);
             setIsReminderModalVisible(false);
-        } catch { Alert.alert('Error', 'No se pudo eliminar'); }
+        } catch { Alert.alert(t('common.error'), t('pets.reminderDeleteError')); }
     };
 
     // ═══════════════════════════════════════════════════
@@ -712,21 +707,21 @@ export default function PawMatePetsCenter() {
             showsVerticalScrollIndicator={false}
         >
             <View style={styles.listHeaderRow}>
-                <Text style={[styles.screenTitle, { color: theme.text }]}>Mis Mascotas</Text>
+                <Text style={[styles.screenTitle, { color: theme.text }]}>{t('pets.title')}</Text>
             </View>
 
             {pets.length === 0 ? (
                 <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground }]}>
                     <Text style={{ fontSize: 64, textAlign: 'center' }}>🐾</Text>
-                    <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin Mascotas</Text>
+                    <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('pets.noPets')}</Text>
                     <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-                        Añade tu primera mascota para gestionar su perfil, paseos y salud.
+                        {t('pets.noPetsDesc')}
                     </Text>
                     <TouchableOpacity
                         style={[styles.addBtn, { width: '100%', borderRadius: 16, height: 52, marginTop: 20 }]}
                         onPress={() => { resetForm(); setIsFormVisible(true); }}
                     >
-                        <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>+ Añadir Mascota</Text>
+                        <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>+ {t('pets.addPet')}</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -761,7 +756,7 @@ export default function PawMatePetsCenter() {
                                     </View>
                                 )}
                             </View>
-                            <ChevronRight size={20} color={theme.textSecondary} />
+                            <Icon name="chevron-forward" size={20} color={theme.textSecondary} />
                         </View>
 
                         {/* Actions */}
@@ -770,21 +765,21 @@ export default function PawMatePetsCenter() {
                                 style={[styles.actionChip, { backgroundColor: theme.primaryBg, marginRight: 8 }]}
                                 onPress={() => openEditModal(pet)}
                             >
-                                <PenSquare size={14} color={COLORS.primary} />
-                                <Text style={[styles.actionChipText, { color: COLORS.primary }]}>Editar</Text>
+                                <Icon name="create-outline" size={14} color={COLORS.primary} />
+                                <Text style={[styles.actionChipText, { color: COLORS.primary }]}>{t('common.edit')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.actionChip, { backgroundColor: theme.cardBackground, borderWidth: 1, borderColor: theme.border, marginRight: 8 }]}
                                 onPress={() => navigateTo('detail', pet)}
                             >
-                                <Eye size={14} color={theme.textSecondary} />
-                                <Text style={[styles.actionChipText, { color: theme.textSecondary }]}>Ver detalles</Text>
+                                <Icon name="eye-outline" size={14} color={theme.textSecondary} />
+                                <Text style={[styles.actionChipText, { color: theme.textSecondary }]}>{t('pets.viewDetails')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.actionChip, { backgroundColor: '#FEE2E2', marginLeft: 'auto' }]}
                                 onPress={() => handleDeletePet(pet.id)}
                             >
-                                <Trash2 size={14} color="#EF4444" />
+                                <Icon name="trash-outline" size={14} color="#EF4444" />
                             </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
@@ -798,64 +793,64 @@ export default function PawMatePetsCenter() {
     // RENDER: PROFILE TAB
     // ═══════════════════════════════════════════════════
     const renderProfileTab = () => {
-        const age = getAge(selectedPet?.birthdate);
+        const age = getAge(selectedPet?.birthdate, t);
         return (
             <View>
                 {/* General Info */}
                 <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>Información General</Text>
+                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>{t('pets.generalInfo')}</Text>
                     <View style={styles.infoGrid}>
-                        <InfoItem label="Especie" value={`${getSpeciesEmoji(selectedPet?.species)} ${getSpeciesLabel(selectedPet?.species)}`} />
-                        <InfoItem label="Raza" value={selectedPet?.breed || '—'} />
-                        <InfoItem label="Sexo" value={selectedPet?.gender === 'female' ? '♀ Hembra' : '♂ Macho'} />
-                        <InfoItem label="Peso" value={selectedPet?.weight ? `${selectedPet.weight} kg` : '—'} />
-                        {age && <InfoItem label="Edad" value={age} />}
+                        <InfoItem label={t('pets.speciesLabel')} value={`${getSpeciesEmoji(selectedPet?.species)} ${getSpeciesLabel(selectedPet?.species)}`} />
+                        <InfoItem label={t('pets.breed')} value={selectedPet?.breed || '—'} />
+                        <InfoItem label={t('pets.sex')} value={selectedPet?.gender === 'female' ? `♀ ${t('pets.female')}` : `♂ ${t('pets.male')}`} />
+                        <InfoItem label={t('pets.weight')} value={selectedPet?.weight ? `${selectedPet.weight} kg` : '—'} />
+                        {age && <InfoItem label={t('pets.age')} value={age} />}
                         {selectedPet?.birthdate && (
-                            <InfoItem label="Nacimiento" value={new Date(selectedPet.birthdate).toLocaleDateString('es-ES')} />
+                            <InfoItem label={t('pets.birthday')} value={new Date(selectedPet.birthdate).toLocaleDateString('es-ES')} />
                         )}
-                        {selectedPet?.color && <InfoItem label="Color" value={selectedPet.color} />}
-                        <InfoItem label="Esterilizado" value={selectedPet?.sterilized ? '✅ Sí' : '❌ No'} />
+                        {selectedPet?.color ? <InfoItem label={t('pets.color')} value={selectedPet.color} /> : null}
+                        <InfoItem label={t('pets.sterilized')} value={selectedPet?.sterilized ? `✅ ${t('common.yes')}` : `❌ ${t('common.no')}`} />
                     </View>
                 </View>
 
                 {/* Medical Data */}
                 <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>🏥 Datos Médicos</Text>
+                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>{t('pets.medicalData')}</Text>
                     <InfoItemFull
-                        label="Nº Microchip"
-                        value={selectedPet?.chipId || 'Sin microchip registrado'}
+                        label={t('pets.chipNumber')}
+                        value={selectedPet?.chipId || t('pets.noChip')}
                         mono
                     />
-                    {selectedPet?.allergies && (
-                        <InfoItemFull label="⚠️ Alergias" value={selectedPet.allergies} danger />
-                    )}
-                    {selectedPet?.medications && (
-                        <InfoItemFull label="💊 Medicamentos" value={selectedPet.medications} />
-                    )}
-                    {selectedPet?.medicalConditions && (
-                        <InfoItemFull label="📋 Condiciones" value={selectedPet.medicalConditions} />
-                    )}
-                    {selectedPet?.insurance && (
-                        <InfoItemFull label="🛡️ Seguro / Póliza" value={selectedPet.insurance} />
-                    )}
+                    {selectedPet?.allergies ? (
+                        <InfoItemFull label={`⚠️ ${t('pets.allergies')}`} value={selectedPet.allergies} danger />
+                    ) : null}
+                    {selectedPet?.medications ? (
+                        <InfoItemFull label={`💊 ${t('pets.medications')}`} value={selectedPet.medications} />
+                    ) : null}
+                    {selectedPet?.medicalConditions ? (
+                        <InfoItemFull label={`📋 ${t('pets.conditions')}`} value={selectedPet.medicalConditions} />
+                    ) : null}
+                    {selectedPet?.insurance ? (
+                        <InfoItemFull label={`🛡️ ${t('pets.insurance')}`} value={selectedPet.insurance} />
+                    ) : null}
                 </View>
 
                 {/* Vet Contact */}
                 {(selectedPet?.vetName || selectedPet?.vetPhone) && (
                     <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
-                        <Text style={[styles.infoCardTitle, { color: theme.text }]}>🩺 Veterinario</Text>
-                        {selectedPet?.vetName && (
+                        <Text style={[styles.infoCardTitle, { color: theme.text }]}>{`🩺 ${t('pets.vet')}`}</Text>
+                        {selectedPet?.vetName ? (
                             <View style={styles.vetRow}>
-                                <User size={17} color={COLORS.secondary} />
+                                <Icon name="person-outline" size={17} color={COLORS.secondary} />
                                 <Text style={styles.vetText}>{selectedPet.vetName}</Text>
                             </View>
-                        )}
-                        {selectedPet?.vetPhone && (
+                        ) : null}
+                        {selectedPet?.vetPhone ? (
                             <View style={styles.vetRow}>
-                                <Phone size={17} color={COLORS.success} />
+                                <Icon name="call-outline" size={17} color={COLORS.success} />
                                 <Text style={styles.vetText}>{selectedPet.vetPhone}</Text>
                             </View>
-                        )}
+                        ) : null}
                     </View>
                 )}
 
@@ -867,18 +862,18 @@ export default function PawMatePetsCenter() {
                 >
                     <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 2, paddingRight: 40 }}>
                         <View style={[styles.passportIconBox, { backgroundColor: '#4f46e5', width: 50, height: 50, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }]}>
-                            <Ionicons name="document-text" size={26} color="#FFF" />
+                            <Icon name="document-text" size={26} color="#FFF" />
                         </View>
                         <View style={{ marginLeft: 16, flex: 1 }}>
-                            <Text style={[styles.passportTitle, { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }]}>PREMIUM PAW-PORT</Text>
-                            <Text style={[styles.passportSub, { color: '#a5b4fc', fontSize: 13, marginTop: 2 }]}>Documento oficial biométrico PDF</Text>
+                            <Text style={[styles.passportTitle, { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }]}>{t('pets.pawPort')}</Text>
+                            <Text style={[styles.passportSub, { color: '#a5b4fc', fontSize: 13, marginTop: 2 }]}>{t('pets.pawPortDesc')}</Text>
                         </View>
                     </View>
                     <View style={[styles.passportChevron, { position: 'absolute', right: 22, backgroundColor: 'rgba(255,255,255,0.15)', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', zIndex: 3 }]}>
-                        <Ionicons name="download-outline" size={20} color="#FFF" />
+                        <Icon name="download-outline" size={20} color="#FFF" />
                     </View>
                     <View style={{ position: 'absolute', right: -20, bottom: -20, opacity: 0.1, zIndex: 1, transform: [{ rotate: '-15deg' }] }}>
-                        <Ionicons name="shield-checkmark" size={130} color="#FFF" />
+                        <Icon name="shield-checkmark" size={130} color="#FFF" />
                     </View>
                 </TouchableOpacity>
 
@@ -888,8 +883,8 @@ export default function PawMatePetsCenter() {
                     onPress={() => openEditModal(selectedPet)}
                     activeOpacity={0.85}
                 >
-                    <PenSquare size={20} color="#FFF" />
-                    <Text style={styles.fullEditBtnText}>Editar Perfil Completo</Text>
+                    <Icon name="create-outline" size={20} color="#FFF" />
+                    <Text style={styles.fullEditBtnText}>{t('pets.editFullProfile')}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -908,14 +903,14 @@ export default function PawMatePetsCenter() {
                     isWalking ? (
                         <View style={[styles.walkBanner, { backgroundColor: COLORS.danger }]}>
                             <View>
-                                <Text style={styles.walkBannerTitle}>🏃 Paseo en Curso</Text>
+                                <Text style={styles.walkBannerTitle}>🏃 {t('pets.activeWalk')}</Text>
                                 <Text style={styles.walkBannerRunning}>
                                     {walkDistance.toFixed(2)} km  ·  {formatDuration(walkTimer)}
                                 </Text>
                             </View>
                             <TouchableOpacity style={styles.walkStopBtn} onPress={stopWalk}>
                                 <Text style={{ color: COLORS.danger, fontWeight: '800', fontSize: 14 }}>
-                                    ■  Terminar
+                                    ■  {t('pets.endWalk')}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -923,14 +918,14 @@ export default function PawMatePetsCenter() {
                         <TouchableOpacity style={styles.walkBanner} onPress={startWalk} activeOpacity={0.85}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <View style={styles.playCircle}>
-                                    <Ionicons name="play" size={18} color={COLORS.primary} />
+                                    <Icon name="play" size={18} color={COLORS.primary} />
                                 </View>
                                 <View style={{ marginLeft: 14 }}>
-                                    <Text style={styles.walkBannerTitle}>Iniciar Nuevo Paseo</Text>
-                                    <Text style={styles.walkBannerSub}>GPS activo · Ruta y biometría</Text>
+                                    <Text style={styles.walkBannerTitle}>{t('pets.startNewWalk')}</Text>
+                                    <Text style={styles.walkBannerSub}>{t('pets.gpsActive')}</Text>
                                 </View>
                             </View>
-                            <Ionicons name="chevron-forward" size={22} color={COLORS.primary} />
+                            <Icon name="chevron-forward" size={22} color={COLORS.primary} />
                         </TouchableOpacity>
                     )
                 )}
@@ -938,13 +933,13 @@ export default function PawMatePetsCenter() {
                 {/* Global Stats */}
                 {walks.length > 0 && (
                     <View style={[styles.globalStatsRow, { backgroundColor: theme.cardBackground }]}>
-                        <GlobalStat value={totalStats.km} label="km totales" />
+                        <GlobalStat value={totalStats.km} label={t('pets.totalKm')} />
                         <View style={styles.statDivider} />
-                        <GlobalStat value={totalStats.kcal} label="kcal" />
+                        <GlobalStat value={totalStats.kcal} label={t('pets.kcal')} />
                         <View style={styles.statDivider} />
-                        <GlobalStat value={totalStats.count} label="paseos" />
+                        <GlobalStat value={totalStats.count} label={t('pets.walksCount')} />
                         <View style={styles.statDivider} />
-                        <GlobalStat value={`${totalStats.avgPace}`} label="km/h avg" />
+                        <GlobalStat value={`${totalStats.avgPace}`} label={t('pets.avgSpeed')} />
                     </View>
                 )}
 
@@ -952,9 +947,9 @@ export default function PawMatePetsCenter() {
                 {walks.length === 0 ? (
                     <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, marginTop: 0 }]}>
                         <Text style={{ fontSize: 52, textAlign: 'center' }}>🗺️</Text>
-                        <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin Paseos</Text>
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('pets.noWalks')}</Text>
                         <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-                            Los paseos con GPS aparecerán aquí con mapa, distancia y calorías.
+                            {t('pets.noWalksDesc')}
                         </Text>
                     </View>
                 ) : (
@@ -1020,12 +1015,12 @@ export default function PawMatePetsCenter() {
                                         </Text>
                                     )}
                                     <View style={styles.walkStatsRow}>
-                                        <WalkStat icon={<Map size={15} color={COLORS.primary} />} value={`${walk.totalKm} km`} />
-                                        <WalkStat icon={<Clock size={15} color={COLORS.secondary} />} value={`${mins} min`} />
-                                        <WalkStat icon={<Flame size={15} color={COLORS.danger} />} value={`${walk.calories || 0} kcal`} />
+                                        <WalkStat icon={<Icon name="map-outline" size={15} color={COLORS.primary} />} value={`${walk.totalKm} km`} />
+                                        <WalkStat icon={<Icon name="time-outline" size={15} color={COLORS.secondary} />} value={`${mins} min`} />
+                                        <WalkStat icon={<Icon name="flame-outline" size={15} color={COLORS.danger} />} value={`${walk.calories || 0} kcal`} />
                                         {walk.durationSeconds > 0 && walk.totalKm > 0 && (
                                             <WalkStat
-                                                icon={<Ionicons name="speedometer-outline" size={15} color={COLORS.success} />}
+                                                icon={<Icon name="speedometer-outline" size={15} color={COLORS.success} />}
                                                 value={`${(walk.totalKm / (walk.durationSeconds / 3600)).toFixed(1)} km/h`}
                                             />
                                         )}
@@ -1037,15 +1032,15 @@ export default function PawMatePetsCenter() {
                                             onPress={() => shareWalk(walk)}
                                             activeOpacity={0.8}
                                         >
-                                            <Share2 size={15} color={COLORS.secondary} />
-                                            <Text style={[styles.shareBtnText, { color: theme.text }]}>Compartir</Text>
+                                            <Icon name="share-outline" size={15} color={COLORS.secondary} />
+                                            <Text style={[styles.shareBtnText, { color: theme.text }]}>{t('pets.share')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.shareBtn, { backgroundColor: '#FEE2E2', paddingHorizontal: 16 }]}
                                             onPress={() => handleDeleteWalk(walk.id)}
                                             activeOpacity={0.8}
                                         >
-                                            <Trash2 size={15} color="#EF4444" />
+                                            <Icon name="trash-outline" size={15} color="#EF4444" />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1057,9 +1052,9 @@ export default function PawMatePetsCenter() {
                 {!isDog && (
                     <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, marginTop: 0 }]}>
                         <Text style={{ fontSize: 48, textAlign: 'center' }}>🐾</Text>
-                        <Text style={[styles.emptyTitle, { color: theme.text }]}>Solo para perros</Text>
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('pets.dogsOnly')}</Text>
                         <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-                            El seguimiento GPS de paseos está disponible para perros.
+                            {t('pets.dogsOnlyDesc')}
                         </Text>
                     </View>
                 )}
@@ -1073,12 +1068,12 @@ export default function PawMatePetsCenter() {
     const renderHealthTab = () => (
         <View>
             <View style={[styles.listHeaderRow, { paddingHorizontal: 2 }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>📅 Recordatorios</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{`📅 ${t('pets.reminders')}`}</Text>
                 <TouchableOpacity
                     style={[styles.addBtn, { width: 34, height: 34, borderRadius: 17 }]}
                     onPress={() => openReminderForm()}
                 >
-                    <Plus size={16} color="#FFF" />
+                    <Icon name="add" size={16} color="#FFF" />
                 </TouchableOpacity>
             </View>
 
@@ -1086,9 +1081,9 @@ export default function PawMatePetsCenter() {
                 {(!selectedPet?.reminders || selectedPet.reminders.length === 0) ? (
                     <View style={{ padding: 30, alignItems: 'center' }}>
                         <Text style={{ fontSize: 44 }}>🔔</Text>
-                        <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Sin recordatorios activos.</Text>
+                        <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>{t('pets.noReminders')}</Text>
                         <TouchableOpacity onPress={() => openReminderForm()} style={{ marginTop: 10 }}>
-                            <Text style={{ color: theme.primary, fontWeight: '700' }}>+ Añadir recordatorio</Text>
+                            <Text style={{ color: theme.primary, fontWeight: '700' }}>+ {t('pets.addReminder')}</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
@@ -1099,7 +1094,7 @@ export default function PawMatePetsCenter() {
                             onPress={() => openReminderForm(rem)}
                         >
                             <View style={styles.agendaIconBox}>
-                                <Bell size={17} color={COLORS.secondary} />
+                                <Icon name="notifications-outline" size={17} color={COLORS.secondary} />
                             </View>
                             <View style={styles.agendaTextWrap}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1110,7 +1105,7 @@ export default function PawMatePetsCenter() {
                                             : ''}
                                     </Text>
                                 </View>
-                                <Text style={styles.agendaDesc}>{rem.description || 'Sin descripción'}</Text>
+                                <Text style={styles.agendaDesc}>{rem.description || t('pets.noDescription')}</Text>
                             </View>
                         </TouchableOpacity>
                     ))
@@ -1124,7 +1119,7 @@ export default function PawMatePetsCenter() {
     // ═══════════════════════════════════════════════════
     const renderDetailView = () => {
         if (!selectedPet) return null;
-        const age = getAge(selectedPet?.birthdate);
+        const age = getAge(selectedPet?.birthdate, t);
 
         return (
             <Animated.ScrollView
@@ -1136,12 +1131,12 @@ export default function PawMatePetsCenter() {
                 <View style={[styles.heroSection, { backgroundColor: theme.cardBackground }]}>
                     {/* Back */}
                     <TouchableOpacity style={[styles.heroBackBtn, { backgroundColor: theme.background }]} onPress={() => navigateTo('list')}>
-                        <Ionicons name="chevron-back" size={21} color={theme.text} />
+                        <Icon name="chevron-back" size={21} color={theme.text} />
                     </TouchableOpacity>
 
                     {/* Edit shortcut */}
                     <TouchableOpacity style={[styles.heroEditBtn, { backgroundColor: theme.background }]} onPress={() => openEditModal(selectedPet)}>
-                        <PenSquare size={17} color={theme.text} />
+                        <Icon name="create-outline" size={17} color={theme.text} />
                     </TouchableOpacity>
 
                     {/* Photo */}
@@ -1160,11 +1155,11 @@ export default function PawMatePetsCenter() {
                     {/* Badges */}
                     <View style={styles.heroBadgesRow}>
                         <Badge label={`${getSpeciesEmoji(selectedPet.species)} ${getSpeciesLabel(selectedPet.species)}`} color="amber" />
-                        {selectedPet.breed && <Badge label={selectedPet.breed} color="blue" />}
-                        {age && <Badge label={age} color="green" />}
-                        {selectedPet.gender && (
-                            <Badge label={selectedPet.gender === 'female' ? '♀ Hembra' : '♂ Macho'} color="purple" />
-                        )}
+                        {selectedPet.breed ? <Badge label={selectedPet.breed} color="blue" /> : null}
+                        {age ? <Badge label={age} color="green" /> : null}
+                        {selectedPet.gender ? (
+                            <Badge label={selectedPet.gender === 'female' ? t('pets.female') : t('pets.male')} color="purple" />
+                        ) : null}
                     </View>
 
                     {/* Stats Row */}
@@ -1173,7 +1168,7 @@ export default function PawMatePetsCenter() {
                         <View style={styles.heroStatDiv} />
                         <HeroStat value={totalStats.kcal > 0 ? totalStats.kcal : '—'} label="kcal" />
                         <View style={styles.heroStatDiv} />
-                        <HeroStat value={totalStats.count > 0 ? totalStats.count : '—'} label="paseos" />
+                        <HeroStat value={totalStats.count > 0 ? totalStats.count : '—'} label={t('pets.walksCount')} />
                         <View style={styles.heroStatDiv} />
                         <HeroStat value={selectedPet.weight ? `${selectedPet.weight}` : '—'} label="kg" />
                     </View>
@@ -1182,9 +1177,9 @@ export default function PawMatePetsCenter() {
                 {/* ── TAB BAR ────────────────────────────── */}
                 <View style={[styles.tabBar, { backgroundColor: theme.cardBackground }]}>
                     {[
-                        { key: 'profile', label: '🐾 Perfil' },
-                        { key: 'walks', label: '🗺️ Paseos' },
-                        { key: 'health', label: '🏥 Salud' },
+                        { key: 'profile', label: t('pets.profileTab') },
+                        { key: 'walks', label: t('pets.walksTab') },
+                        { key: 'health', label: t('pets.healthTab') },
                     ].map(tab => (
                         <TouchableOpacity
                             key={tab.key}
@@ -1218,7 +1213,7 @@ export default function PawMatePetsCenter() {
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }]}>
                 <ActivityIndicator size="large" color={theme.primary} />
                 <Text style={{ color: theme.textSecondary, marginTop: 12, fontWeight: '600' }}>
-                    Cargando mascotas...
+                    {t('pets.petsLoading')}
                 </Text>
             </View>
         );
@@ -1242,7 +1237,7 @@ export default function PawMatePetsCenter() {
                     ]}
                     onPress={() => { resetForm(); setIsFormVisible(true); }}
                 >
-                    <Plus size={24} color="#FFF" />
+                    <Icon name="add" size={24} color="#FFF" />
                 </TouchableOpacity>
             )}
 
@@ -1257,14 +1252,14 @@ export default function PawMatePetsCenter() {
                                 else setWizardStep(s => s - 1);
                             }}
                         >
-                            <Ionicons name="chevron-back" size={24} color="#FFF" />
+                            <Icon name="chevron-back" size={24} color="#FFF" />
                         </TouchableOpacity>
                         <View style={wizStyles.headerCenter}>
                             <Text style={wizStyles.brandText}>🐾 PawMate</Text>
                             <Text style={wizStyles.stepCounter}>{wizardStep + 1}/{TOTAL_STEPS}</Text>
                         </View>
                         <TouchableOpacity onPress={() => { setIsFormVisible(false); resetForm(); }}>
-                            <X size={22} color="rgba(255,255,255,0.5)" />
+                            <Icon name="close" size={22} color="rgba(255,255,255,0.5)" />
                         </TouchableOpacity>
                     </View>
 
@@ -1287,23 +1282,23 @@ export default function PawMatePetsCenter() {
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>📸</Text>
                                     <Text style={wizStyles.stepTitle}>
-                                        {isEditing ? 'Actualiza las fotos' : 'Añade fotos'}
+                                        {isEditing ? t('pets.updatePhotos') : t('pets.addPhotos')}
                                     </Text>
-                                    <Text style={wizStyles.stepDesc}>Puedes añadir hasta 5 fotos de tu mascota</Text>
+                                    <Text style={wizStyles.stepDesc}>{t('pets.photosDesc')}</Text>
                                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 20 }}>
                                         {(formParams.images || []).map((uri, i) => (
                                             <TouchableOpacity key={i} onPress={() => removeImage(i)} style={{ position: 'relative' }}>
                                                 <Image source={{ uri }} style={{ width: 90, height: 90, borderRadius: 16 }} />
                                                 <View style={{ position: 'absolute', top: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center' }}>
-                                                    <Ionicons name="close" size={14} color="#FFF" />
+                                                    <Icon name="close" size={14} color="#FFF" />
                                                 </View>
                                             </TouchableOpacity>
                                         ))}
                                         {(formParams.images || []).length < 5 && (
                                             <TouchableOpacity style={[wizStyles.photoCircle, { width: 90, height: 90, borderRadius: 16 }]} onPress={pickImage}>
                                                 <View style={[wizStyles.photoPlaceholder, { width: 90, height: 90, borderRadius: 16 }]}>
-                                                    <Ionicons name="add-circle" size={32} color="rgba(255,255,255,0.5)" />
-                                                    <Text style={[wizStyles.photoPlaceholderText, { fontSize: 10 }]}>Añadir</Text>
+                                                    <Icon name="add-circle" size={32} color="rgba(255,255,255,0.5)" />
+                                                    <Text style={[wizStyles.photoPlaceholderText, { fontSize: 10 }]}>{t('pets.addLabel')}</Text>
                                                 </View>
                                             </TouchableOpacity>
                                         )}
@@ -1315,8 +1310,8 @@ export default function PawMatePetsCenter() {
                             {WIZARD_STEPS[wizardStep] === 'name' && (
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>✏️</Text>
-                                    <Text style={wizStyles.stepTitle}>¿Cómo se llama?</Text>
-                                    <Text style={wizStyles.stepDesc}>Escribe el nombre de tu mascota</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.whatsName')}</Text>
+                                    <Text style={wizStyles.stepDesc}>{t('pets.namePlaceholder')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         value={formParams.name}
@@ -1331,8 +1326,8 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 2: SPECIES ── */}
                             {WIZARD_STEPS[wizardStep] === 'species' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepTitle}>¿Cuál es su especie?</Text>
-                                    <Text style={wizStyles.stepDesc}>Selecciona el tipo de animal</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.whatsSpecies')}</Text>
+                                    <Text style={wizStyles.stepDesc}>{t('pets.selectSpecies')}</Text>
                                     <View style={wizStyles.speciesGrid}>
                                         {SPECIES_OPTIONS.map(sp => (
                                             <TouchableOpacity
@@ -1363,7 +1358,7 @@ export default function PawMatePetsCenter() {
                             {WIZARD_STEPS[wizardStep] === 'breed' && (
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>{getSpeciesEmoji(formParams.species)}</Text>
-                                    <Text style={wizStyles.stepTitle}>¿Cuál es su raza?</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.whatsBreed')}</Text>
                                     <Text style={wizStyles.stepDesc}>Escribe la raza de tu {getSpeciesLabel(formParams.species).toLowerCase()}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
@@ -1379,7 +1374,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 4: GENDER ── */}
                             {WIZARD_STEPS[wizardStep] === 'gender' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepTitle}>¿Cuál es su sexo?</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.whatsSex')}</Text>
                                     <Text style={wizStyles.stepDesc}>Selecciona el sexo de {formParams.name || 'tu mascota'}</Text>
                                     <View style={wizStyles.genderRow}>
                                         <TouchableOpacity
@@ -1389,8 +1384,8 @@ export default function PawMatePetsCenter() {
                                             ]}
                                             onPress={() => setFormParams(p => ({ ...p, gender: 'male' }))}
                                         >
-                                            <Ionicons name="male" size={44} color={formParams.gender === 'male' ? '#3B82F6' : 'rgba(255,255,255,0.4)'} />
-                                            <Text style={[wizStyles.genderLabel, formParams.gender === 'male' && { color: '#3B82F6' }]}>Macho</Text>
+                                            <Icon name="male" size={44} color={formParams.gender === 'male' ? '#3B82F6' : 'rgba(255,255,255,0.4)'} />
+                                            <Text style={[wizStyles.genderLabel, formParams.gender === 'male' && { color: '#3B82F6' }]}>{t('pets.maleLabel')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[
@@ -1399,12 +1394,12 @@ export default function PawMatePetsCenter() {
                                             ]}
                                             onPress={() => setFormParams(p => ({ ...p, gender: 'female' }))}
                                         >
-                                            <Ionicons name="female" size={44} color={formParams.gender === 'female' ? '#EC4899' : 'rgba(255,255,255,0.4)'} />
-                                            <Text style={[wizStyles.genderLabel, formParams.gender === 'female' && { color: '#EC4899' }]}>Hembra</Text>
+                                            <Icon name="female" size={44} color={formParams.gender === 'female' ? '#EC4899' : 'rgba(255,255,255,0.4)'} />
+                                            <Text style={[wizStyles.genderLabel, formParams.gender === 'female' && { color: '#EC4899' }]}>{t('pets.femaleLabel')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                     <TouchableOpacity onPress={() => setFormParams(p => ({ ...p, gender: '' }))}>
-                                        <Text style={wizStyles.skipText}>No lo sé</Text>
+                                        <Text style={wizStyles.skipText}>{t('pets.dontKnow')}</Text>
                                     </TouchableOpacity>
                                 </View>
                             )}
@@ -1413,45 +1408,62 @@ export default function PawMatePetsCenter() {
                             {WIZARD_STEPS[wizardStep] === 'details' && (
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>📋</Text>
-                                    <Text style={wizStyles.stepTitle}>Detalles adicionales</Text>
-                                    <Text style={wizStyles.stepDesc}>Estos datos son opcionales</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.additionalDetails')}</Text>
+                                    <Text style={wizStyles.stepDesc}>{t('pets.optionalData')}</Text>
 
-                                    <Text style={wizStyles.fieldLabel}>Peso (kg)</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.weightKg')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         keyboardType="numeric"
                                         value={formParams.weight}
                                         onChangeText={t => setFormParams(p => ({ ...p, weight: t }))}
-                                        placeholder="Ej. 12.5"
+                                        placeholder={t('pets.weightPlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>Fecha de Nacimiento</Text>
-                                    <TextInput
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.birthdateLabel')}</Text>
+                                    <TouchableOpacity
                                         style={wizStyles.wizardInput}
-                                        value={formParams.birthdate}
-                                        onChangeText={t => setFormParams(p => ({ ...p, birthdate: t }))}
-                                        placeholder="YYYY-MM-DD"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
-                                    />
+                                        onPress={() => setShowBirthdatePicker(true)}
+                                    >
+                                        <Text style={{ color: formParams.birthdate ? '#FFF' : 'rgba(255,255,255,0.3)', fontSize: 16 }}>
+                                            {formParams.birthdate
+                                                ? new Date(formParams.birthdate).toLocaleDateString()
+                                                : t('pets.birthdateLabel')}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    {showBirthdatePicker && (
+                                        <DateTimePicker
+                                            value={formParams.birthdate ? new Date(formParams.birthdate) : new Date()}
+                                            mode="date"
+                                            maximumDate={new Date()}
+                                            onChange={(event, selectedDate) => {
+                                                setShowBirthdatePicker(Platform.OS === 'ios');
+                                                if (selectedDate) {
+                                                    setFormParams(p => ({ ...p, birthdate: selectedDate.toISOString().split('T')[0] }));
+                                                }
+                                                if (Platform.OS === 'android') setShowBirthdatePicker(false);
+                                            }}
+                                        />
+                                    )}
 
-                                    <Text style={wizStyles.fieldLabel}>Color del pelaje</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.colorLabel')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         value={formParams.color}
                                         onChangeText={t => setFormParams(p => ({ ...p, color: t }))}
-                                        placeholder="Ej. Dorado con blanco"
+                                        placeholder={t('pets.colorPlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
                                     <View style={wizStyles.switchRow}>
-                                        <Text style={wizStyles.fieldLabel}>Esterilizado/a</Text>
+                                        <Text style={wizStyles.fieldLabel}>{t('pets.sterilizedLabel')}</Text>
                                         <TouchableOpacity
                                             style={[wizStyles.togglePill, formParams.sterilized && { backgroundColor: '#22C55E' }]}
                                             onPress={() => setFormParams(p => ({ ...p, sterilized: !p.sterilized }))}
                                         >
                                             <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
-                                                {formParams.sterilized ? '✅ Sí' : '❌ No'}
+                                                {formParams.sterilized ? `✅ ${t('common.yes')}` : `❌ ${t('common.no')}`}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -1462,54 +1474,54 @@ export default function PawMatePetsCenter() {
                             {WIZARD_STEPS[wizardStep] === 'medical' && (
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>🏥</Text>
-                                    <Text style={wizStyles.stepTitle}>Datos médicos</Text>
-                                    <Text style={wizStyles.stepDesc}>Información importante de salud (opcional)</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.medicalTitle')}</Text>
+                                    <Text style={wizStyles.stepDesc}>{t('pets.medicalDesc')}</Text>
 
-                                    <Text style={wizStyles.fieldLabel}>Nº Microchip</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.chipNumber')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         value={formParams.chipId}
                                         onChangeText={t => setFormParams(p => ({ ...p, chipId: t }))}
-                                        placeholder="Ej. 941000024583921"
+                                        placeholder={t('pets.chipPlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>⚠️ Alergias</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.allergies')}</Text>
                                     <TextInput
                                         style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
                                         multiline
                                         value={formParams.allergies}
                                         onChangeText={t => setFormParams(p => ({ ...p, allergies: t }))}
-                                        placeholder="Ej. Polen, pollo..."
+                                        placeholder={t('pets.allergiesPlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>💊 Medicamentos actuales</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.medications')}</Text>
                                     <TextInput
                                         style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
                                         multiline
                                         value={formParams.medications}
                                         onChangeText={t => setFormParams(p => ({ ...p, medications: t }))}
-                                        placeholder="Ej. Apoquel 16mg/día"
+                                        placeholder={t('pets.medicationsPlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>📋 Condiciones médicas</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.conditionsLabel')}</Text>
                                     <TextInput
                                         style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
                                         multiline
                                         value={formParams.medicalConditions}
                                         onChangeText={t => setFormParams(p => ({ ...p, medicalConditions: t }))}
-                                        placeholder="Ej. Displasia de cadera..."
+                                        placeholder={t('pets.conditionsPlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>🛡️ Nº Seguro / Póliza</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.insurance')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         value={formParams.insurance}
                                         onChangeText={t => setFormParams(p => ({ ...p, insurance: t }))}
-                                        placeholder="Ej. AXA-2024-001234"
+                                        placeholder={t('pets.insurancePlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
                                 </View>
@@ -1519,25 +1531,25 @@ export default function PawMatePetsCenter() {
                             {WIZARD_STEPS[wizardStep] === 'vet' && (
                                 <View style={wizStyles.stepContainer}>
                                     <Text style={wizStyles.stepEmoji}>🩺</Text>
-                                    <Text style={wizStyles.stepTitle}>Veterinario</Text>
-                                    <Text style={wizStyles.stepDesc}>Datos de contacto del veterinario (opcional)</Text>
+                                    <Text style={wizStyles.stepTitle}>{t('pets.vetTitle')}</Text>
+                                    <Text style={wizStyles.stepDesc}>{t('pets.vetDesc')}</Text>
 
-                                    <Text style={wizStyles.fieldLabel}>Nombre del veterinario</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.vetNameLabel')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         value={formParams.vetName}
                                         onChangeText={t => setFormParams(p => ({ ...p, vetName: t }))}
-                                        placeholder="Ej. Dr. García"
+                                        placeholder={t('pets.vetNamePlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>Teléfono de contacto</Text>
+                                    <Text style={wizStyles.fieldLabel}>{t('pets.vetPhoneLabel')}</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         keyboardType="phone-pad"
                                         value={formParams.vetPhone}
                                         onChangeText={t => setFormParams(p => ({ ...p, vetPhone: t }))}
-                                        placeholder="Ej. +34 912 345 678"
+                                        placeholder={t('pets.vetPhonePlaceholder')}
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
                                 </View>
@@ -1551,27 +1563,27 @@ export default function PawMatePetsCenter() {
                                     style={wizStyles.nextBtn}
                                     onPress={() => {
                                         if (WIZARD_STEPS[wizardStep] === 'name' && !formParams.name.trim()) {
-                                            Alert.alert('Error', 'El nombre es obligatorio');
+                                            Alert.alert(t('common.error'), t('pets.nameRequired'));
                                             return;
                                         }
                                         setWizardStep(s => s + 1);
                                     }}
                                 >
                                     <Text style={wizStyles.nextBtnText}>
-                                        {WIZARD_STEPS[wizardStep] === 'species' ? 'Siguiente: Raza' :
-                                         WIZARD_STEPS[wizardStep] === 'breed' ? 'Siguiente: Sexo' :
-                                         WIZARD_STEPS[wizardStep] === 'gender' ? 'Siguiente: Detalles' :
-                                         WIZARD_STEPS[wizardStep] === 'photo' ? 'Siguiente: Nombre' :
-                                         WIZARD_STEPS[wizardStep] === 'name' ? 'Siguiente: Especie' :
-                                         WIZARD_STEPS[wizardStep] === 'details' ? 'Siguiente: Médico' :
-                                         'Siguiente'}
+                                        {WIZARD_STEPS[wizardStep] === 'species' ? t('pets.nextBreed') :
+                                         WIZARD_STEPS[wizardStep] === 'breed' ? t('pets.nextGender') :
+                                         WIZARD_STEPS[wizardStep] === 'gender' ? t('pets.nextDetails') :
+                                         WIZARD_STEPS[wizardStep] === 'photo' ? t('pets.nextName') :
+                                         WIZARD_STEPS[wizardStep] === 'name' ? t('pets.nextSpecies') :
+                                         WIZARD_STEPS[wizardStep] === 'details' ? t('pets.nextMedical') :
+                                         t('pets.nextVet')}
                                     </Text>
-                                    <Ionicons name="arrow-forward" size={20} color="#1A1A2E" />
+                                    <Icon name="arrow-forward" size={20} color="#1A1A2E" />
                                 </TouchableOpacity>
                             ) : (
                                 <TouchableOpacity style={wizStyles.saveBtn} onPress={handleSavePet}>
                                     <Text style={wizStyles.saveBtnText}>
-                                        {isEditing ? '✅ Guardar Cambios' : '🐾 Registrar Mascota'}
+                                        {isEditing ? t('pets.saveChanges') : t('pets.registerPet')}
                                     </Text>
                                 </TouchableOpacity>
                             )}
@@ -1580,7 +1592,7 @@ export default function PawMatePetsCenter() {
                                     style={wizStyles.skipBtn}
                                     onPress={() => setWizardStep(s => s + 1)}
                                 >
-                                    <Text style={wizStyles.skipBtnText}>Saltar este paso</Text>
+                                    <Text style={wizStyles.skipBtnText}>{t('pets.skipStep')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -1593,44 +1605,44 @@ export default function PawMatePetsCenter() {
                 <View style={styles.qrOverlay}>
                     <View style={styles.qrCard}>
                         <TouchableOpacity style={styles.qrClose} onPress={() => setIsPassportVisible(false)}>
-                            <X size={20} color={COLORS.textLight} />
+                            <Icon name="close" size={20} color={COLORS.textLight} />
                         </TouchableOpacity>
 
-                        <Text style={styles.qrBrand}>PAW-PORT BIOMÉTRICO</Text>
+                        <Text style={styles.qrBrand}>{t('pets.pawPortTitle')}</Text>
                         <Text style={styles.qrPetName}>{selectedPet?.name}</Text>
 
                         <View style={styles.qrBox}>
                             <QRCode value={qrPayload} size={200} color={COLORS.text} backgroundColor={COLORS.surface} />
                         </View>
 
-                        {selectedPet?.chipId && (
+                        {selectedPet?.chipId ? (
                             <Text style={styles.qrChipLabel}>
                                 CHIP: {selectedPet.chipId.toUpperCase()}
                             </Text>
-                        )}
+                        ) : null}
 
                         <View style={styles.qrInfoGrid}>
-                            {selectedPet?.allergies && (
+                            {selectedPet?.allergies ? (
                                 <View style={styles.qrInfoRow}>
-                                    <Text style={styles.qrInfoKey}>⚠️ Alergias</Text>
+                                    <Text style={styles.qrInfoKey}>{t('pets.allergies')}</Text>
                                     <Text style={styles.qrInfoVal}>{selectedPet.allergies}</Text>
                                 </View>
-                            )}
-                            {selectedPet?.vetPhone && (
+                            ) : null}
+                            {selectedPet?.vetPhone ? (
                                 <View style={styles.qrInfoRow}>
-                                    <Text style={styles.qrInfoKey}>🩺 Vet</Text>
+                                    <Text style={styles.qrInfoKey}>{t('pets.qrVet')}</Text>
                                     <Text style={styles.qrInfoVal}>{selectedPet.vetPhone}</Text>
                                 </View>
-                            )}
-                            {selectedPet?.medications && (
+                            ) : null}
+                            {selectedPet?.medications ? (
                                 <View style={styles.qrInfoRow}>
-                                    <Text style={styles.qrInfoKey}>💊 Medicación</Text>
+                                    <Text style={styles.qrInfoKey}>{t('pets.qrMedication')}</Text>
                                     <Text style={styles.qrInfoVal}>{selectedPet.medications}</Text>
                                 </View>
-                            )}
+                            ) : null}
                         </View>
 
-                        <Text style={styles.qrFooter}>PROTEGIDO POR PAWMATE · Escanea para emergencias</Text>
+                        <Text style={styles.qrFooter}>{t('pets.qrFooter')}</Text>
                     </View>
                 </View>
             </Modal>
@@ -1643,33 +1655,33 @@ export default function PawMatePetsCenter() {
                 >
                     <View style={[styles.formHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                         <Text style={[styles.formTitle, { color: theme.text }]}>
-                            {editingReminder ? 'Editar Aviso' : 'Nuevo Aviso'}
+                            {editingReminder ? t('pets.editReminder') : t('pets.newReminder')}
                         </Text>
                         <TouchableOpacity onPress={() => setIsReminderModalVisible(false)}>
-                            <X size={24} color={theme.text} />
+                            <Icon name="close" size={24} color={theme.text} />
                         </TouchableOpacity>
                     </View>
                     <ScrollView style={[styles.formBody, { backgroundColor: theme.background }]}>
-                        <FormLabel text="Título" />
+                        <FormLabel text={t('pets.reminderTitleLabel')} />
                         <TextInput
                             style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={reminderForm.title}
                             onChangeText={t => setReminderForm(r => ({ ...r, title: t }))}
-                            placeholder="Ej. Vacuna Rabia"
+                            placeholder={t('pets.reminderTitlePlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                         />
 
-                        <FormLabel text="Descripción" />
+                        <FormLabel text={t('pets.descriptionLabel')} />
                         <TextInput
                             style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             multiline
                             value={reminderForm.description}
                             onChangeText={t => setReminderForm(r => ({ ...r, description: t }))}
-                            placeholder="Notas adicionales..."
+                            placeholder={t('pets.additionalNotesPlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                         />
 
-                        <FormLabel text="Fecha y hora del evento" />
+                        <FormLabel text={t('pets.eventDateTime')} />
                         {Platform.OS === 'ios' ? (
                             <DateTimePicker
                                 value={reminderForm.eventTime}
@@ -1723,7 +1735,7 @@ export default function PawMatePetsCenter() {
                             />
                         )}
 
-                        <FormLabel text="Avisarme con antelación" />
+                        <FormLabel text={t('pets.notifyInAdvance')} />
                         <View style={{ borderWidth: 1.5, borderColor: '#e2ede8', borderRadius: 14, overflow: 'hidden', backgroundColor: COLORS.surface }}>
                             <Picker
                                 selectedValue={reminderForm.notificationAdvance}
@@ -1731,18 +1743,18 @@ export default function PawMatePetsCenter() {
                                 style={{ color: COLORS.text }}
                                 itemStyle={{ color: COLORS.text, fontSize: 16 }}
                             >
-                                <Picker.Item label="A la hora exacta" value={0} />
-                                <Picker.Item label="5 minutos antes" value={5} />
-                                <Picker.Item label="15 minutos antes" value={15} />
-                                <Picker.Item label="30 minutos antes" value={30} />
-                                <Picker.Item label="1 hora antes" value={60} />
-                                <Picker.Item label="1 día antes" value={1440} />
+                                <Picker.Item label={t('pets.atExactTime')} value={0} />
+                                <Picker.Item label={t('pets.fiveMinBefore')} value={5} />
+                                <Picker.Item label={t('pets.fifteenMinBefore')} value={15} />
+                                <Picker.Item label={t('pets.thirtyMinBefore')} value={30} />
+                                <Picker.Item label={t('pets.oneHourBefore')} value={60} />
+                                <Picker.Item label={t('pets.oneDayBefore')} value={1440} />
                             </Picker>
                         </View>
 
                         <TouchableOpacity style={styles.submitBtn} onPress={saveReminder}>
                             <Text style={styles.submitText}>
-                                {editingReminder ? 'Guardar Cambios' : 'Agendar Aviso'}
+                                {editingReminder ? t('pets.saveChanges') : t('pets.scheduleReminder')}
                             </Text>
                         </TouchableOpacity>
 
@@ -1752,7 +1764,7 @@ export default function PawMatePetsCenter() {
                                 onPress={() => deleteReminder(editingReminder.id)}
                             >
                                 <Text style={[styles.submitText, { color: COLORS.danger }]}>
-                                    Eliminar Recordatorio
+                                    {t('pets.deleteReminder')}
                                 </Text>
                             </TouchableOpacity>
                         )}

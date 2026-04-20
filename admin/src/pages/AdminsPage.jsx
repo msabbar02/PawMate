@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from '../config/supabase';
 import { AuthContext } from '../context/AuthContext';
-import { UserPlus, Shield, Trash2, X, Mail, Lock, User } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserPlus, faShield, faTrash, faXmark, faEnvelope, faLock, faUser } from '@fortawesome/free-solid-svg-icons';
+import { useTranslation } from 'react-i18next';
 import './AdminsPage.css';
 
 export default function AdminsPage() {
+    const { t } = useTranslation();
     const { adminUser } = useContext(AuthContext);
     const [admins, setAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -44,10 +47,10 @@ export default function AdminsPage() {
 
         try {
             if (!newAdmin.email || !newAdmin.password || !newAdmin.fullName) {
-                throw new Error('Todos los campos son obligatorios');
+                throw new Error(t('admins.allFieldsRequired'));
             }
             if (newAdmin.password.length < 6) {
-                throw new Error('La contraseña debe tener al menos 6 caracteres');
+                throw new Error(t('admins.passwordMinLength'));
             }
 
             // Create auth user via Supabase
@@ -72,7 +75,7 @@ export default function AdminsPage() {
                 if (insertError) throw insertError;
             }
 
-            setMessage({ text: `Admin "${newAdmin.fullName}" creado correctamente. Se enviará un email de confirmación.`, type: 'success' });
+            setMessage({ text: t('admins.adminCreatedSuccess', { name: newAdmin.fullName }), type: 'success' });
             setNewAdmin({ email: '', password: '', fullName: '' });
             setShowModal(false);
             fetchAdmins();
@@ -84,14 +87,14 @@ export default function AdminsPage() {
 
     const handleRemoveAdmin = async (user) => {
         if (user.id === adminUser?.id) {
-            setMessage({ text: 'No puedes eliminarte a ti mismo como admin', type: 'error' });
+            setMessage({ text: t('admins.cannotRemoveSelf'), type: 'error' });
             return;
         }
-        if (!window.confirm(`¿Quitar permisos de admin a ${user.fullName || user.email}?`)) return;
+        if (!window.confirm(t('admins.confirmRemove', { name: user.fullName || user.email }))) return;
 
         try {
             await supabase.from('users').update({ role: 'normal' }).eq('id', user.id);
-            setMessage({ text: `${user.fullName || user.email} ya no es administrador`, type: 'success' });
+            setMessage({ text: t('admins.adminRemoved', { name: user.fullName || user.email }), type: 'success' });
             fetchAdmins();
         } catch (err) {
             setMessage({ text: 'Error: ' + err.message, type: 'error' });
@@ -101,9 +104,9 @@ export default function AdminsPage() {
     return (
         <div className="admins-page">
             <div className="page-header">
-                <h2 className="page-title">Gestión de Administradores</h2>
+                <h2 className="page-title">{t('admins.pageTitle')}</h2>
                 <button className="btn-primary add-admin-btn" onClick={() => setShowModal(true)}>
-                    <UserPlus size={18} /> Crear Admin
+                    <FontAwesomeIcon icon={faUserPlus} style={{ fontSize: 18 }} /> {t('admins.createAdmin')}
                 </button>
             </div>
 
@@ -112,7 +115,7 @@ export default function AdminsPage() {
             )}
 
             {loading ? (
-                <div className="loading-state"><div className="spinner"></div><p>Cargando admins...</p></div>
+                <div className="loading-state"><div className="spinner"></div><p>{t('admins.loading')}</p></div>
             ) : (
                 <div className="admins-grid">
                     {admins.map(admin => (
@@ -126,28 +129,28 @@ export default function AdminsPage() {
                                     </div>
                                 )}
                                 <div className="admin-card-info">
-                                    <h3>{admin.fullName || 'Sin nombre'}</h3>
+                                    <h3>{admin.fullName || t('admins.noName')}</h3>
                                     <span className="admin-card-email">{admin.email}</span>
                                 </div>
                                 {admin.id === adminUser?.id && (
-                                    <span className="you-badge">Tú</span>
+                                    <span className="you-badge">{t('admins.youBadge')}</span>
                                 )}
                             </div>
                             <div className="admin-card-meta">
-                                <span>Teléfono: {admin.phone || 'No configurado'}</span>
-                                <span>Desde: {admin.created_at ? new Date(admin.created_at).toLocaleDateString('es-ES') : 'N/A'}</span>
+                                <span>{t('admins.phoneLabel')} {admin.phone || t('admins.notConfigured')}</span>
+                                <span>{t('admins.sinceLabel')} {admin.created_at ? new Date(admin.created_at).toLocaleDateString('es-ES') : 'N/A'}</span>
                             </div>
                             {admin.id !== adminUser?.id && (
                                 <button className="remove-admin-btn" onClick={() => handleRemoveAdmin(admin)}>
-                                    <Trash2 size={14} /> Quitar permisos
+                                    <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} /> {t('admins.removePermissions')}
                                 </button>
                             )}
                         </div>
                     ))}
                     {admins.length === 0 && (
                         <div className="empty-state">
-                            <Shield size={40} />
-                            <p>No hay administradores registrados</p>
+                            <FontAwesomeIcon icon={faShield} style={{ fontSize: 40 }} />
+                            <p>{t('admins.noAdmins')}</p>
                         </div>
                     )}
                 </div>
@@ -158,39 +161,39 @@ export default function AdminsPage() {
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content glass-panel" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2><UserPlus size={20} /> Crear Nuevo Admin</h2>
-                            <button className="close-btn" onClick={() => setShowModal(false)}><X size={24} /></button>
+                            <h2><FontAwesomeIcon icon={faUserPlus} style={{ fontSize: 20 }} /> {t('admins.createModalTitle')}</h2>
+                            <button className="close-btn" onClick={() => setShowModal(false)}><FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} /></button>
                         </div>
                         <form onSubmit={handleCreateAdmin}>
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label><User size={14} /> Nombre completo</label>
+                                    <label><FontAwesomeIcon icon={faUser} style={{ fontSize: 14 }} /> {t('admins.fullNameLabel')}</label>
                                     <input 
                                         type="text"
                                         className="form-control"
-                                        placeholder="Nombre del admin"
+                                        placeholder={t('admins.fullNamePlaceholder')}
                                         value={newAdmin.fullName}
                                         onChange={e => setNewAdmin({ ...newAdmin, fullName: e.target.value })}
                                         required
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label><Mail size={14} /> Email</label>
+                                    <label><FontAwesomeIcon icon={faEnvelope} style={{ fontSize: 14 }} /> {t('admins.emailLabel')}</label>
                                     <input 
                                         type="email"
                                         className="form-control"
-                                        placeholder="email@ejemplo.com"
+                                        placeholder={t('admins.emailPlaceholder')}
                                         value={newAdmin.email}
                                         onChange={e => setNewAdmin({ ...newAdmin, email: e.target.value })}
                                         required
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label><Lock size={14} /> Contraseña</label>
+                                    <label><FontAwesomeIcon icon={faLock} style={{ fontSize: 14 }} /> {t('admins.passwordLabel')}</label>
                                     <input 
                                         type="password"
                                         className="form-control"
-                                        placeholder="Mínimo 6 caracteres"
+                                        placeholder={t('admins.passwordPlaceholder')}
                                         value={newAdmin.password}
                                         onChange={e => setNewAdmin({ ...newAdmin, password: e.target.value })}
                                         required
@@ -199,9 +202,9 @@ export default function AdminsPage() {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                                <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>{t('admins.cancel')}</button>
                                 <button type="submit" className="btn-primary" disabled={creating}>
-                                    {creating ? 'Creando...' : 'Crear Admin'}
+                                    {creating ? t('admins.creating') : t('admins.createButton')}
                                 </button>
                             </div>
                         </form>

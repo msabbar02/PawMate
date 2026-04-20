@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     StyleSheet,
     View,
@@ -13,11 +13,12 @@ import {
     ScrollView,
     Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../context/LanguageContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -26,7 +27,7 @@ const { width } = Dimensions.get('window');
 const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error }) => (
     <View style={styles.inputWrapper}>
         <View style={[styles.inputContainer, error && styles.inputError]}>
-            <Ionicons name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
+            <Icon name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
             <TextInput
                 style={styles.input}
                 placeholder={placeholder}
@@ -42,7 +43,7 @@ const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPa
                     style={styles.eyeBtn}
                     onPress={onTogglePassword}
                 >
-                    <Ionicons name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
+                    <Icon name={secureTextEntry ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.primary} />
                 </TouchableOpacity>
             )}
         </View>
@@ -51,6 +52,7 @@ const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPa
 );
 
 export default function SignupScreen({ navigation }) {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -71,33 +73,33 @@ export default function SignupScreen({ navigation }) {
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!formData.fullName.trim()) {
-            newErrors.fullName = 'El nombre completo es requerido.';
+            newErrors.fullName = t('signup.nameRequired');
             isValid = false;
         }
 
         if (!formData.email.trim()) {
-            newErrors.email = 'El email es requerido.';
+            newErrors.email = t('login.emailRequired');
             isValid = false;
         } else if (!emailRegex.test(formData.email)) {
-            newErrors.email = 'Ingresa un email válido.';
+            newErrors.email = t('login.invalidEmail');
             isValid = false;
         }
 
         if (!formData.password) {
-            newErrors.password = 'La contraseña es requerida.';
+            newErrors.password = t('login.passwordRequired');
             isValid = false;
         } else if (formData.password.length < 8) {
-            newErrors.password = 'La contraseña debe tener al menos 8 caracteres.';
+            newErrors.password = t('signup.passwordMinLength');
             isValid = false;
         }
 
         if (formData.password !== formData.confirmPassword) {
-            newErrors.confirmPassword = 'Las contraseñas no coinciden.';
+            newErrors.confirmPassword = t('signup.passwordsMismatch');
             isValid = false;
         }
 
         if (!termsAccepted) {
-            newErrors.terms = 'Debes aceptar los términos y condiciones.';
+            newErrors.terms = t('signup.termsRequired');
             isValid = false;
         }
 
@@ -131,7 +133,7 @@ export default function SignupScreen({ navigation }) {
             // Check email already registered
             const emailTaken = await checkEmailExists(formData.email);
             if (emailTaken) {
-                setErrors({ email: 'Este correo electrónico ya está registrado.' });
+                setErrors({ email: t('signup.emailExists') });
                 return;
             }
 
@@ -162,17 +164,17 @@ export default function SignupScreen({ navigation }) {
                     // Si hay sesión activa, el AuthContext redirigirá automáticamente
                     if (!data?.session) {
                         setErrors({
-                            form: '¡Cuenta creada! Revisa tu bandeja de entrada para confirmar tu correo.',
+                            form: t('signup.accountCreated'),
                         });
                     }
                     return;
                 }
                 if (msg.includes('User already registered') || msg.includes('already registered')) {
-                    setErrors({ email: 'Este correo electrónico ya está registrado.' });
+                    setErrors({ email: t('signup.emailExists') });
                     return;
                 }
                 if (msg.includes('FetchError') || msg.includes('Network request failed') || msg.includes('fetch')) {
-                    setErrors({ form: 'Error de red. Revisa tu conexión a internet.' });
+                    setErrors({ form: t('login.networkError') });
                     return;
                 }
                 throw error;
@@ -183,12 +185,12 @@ export default function SignupScreen({ navigation }) {
             // Si se requiere confirmación, mostramos aviso.
             if (data?.user && !data?.session) {
                 setErrors({
-                    form: '¡Cuenta creada! Revisa tu correo para confirmar tu cuenta.',
+                    form: t('signup.accountCreated'),
                 });
             }
         } catch (error) {
             console.error('Supabase Signup Error:', error.message);
-            setErrors({ form: 'Ocurrió un error. Inténtalo de nuevo.' });
+            setErrors({ form: t('signup.genericError') });
         } finally {
             setLoading(false);
         }
@@ -232,7 +234,7 @@ export default function SignupScreen({ navigation }) {
             }
         } catch (error) {
             console.error('Google signup error:', error);
-            Alert.alert('Error', error.message || 'No se pudo registrar con Google.');
+            Alert.alert(t('common.error'), error.message || t('signup.googleError'));
         } finally {
             setLoading(false);
         }
@@ -258,17 +260,17 @@ export default function SignupScreen({ navigation }) {
 
                         <View style={styles.header}>
                             <View style={styles.logoContainer}>
-                                <Ionicons name="paw" size={40} color={COLORS.background} />
+                                <Icon name="paw" size={40} color={COLORS.background} />
                             </View>
-                            <Text style={styles.title}>Crear Cuenta</Text>
-                            <Text style={styles.subtitle}>Cuidando lo que más quieres</Text>
+                            <Text style={styles.title}>{t('signup.title')}</Text>
+                            <Text style={styles.subtitle}>{t('signup.subtitle')}</Text>
                         </View>
 
                         <View style={styles.formContainer}>
 
                             <InputField
                                 icon="person-outline"
-                                placeholder="Nombre Completo"
+                                placeholder={t('signup.fullName')}
                                 value={formData.fullName}
                                 fieldName="fullName"
                                 error={errors.fullName}
@@ -280,7 +282,7 @@ export default function SignupScreen({ navigation }) {
 
                             <InputField
                                 icon="mail-outline"
-                                placeholder="Correo Electrónico"
+                                placeholder={t('login.email')}
                                 value={formData.email}
                                 fieldName="email"
                                 error={errors.email}
@@ -292,7 +294,7 @@ export default function SignupScreen({ navigation }) {
 
                             <InputField
                                 icon="lock-closed-outline"
-                                placeholder="Contraseña"
+                                placeholder={t('login.password')}
                                 value={formData.password}
                                 fieldName="password"
                                 secureTextEntry={!showPassword}
@@ -307,7 +309,7 @@ export default function SignupScreen({ navigation }) {
 
                             <InputField
                                 icon="lock-closed-outline"
-                                placeholder="Confirmar Contraseña"
+                                placeholder={t('signup.confirmPassword')}
                                 value={formData.confirmPassword}
                                 fieldName="confirmPassword"
                                 secureTextEntry={!showConfirmPassword}
@@ -328,17 +330,17 @@ export default function SignupScreen({ navigation }) {
                                         if (errors.terms) setErrors({ ...errors, terms: null });
                                     }}
                                 >
-                                    {termsAccepted && <Ionicons name="checkmark" size={16} color={COLORS.background} style={styles.checkIcon} />}
+                                    {termsAccepted && <Icon name="checkmark" size={16} color={COLORS.background} style={styles.checkIcon} />}
                                     {!termsAccepted && <View style={styles.checkboxInner} />}
                                 </TouchableOpacity>
-                                <Text style={styles.termsText}>Acepto los Términos y Política de Privacidad</Text>
+                                <Text style={styles.termsText}>{t('signup.acceptTerms')}</Text>
                             </View>
                             {errors.terms && <Text style={[styles.errorText, { marginTop: -10, marginBottom: 15 }]}>{errors.terms}</Text>}
 
                             {errors.form && (
                                 <Text style={[
                                     styles.serverError,
-                                    errors.form.includes('creada') && { backgroundColor: '#16a34a' }
+                                    errors.form.includes(t('signup.accountCreated')) && { backgroundColor: '#16a34a' }
                                 ]}>
                                     {errors.form}
                                 </Text>
@@ -352,30 +354,30 @@ export default function SignupScreen({ navigation }) {
                                 {loading ? (
                                     <ActivityIndicator color={COLORS.background} />
                                 ) : (
-                                    <Text style={styles.submitButtonText}>Regístrate</Text>
+                                    <Text style={styles.submitButtonText}>{t('signup.signUp')}</Text>
                                 )}
                             </TouchableOpacity>
 
                             <View style={styles.switchFlow}>
-                                <Text style={styles.switchText}>¿Ya tienes cuenta? </Text>
+                                <Text style={styles.switchText}>{t('signup.hasAccount')} </Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                                    <Text style={styles.switchLink}>Inicia Sesión</Text>
+                                    <Text style={styles.switchLink}>{t('signup.loginHere')}</Text>
                                 </TouchableOpacity>
                             </View>
 
                             <View style={styles.oauthSection}>
                                 <View style={styles.oauthDivider}>
                                     <View style={styles.line} />
-                                    <Text style={styles.oauthText}>O regístrate con</Text>
+                                    <Text style={styles.oauthText}>{t('signup.continueWith')}</Text>
                                     <View style={styles.line} />
                                 </View>
                                 <View style={styles.oauthButtonsRow}>
                                     <TouchableOpacity style={styles.oauthBtn} onPress={handleGoogleSignup} disabled={loading}>
-                                        <Ionicons name="logo-google" size={20} color="#DB4437" />
+                                        <Icon name="logo-google" size={20} color="#DB4437" />
                                         <Text style={styles.oauthBtnText}>Google</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.oauthBtn} disabled>
-                                        <Ionicons name="logo-apple" size={20} color="#000000" />
+                                        <Icon name="logo-apple" size={20} color="#000000" />
                                         <Text style={styles.oauthBtnText}>Apple</Text>
                                     </TouchableOpacity>
                                 </View>

@@ -9,8 +9,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors()); // Enable CORS for all origins
-app.use(express.json()); // Parse JSON bodies
+const allowedOrigins = [
+    'https://apppawmate.com',
+    'https://www.apppawmate.com',
+    'https://admin.apppawmate.com',
+    'https://api.apppawmate.com',
+];
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174');
+}
+app.use(cors({
+    origin: (origin, cb) => {
+        // Allow requests with no origin (mobile apps, curl, server-to-server)
+        if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+        cb(null, false);
+    },
+}));
+app.use(express.json({ limit: '100kb' })); // Parse JSON bodies with explicit size limit
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
 // API Routes

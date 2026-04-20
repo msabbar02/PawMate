@@ -1,27 +1,29 @@
-import React, { useContext } from 'react';
+﻿import React, { useContext } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './Icon';
 import { AuthContext } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 
 const WeatherWidget = () => {
     const { userData } = useContext(AuthContext);
+    const { t } = useTranslation();
     const userName = userData?.name || 'User';
 
     // Simulated weather data
     const weather = {
         temp: 22,
-        condition: '¡Tiempo estupendo!',
+        condition: t('components.greatWeather'),
         icon: 'sunny',
     };
 
     return (
         <View style={styles.container}>
             <View style={styles.row}>
-                <Ionicons name={weather.icon} size={22} color="#F59E0B" />
+                <Icon name={weather.icon} size={22} color="#F59E0B" />
                 <Text style={styles.tempText}>{weather.temp}°C</Text>
             </View>
             <Text style={styles.greetingText} numberOfLines={1}>
-                {'Hola '}{userName}{'!'}
+                {t('components.hello', { name: userName })}
             </Text>
             <Text style={styles.conditionText} numberOfLines={1}>
                 {weather.condition}

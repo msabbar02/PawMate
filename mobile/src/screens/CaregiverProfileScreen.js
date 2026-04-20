@@ -1,23 +1,25 @@
-import React, { useContext, useState, useEffect } from 'react';
+﻿import React, { useContext, useState, useEffect } from 'react';
 import {
     StyleSheet, View, Text, Image, ScrollView,
     TouchableOpacity, ActivityIndicator, Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
-
-const SERVICE_LABELS = { walking: '🚶 Paseos', hotel: '🏨 Hotel', daycare: '☀️ Guardería', grooming: '✂️ Peluquería', training: '🏋️ Entrenamiento' };
-const TABS = ['General', 'Disponibilidad', 'Reseñas'];
-const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+import { useTranslation } from '../context/LanguageContext';
 
 export default function CaregiverProfileScreen({ route, navigation }) {
     const { caregiverId } = route.params || {};
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { user, userData } = useContext(AuthContext);
+    const { t } = useTranslation();
+
+    const SERVICE_LABELS = { walking: '🚶 ' + t('services.walking'), hotel: '🏨 ' + t('services.hotel') };
+    const TABS = [t('caregiverProfile.generalTab'), t('caregiverProfile.availabilityTab'), t('caregiverProfile.reviewsTab')];
+    const DAYS = [t('days.monday'), t('days.tuesday'), t('days.wednesday'), t('days.thursday'), t('days.friday'), t('days.saturday'), t('days.sunday')];
 
     const [caregiver, setCaregiver] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -54,9 +56,9 @@ export default function CaregiverProfileScreen({ route, navigation }) {
     if (!caregiver) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: theme.text, fontSize: 16 }}>Cuidador no encontrado</Text>
+                <Text style={{ color: theme.text, fontSize: 16 }}>{t('caregiverProfile.notFound')}</Text>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
-                    <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Volver</Text>
+                    <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{t('common.back')}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -81,8 +83,8 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                 const { data: newConvo, error } = await supabase.from('conversations').insert({
                     ownerId,
                     caregiverId: cgId,
-                    ownerName: isOwner ? (userData?.fullName || 'Dueño') : (caregiver.fullName || 'Dueño'),
-                    caregiverName: isOwner ? (caregiver.fullName || 'Cuidador') : (userData?.fullName || 'Cuidador'),
+                    ownerName: isOwner ? (userData?.fullName || t('roles.owner')) : (caregiver.fullName || t('roles.owner')),
+                    caregiverName: isOwner ? (caregiver.fullName || t('roles.caregiver')) : (userData?.fullName || t('roles.caregiver')),
                     ownerAvatar: isOwner ? (userData?.avatar || null) : (caregiver.avatar || null),
                     caregiverAvatar: isOwner ? (caregiver.avatar || null) : (userData?.avatar || null),
                 }).select().single();
@@ -105,12 +107,12 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             {/* Stats row */}
             <View style={styles.statsRow}>
                 {[
-                    { label: 'Reseñas', value: String(caregiver.reviewCount || reviews.length || '0'), icon: 'chatbubble-outline' },
-                    { label: 'Experiencia', value: caregiver.experience || 'Sin info', icon: 'time-outline' },
-                    { label: 'Radio', value: `${caregiver.serviceRadius || 5} km`, icon: 'location-outline' },
+                    { label: t('caregiverProfile.reviews'), value: String(caregiver.reviewCount || reviews.length || '0'), icon: 'chatbubble-outline' },
+                    { label: t('caregiverProfile.experience'), value: caregiver.experience || t('caregiverProfile.noInfo'), icon: 'time-outline' },
+                    { label: t('caregiverProfile.radius'), value: `${caregiver.serviceRadius || 5} km`, icon: 'location-outline' },
                 ].map((s, i) => (
                     <View key={i} style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
-                        <Ionicons name={s.icon} size={18} color={COLORS.primary} />
+                        <Icon name={s.icon} size={18} color={COLORS.primary} />
                         <Text style={[styles.statValue, { color: theme.text }]}>{s.value}</Text>
                         <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{s.label}</Text>
                     </View>
@@ -120,7 +122,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             {/* Services */}
             {(caregiver.serviceTypes?.length > 0) && (
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Servicios</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.servicesTitle')}</Text>
                     <View style={styles.serviceChips}>
                         {caregiver.serviceTypes.map(s => (
                             <View key={s} style={[styles.chip, { backgroundColor: COLORS.primaryBg }]}>
@@ -130,9 +132,9 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                     </View>
                     {caregiver.price > 0 && (
                         <View style={[styles.priceTag, { backgroundColor: theme.background }]}>
-                            <Ionicons name="pricetag" size={16} color={COLORS.primary} />
+                            <Icon name="pricetag" size={16} color={COLORS.primary} />
                             <Text style={[styles.priceText, { color: theme.text }]}>{caregiver.price}€</Text>
-                            <Text style={[styles.priceUnit, { color: theme.textSecondary }]}>/hora</Text>
+                            <Text style={[styles.priceUnit, { color: theme.textSecondary }]}>{t('caregivers.perHour')}</Text>
                         </View>
                     )}
                 </View>
@@ -141,7 +143,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             {/* About */}
             {caregiver.bio ? (
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Sobre Mí</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.aboutMe')}</Text>
                     <Text style={[styles.aboutText, { color: theme.textSecondary }]}>{caregiver.bio}</Text>
                 </View>
             ) : null}
@@ -149,12 +151,12 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             {/* Accepted species */}
             {(caregiver.acceptedSpecies?.length > 0) && (
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Mascotas que acepta</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.acceptedPets')}</Text>
                     <View style={styles.serviceChips}>
                         {caregiver.acceptedSpecies.map(s => (
                             <View key={s} style={[styles.chip, { backgroundColor: '#E0F2FE' }]}>
                                 <Text style={[styles.chipText, { color: '#0891b2' }]}>
-                                    {s === 'perro' ? '🐶 Perros' : s === 'gato' ? '🐱 Gatos' : s === 'ave' ? '🐦 Aves' : s === 'reptil' ? '🦎 Reptiles' : '🐾 ' + s}
+                                    {s === 'perro' ? '🐶 ' + t('species.dogs') : s === 'gato' ? '🐱 ' + t('species.cats') : '🐾 ' + s}
                                 </Text>
                             </View>
                         ))}
@@ -173,7 +175,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
 
         return (
             <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Horario Semanal</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.weeklySchedule')}</Text>
                 {hasSchedule ? DAYS.map(day => {
                     const dayData = sched[day];
                     const available = dayData?.available !== false;
@@ -182,21 +184,21 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                             <Text style={[styles.dayText, { color: theme.text }]}>{day}</Text>
                             {available ? (
                                 <View style={styles.timeSlot}>
-                                    <Ionicons name="time-outline" size={14} color={COLORS.primary} />
+                                    <Icon name="time-outline" size={14} color={COLORS.primary} />
                                     <Text style={[styles.timeText, { color: theme.textSecondary }]}>
                                         {dayData?.from || '09:00'} - {dayData?.to || '18:00'}
                                     </Text>
                                 </View>
                             ) : (
-                                <Text style={styles.unavailableText}>No disponible</Text>
+                                <Text style={styles.unavailableText}>{t('caregiverProfile.notAvailable')}</Text>
                             )}
                         </View>
                     );
                 }) : (
                     <View style={{ alignItems: 'center', paddingVertical: 30 }}>
-                        <Ionicons name="calendar-outline" size={40} color={COLORS.textLight} />
+                        <Icon name="calendar-outline" size={40} color={COLORS.textLight} />
                         <Text style={[{ color: theme.textSecondary, marginTop: 10, fontSize: 14 }]}>
-                            El cuidador no ha configurado su horario aún.
+                            {t('caregiverProfile.noSchedule')}
                         </Text>
                     </View>
                 )}
@@ -208,10 +210,10 @@ export default function CaregiverProfileScreen({ route, navigation }) {
     const renderReviewsTab = () => (
         <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.reviewHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Reseñas</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.reviews')}</Text>
                 {caregiver.rating > 0 && (
                     <View style={styles.overallRating}>
-                        <Ionicons name="star" size={18} color="#F5A623" />
+                        <Icon name="star" size={18} color="#F5A623" />
                         <Text style={[styles.overallRatingText, { color: theme.text }]}>{caregiver.rating?.toFixed(1)}</Text>
                     </View>
                 )}
@@ -226,7 +228,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                                 </Text>
                             </View>
                             <View>
-                                <Text style={[styles.reviewName, { color: theme.text }]}>{r.reviewerName || 'Usuario'}</Text>
+                                <Text style={[styles.reviewName, { color: theme.text }]}>{r.reviewerName || t('common.user')}</Text>
                                 <Text style={[styles.reviewDate, { color: theme.textSecondary }]}>
                                     {r.created_at ? new Date(r.created_at).toLocaleDateString('es-ES') : ''}
                                 </Text>
@@ -234,7 +236,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                         </View>
                         <View style={styles.reviewStars}>
                             {[1, 2, 3, 4, 5].map(s => (
-                                <Ionicons key={s} name="star" size={14} color={s <= (r.rating || 5) ? '#F5A623' : '#E5E7EB'} />
+                                <Icon key={s} name="star" size={14} color={s <= (r.rating || 5) ? '#F5A623' : '#E5E7EB'} />
                             ))}
                         </View>
                     </View>
@@ -242,8 +244,8 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                 </View>
             )) : (
                 <View style={styles.noReviews}>
-                    <Ionicons name="chatbubble-outline" size={40} color={COLORS.textLight} />
-                    <Text style={[styles.noReviewsText, { color: theme.textSecondary }]}>Aún no hay reseñas</Text>
+                    <Icon name="chatbubble-outline" size={40} color={COLORS.textLight} />
+                    <Text style={[styles.noReviewsText, { color: theme.textSecondary }]}>{t('caregiverProfile.noReviews')}</Text>
                 </View>
             )}
         </View>
@@ -258,9 +260,9 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             {/* Header */}
             <View style={[styles.headerBanner, { backgroundColor: COLORS.primaryBg }]}>
                 <TouchableOpacity style={[styles.backBtn, { backgroundColor: theme.cardBackground }]} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+                    <Icon name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerLabel, { color: COLORS.primary }]}>Perfil del Cuidador</Text>
+                <Text style={[styles.headerLabel, { color: COLORS.primary }]}>{t('caregiverProfile.title')}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
@@ -282,32 +284,32 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                     <View style={styles.profileInfo}>
                         <View style={styles.nameRow}>
                             <Text style={[styles.nameText, { color: theme.text }]} numberOfLines={1}>
-                                {caregiver.fullName || caregiver.firstName || 'Cuidador'}
+                                {caregiver.fullName || caregiver.firstName || t('roles.caregiver')}
                             </Text>
                             {caregiver.verificationStatus === 'verified' && (
                                 <View style={styles.verifiedBadge}>
-                                    <Ionicons name="shield-checkmark" size={14} color="#F5A623" />
+                                    <Icon name="shield-checkmark" size={14} color="#F5A623" />
                                 </View>
                             )}
                         </View>
                         
                         {caregiver.rating > 0 && (
                             <View style={styles.ratingRow}>
-                                <Ionicons name="star" size={15} color="#F5A623" />
+                                <Icon name="star" size={15} color="#F5A623" />
                                 <Text style={[styles.ratingText, { color: theme.text }]}>{caregiver.rating?.toFixed(1)}</Text>
-                                <Text style={[styles.ratingCount, { color: theme.textSecondary }]}>({caregiver.reviewCount || 0} reseñas)</Text>
+                                <Text style={[styles.ratingCount, { color: theme.textSecondary }]}>({caregiver.reviewCount || 0} {t('caregivers.reviews')})</Text>
                             </View>
                         )}
 
                         <View style={styles.locationRow}>
-                            <Ionicons name="location-outline" size={14} color={theme.textSecondary} />
-                            <Text style={[styles.locationText, { color: theme.textSecondary }]}>{caregiver.city || 'Sin ubicación'}</Text>
+                            <Icon name="location-outline" size={14} color={theme.textSecondary} />
+                            <Text style={[styles.locationText, { color: theme.textSecondary }]}>{caregiver.city || t('caregivers.noLocation')}</Text>
                         </View>
 
                         {caregiver.price > 0 && (
                             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
                                 <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.primary }}>{caregiver.price}€</Text>
-                                <Text style={{ fontSize: 13, color: theme.textSecondary, marginLeft: 2 }}>/hora</Text>
+                                <Text style={{ fontSize: 13, color: theme.textSecondary, marginLeft: 2 }}>{t('caregivers.perHour')}</Text>
                             </View>
                         )}
                     </View>
@@ -320,13 +322,13 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                             style={[styles.actionBtn, { backgroundColor: theme.cardBackground, borderWidth: 1.5, borderColor: COLORS.primary }]} 
                             onPress={startChat}
                         >
-                            <Ionicons name="chatbubble-outline" size={19} color={COLORS.primary} />
-                            <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Mensaje</Text>
+                            <Icon name="chatbubble-outline" size={19} color={COLORS.primary} />
+                            <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>{t('caregivers.message')}</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.primary }]} onPress={makeReservation}>
-                            <Ionicons name="calendar-outline" size={19} color="#FFF" />
-                            <Text style={[styles.actionBtnText, { color: '#FFF' }]}>Reservar</Text>
+                            <Icon name="calendar-outline" size={19} color="#FFF" />
+                            <Text style={[styles.actionBtnText, { color: '#FFF' }]}>{t('caregivers.book')}</Text>
                         </TouchableOpacity>
                     </View>
                 )}

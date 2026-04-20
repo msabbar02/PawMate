@@ -53,12 +53,18 @@ const getPetById = async (req, res) => {
  * Create new pet
  * POST /api/pets
  */
+const ALLOWED_PET_FIELDS = [
+    'name', 'species', 'breed', 'birthDate', 'birthdate', 'weight', 'gender', 'sex',
+    'color', 'photoURL', 'image', 'description', 'microchip', 'vaccinated',
+    'neutered', 'medicalNotes', 'allergies', 'medications',
+];
+
 const createPet = async (req, res) => {
     try {
-        const petData = {
-            ...req.body,
-            ownerId: req.user.uid,
-        };
+        const petData = { ownerId: req.user.uid };
+        for (const key of ALLOWED_PET_FIELDS) {
+            if (req.body[key] !== undefined) petData[key] = req.body[key];
+        }
 
         const { data, error } = await supabase
             .from('pets')
@@ -97,9 +103,17 @@ const updatePet = async (req, res) => {
             return sendError(res, 'Unauthorized', 403);
         }
 
+        const updates = {};
+        for (const key of ALLOWED_PET_FIELDS) {
+            if (req.body[key] !== undefined) updates[key] = req.body[key];
+        }
+        if (Object.keys(updates).length === 0) {
+            return sendError(res, 'No valid fields to update', 400);
+        }
+
         const { error } = await supabase
             .from('pets')
-            .update(req.body)
+            .update(updates)
             .eq('id', id);
 
         if (error) throw error;

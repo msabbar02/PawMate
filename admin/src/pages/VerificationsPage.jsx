@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-import { ShieldCheck, ShieldX, Clock, X, Eye, UserCheck, Undo2, FileImage } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShieldHalved, faClock, faXmark, faEye, faUserCheck, faRotateLeft, faFileImage } from '@fortawesome/free-solid-svg-icons';
+import { useTranslation } from 'react-i18next';
 import './VerificationsPage.css';
 
 export default function VerificationsPage() {
@@ -9,6 +11,7 @@ export default function VerificationsPage() {
     const [statusFilter, setStatusFilter] = useState('pending');
     const [previewImage, setPreviewImage] = useState(null);
     const [previewLabel, setPreviewLabel] = useState('');
+    const { t } = useTranslation();
 
     useEffect(() => {
         fetchVerifications();
@@ -32,7 +35,7 @@ export default function VerificationsPage() {
     };
 
     const handleApprove = async (user) => {
-        if (!window.confirm(`¿Aprobar la verificación de ${user.fullName || user.email}? Se le asignará el rol "${user.pendingRole || 'owner'}".`)) return;
+        if (!window.confirm(t('verifications.confirmApprove', { name: user.fullName || user.email, role: user.pendingRole || 'owner' }))) return;
 
         try {
             const newRole = user.pendingRole || 'owner';
@@ -43,7 +46,7 @@ export default function VerificationsPage() {
 
             if (error) {
                 console.error('Supabase update error:', error);
-                alert(`Error al aprobar: ${error.message}`);
+                alert(`${t('verifications.errorApprove')} ${error.message}`);
                 return;
             }
 
@@ -52,22 +55,23 @@ export default function VerificationsPage() {
             ));
         } catch (err) {
             console.error('Error approving:', err);
-            alert('Error al aprobar la verificación.');
+            alert(t('verifications.errorApproveGeneric'));
         }
     };
 
     const handleReject = async (user) => {
-        const reason = window.prompt(`Motivo del rechazo para ${user.fullName || user.email}:`, 'Documentación insuficiente o ilegible.');
+        const reason = window.prompt(t('verifications.rejectPrompt', { name: user.fullName || user.email }), t('verifications.rejectDefaultReason'));
         if (reason === null) return;
 
         try {
             const { error } = await supabase.from('users').update({
                 verificationStatus: 'rejected',
+                verificationRejectionReason: reason,
             }).eq('id', user.id);
 
             if (error) {
                 console.error('Supabase update error:', error);
-                alert(`Error al rechazar: ${error.message}`);
+                alert(`${t('verifications.errorReject')} ${error.message}`);
                 return;
             }
 
@@ -76,12 +80,12 @@ export default function VerificationsPage() {
             ));
         } catch (err) {
             console.error('Error rejecting:', err);
-            alert('Error al rechazar la verificación.');
+            alert(t('verifications.errorRejectGeneric'));
         }
     };
 
     const handleResetToPending = async (user) => {
-        if (!window.confirm(`¿Revertir la verificación de ${user.fullName || user.email} a pendiente?`)) return;
+        if (!window.confirm(t('verifications.confirmRevert', { name: user.fullName || user.email }))) return;
 
         try {
             const { error } = await supabase.from('users').update({
@@ -90,7 +94,7 @@ export default function VerificationsPage() {
 
             if (error) {
                 console.error('Supabase update error:', error);
-                alert(`Error al revertir: ${error.message}`);
+                alert(`${t('verifications.errorRevert')} ${error.message}`);
                 return;
             }
 
@@ -99,7 +103,7 @@ export default function VerificationsPage() {
             ));
         } catch (err) {
             console.error('Error resetting:', err);
-            alert('Error al revertir la verificación.');
+            alert(t('verifications.errorRevertGeneric'));
         }
     };
 
@@ -130,7 +134,7 @@ export default function VerificationsPage() {
         return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
 
-    const getUserName = (u) => u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email?.split('@')[0] || 'Usuario';
+    const getUserName = (u) => u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email?.split('@')[0] || t('verifications.userFallback');
     const getInitial = (u) => getUserName(u).charAt(0).toUpperCase();
 
     // ── Render ──────────────────────────
@@ -139,7 +143,7 @@ export default function VerificationsPage() {
             <div className="verifications-page">
                 <div className="verifications-loading">
                     <div className="spinner" />
-                    <span>Cargando solicitudes...</span>
+                    <span>{t('verifications.loading')}</span>
                 </div>
             </div>
         );
@@ -151,13 +155,13 @@ export default function VerificationsPage() {
             {/* Header */}
             <div className="page-header">
                 <h1>
-                    <ShieldCheck size={26} />
-                    Verificaciones de Identidad
+                    <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 26 }} />
+                    {t('verifications.pageTitle')}
                 </h1>
                 <div className="stat-pills">
-                    <span className="stat-pill pending"><Clock size={14} /> {counts.pending} pendientes</span>
-                    <span className="stat-pill approved"><ShieldCheck size={14} /> {counts.approved} aprobados</span>
-                    <span className="stat-pill rejected"><ShieldX size={14} /> {counts.rejected} rechazados</span>
+                    <span className="stat-pill pending"><FontAwesomeIcon icon={faClock} style={{ fontSize: 14 }} /> {counts.pending} {t('verifications.pendingCount')}</span>
+                    <span className="stat-pill approved"><FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 14 }} /> {counts.approved} {t('verifications.approvedCount')}</span>
+                    <span className="stat-pill rejected"><FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 14 }} /> {counts.rejected} {t('verifications.rejectedCount')}</span>
                 </div>
             </div>
 
@@ -169,7 +173,7 @@ export default function VerificationsPage() {
                         className={`filter-btn ${statusFilter === f ? 'active' : ''}`}
                         onClick={() => setStatusFilter(f)}
                     >
-                        {f === 'all' ? 'Todos' : f === 'pending' ? 'Pendientes' : f === 'approved' ? 'Aprobados' : 'Rechazados'}
+                        {f === 'all' ? t('verifications.filterAll') : f === 'pending' ? t('verifications.filterPending') : f === 'approved' ? t('verifications.filterApproved') : t('verifications.filterRejected')}
                         {' '}({counts[f]})
                     </button>
                 ))}
@@ -178,9 +182,9 @@ export default function VerificationsPage() {
             {/* Grid */}
             {filtered.length === 0 ? (
                 <div className="verifications-empty">
-                    <FileImage size={52} />
-                    <h3>Sin solicitudes</h3>
-                    <p>No hay solicitudes de verificación {statusFilter !== 'all' ? `con estado "${statusFilter}"` : ''}.</p>
+                    <FontAwesomeIcon icon={faFileImage} style={{ fontSize: 52 }} />
+                    <h3>{t('verifications.noRequests')}</h3>
+                    <p>{t('verifications.noRequestsMessage')} {statusFilter !== 'all' ? `${t('verifications.withStatus')} "${statusFilter}"` : ''}.</p>
                 </div>
             ) : (
                 <div className="verifications-grid">
@@ -200,17 +204,17 @@ export default function VerificationsPage() {
                                     <span className="email">{req.email}</span>
                                 </div>
                                 <span className={`role-badge ${req.pendingRole || 'owner'}`}>
-                                    {req.pendingRole === 'caregiver' ? '🛡️ Cuidador' : '🐾 Dueño'}
+                                    {req.pendingRole === 'caregiver' ? `🛡️ ${t('verifications.roleCaregiver')}` : `🐾 ${t('verifications.roleOwner')}`}
                                 </span>
                             </div>
 
                             {/* Document previews */}
                             <div className={`docs-preview ${req.certDocUrl ? 'has-cert' : ''}`}>
                                 {[
-                                    { url: req.idFrontUrl, label: 'DNI Frente' },
-                                    { url: req.idBackUrl, label: 'DNI Dorso' },
-                                    { url: req.selfieUrl, label: 'Selfie' },
-                                    ...(req.certDocUrl ? [{ url: req.certDocUrl, label: 'Certificado' }] : []),
+                                    { url: req.idFrontUrl, label: t('verifications.docFront') },
+                                    { url: req.idBackUrl, label: t('verifications.docBack') },
+                                    { url: req.selfieUrl, label: t('verifications.docSelfie') },
+                                    ...(req.certDocUrl ? [{ url: req.certDocUrl, label: t('verifications.docCert') }] : []),
                                 ].map((doc, i) => (
                                     <div
                                         key={i}
@@ -223,7 +227,7 @@ export default function VerificationsPage() {
                                                 <span className="doc-label">{doc.label}</span>
                                             </>
                                         ) : (
-                                            <span className="no-doc">Sin {doc.label}</span>
+                                            <span className="no-doc">{t('verifications.noDoc')} {doc.label}</span>
                                         )}
                                     </div>
                                 ))}
@@ -232,14 +236,14 @@ export default function VerificationsPage() {
                             {/* Meta chips */}
                             <div className="card-meta">
                                 <span className={`status-badge ${req.verificationStatus}`}>
-                                    {req.verificationStatus === 'pending' ? '⏳ Pendiente' : req.verificationStatus === 'approved' ? '✅ Aprobado' : '❌ Rechazado'}
+                                    {req.verificationStatus === 'pending' ? `⏳ ${t('verifications.statusPending')}` : req.verificationStatus === 'approved' ? `✅ ${t('verifications.statusApproved')}` : `❌ ${t('verifications.statusRejected')}`}
                                 </span>
                                 <span className="meta-chip">
-                                    <Clock size={12} /> {formatDate(req.verificationRequestedAt)}
+                                    <FontAwesomeIcon icon={faClock} style={{ fontSize: 12 }} /> {formatDate(req.verificationRequestedAt)}
                                 </span>
                                 {req.pendingRole === 'caregiver' && req.serviceTypes?.length > 0 && (
                                     <span className="meta-chip">
-                                        Servicios: {req.serviceTypes.join(', ')}
+                                        {t('verifications.servicesLabel')} {req.serviceTypes.join(', ')}
                                     </span>
                                 )}
                             </div>
@@ -249,16 +253,16 @@ export default function VerificationsPage() {
                                 {req.verificationStatus === 'pending' && (
                                     <>
                                         <button className="approve-btn" onClick={() => handleApprove(req)}>
-                                            <UserCheck size={16} /> Aprobar
+                                            <FontAwesomeIcon icon={faUserCheck} style={{ fontSize: 16 }} /> {t('verifications.approve')}
                                         </button>
                                         <button className="reject-btn" onClick={() => handleReject(req)}>
-                                            <ShieldX size={16} /> Rechazar
+                                            <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 16 }} /> {t('verifications.reject')}
                                         </button>
                                     </>
                                 )}
                                 {(req.verificationStatus === 'approved' || req.verificationStatus === 'rejected') && (
                                     <button className="undo-btn" onClick={() => handleResetToPending(req)}>
-                                        <Undo2 size={16} /> Revertir a Pendiente
+                                        <FontAwesomeIcon icon={faRotateLeft} style={{ fontSize: 16 }} /> {t('verifications.revertToPending')}
                                     </button>
                                 )}
                             </div>
@@ -271,7 +275,7 @@ export default function VerificationsPage() {
             {previewImage && (
                 <div className="image-preview-overlay" onClick={closePreview}>
                     <button className="close-preview" onClick={closePreview}>
-                        <X size={22} />
+                        <FontAwesomeIcon icon={faXmark} style={{ fontSize: 22 }} />
                     </button>
                     <img src={previewImage} alt={previewLabel} onClick={e => e.stopPropagation()} />
                     <span className="preview-label">{previewLabel}</span>

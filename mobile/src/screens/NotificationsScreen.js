@@ -1,38 +1,42 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import {
     StyleSheet, View, Text, TouchableOpacity, FlatList,
     Platform, ScrollView, Alert, ActivityIndicator, Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
+import { useTranslation } from '../context/LanguageContext';
 
 // Relative time helper
-function relativeTime(ts) {
+function relativeTime(ts, t) {
     if (!ts) return '';
     const time = ts.toMillis ? ts.toMillis() : new Date(ts).getTime();
     const diff = Date.now() - time;
     const m = Math.floor(diff / 60000);
-    if (m < 1) return 'Ahora mismo';
-    if (m < 60) return `Hace ${m} min`;
+    if (m < 1) return t('notifications.now');
+    if (m < 60) return t('notifications.minutesAgo', { count: m });
     const h = Math.floor(m / 60);
-    if (h < 24) return `Hace ${h}h`;
+    if (h < 24) return t('notifications.hoursAgo', { count: h });
     const d = Math.floor(h / 24);
-    if (d < 7) return `Hace ${d} día${d > 1 ? 's' : ''}`;
-    return `Hace ${Math.floor(d / 7)} sem`;
+    if (d < 7) return t('notifications.daysAgo', { count: d });
+    return t('notifications.weeksAgo', { count: Math.floor(d / 7) });
 }
 
 export default function NotificationsScreen({ navigation }) {
     const { userData, user } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
+    const { t } = useTranslation();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [activeNotif, setActiveNotif] = useState(null);
+
+    const isCaregiver = userData?.role === 'caregiver';
 
     // ── SUPABASE LISTENER ────────────────────────
     useEffect(() => {
@@ -135,12 +139,12 @@ export default function NotificationsScreen({ navigation }) {
     const handleAcceptBooking = async (notif) => {
         const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data) : (notif.data || {});
         const bookingId = notifData.bookingId;
-        if (!bookingId) { Alert.alert('Error', 'No se encontró la reserva asociada.'); return; }
+        if (!bookingId) { Alert.alert(t('common.error'), t('notifications.bookingNotFound')); return; }
         try {
             // Fetch reservation to get real data
             const { data: reservation } = await supabase
                 .from('reservations').select('*').eq('id', bookingId).single();
-            if (!reservation) { Alert.alert('Error', 'Reserva no encontrada.'); return; }
+            if (!reservation) { Alert.alert(t('common.error'), t('notifications.reservationNotFound')); return; }
 
             // Capacity check
             const serviceType = reservation.serviceType || 'walking';
@@ -150,11 +154,11 @@ export default function NotificationsScreen({ navigation }) {
                 .from('reservations')
                 .select('*', { count: 'exact', head: true })
                 .eq('caregiverId', user?.id)
-                .eq('status', 'aceptada')
+                .in('status', ['aceptada', 'activa'])
                 .eq('serviceType', serviceType);
 
             if (count >= MAX) {
-                Alert.alert('Sin capacidad', `Ya tienes ${MAX} reservas activas de este tipo.`);
+                Alert.alert(t('notifications.noCapacity'), t('notifications.noCapacityMsg', { count: MAX }));
                 return;
             }
 
@@ -165,17 +169,17 @@ export default function NotificationsScreen({ navigation }) {
             await createNotification(reservation.ownerId, {
                 type: 'booking_confirmed',
                 bookingId,
-                title: '¡Reserva aceptada! 🎉',
-                body: `${userData?.fullName || 'El cuidador'} aceptó tu reserva. ¡Completa el pago para confirmar!`,
+                title: t('notifications.bookingAccepted'),
+                body: t('notifications.bookingAcceptedBody', { name: userData?.fullName || t('notifications.theCaregiverFallback') }),
                 icon: 'checkmark-circle-outline',
                 iconBg: '#DCFCE7',
                 iconColor: '#16A34A',
             });
             await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
-            Alert.alert('¡Reserva aceptada! 🎉', 'El dueño recibirá una notificación.');
+            Alert.alert(t('notifications.bookingAccepted'), t('notifications.bookingAcceptedMsg'));
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch {
-            Alert.alert('Error', 'No se pudo aceptar la reserva.');
+            Alert.alert(t('common.error'), t('notifications.bookingAcceptError'));
         }
     };
 
@@ -183,7 +187,7 @@ export default function NotificationsScreen({ navigation }) {
     const handleRejectBooking = async (notif) => {
         const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data) : (notif.data || {});
         const bookingId = notifData.bookingId;
-        if (!bookingId) { Alert.alert('Error', 'No se encontró la reserva asociada.'); return; }
+        if (!bookingId) { Alert.alert(t('common.error'), t('notifications.bookingNotFound')); return; }
         try {
             // Fetch reservation to get ownerId
             const { data: reservation } = await supabase
@@ -195,8 +199,8 @@ export default function NotificationsScreen({ navigation }) {
                 await createNotification(reservation.ownerId, {
                     type: 'booking_rejected',
                     bookingId,
-                    title: 'Reserva rechazada',
-                    body: `${userData?.fullName || 'El cuidador'} no pudo aceptar tu reserva para ${reservation.startDate || ''}.`,
+                    title: t('notifications.bookingRejected'),
+                    body: t('notifications.bookingRejectedBody', { name: userData?.fullName || t('notifications.theCaregiverFallback'), date: reservation.startDate || '' }),
                     icon: 'close-circle-outline',
                     iconBg: '#FEE2E2',
                     iconColor: '#EF4444',
@@ -205,11 +209,9 @@ export default function NotificationsScreen({ navigation }) {
             await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
             if (activeNotif?.id === notif.id) setActiveNotif(null);
         } catch {
-            Alert.alert('Error', 'No se pudo rechazar la reserva.');
+            Alert.alert(t('common.error'), t('notifications.bookingRejectError'));
         }
     };
-
-    const isCaregiver = userData?.role === 'caregiver';
 
     // ── FRIEND REQUESTS ────────────────────────────
     const handleAcceptFriend = async (notif) => {
@@ -237,18 +239,18 @@ export default function NotificationsScreen({ navigation }) {
                 <StatusBar style={isDarkMode ? 'light' : 'dark'} />
                 <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                     <TouchableOpacity onPress={() => setActiveNotif(null)} style={styles.iconBtn}>
-                        <Ionicons name="arrow-back" size={22} color={theme.text} />
+                        <Icon name="arrow-back" size={22} color={theme.text} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>Notificación</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>{t('notifications.notification')}</Text>
                     <View style={{ width: 38 }} />
                 </View>
 
                 <ScrollView contentContainerStyle={styles.detailContent}>
                     <View style={[styles.detailIconBox, { backgroundColor: activeNotif.iconBg || COLORS.primaryBg }]}>
-                        <Ionicons name={activeNotif.icon || 'notifications-outline'} size={38} color={activeNotif.iconColor || COLORS.primary} />
+                        <Icon name={activeNotif.icon || 'notifications-outline'} size={38} color={activeNotif.iconColor || COLORS.primary} />
                     </View>
                     <Text style={[styles.detailTitle, { color: theme.text }]}>{activeNotif.title}</Text>
-                    <Text style={[styles.detailTime, { color: theme.textSecondary }]}>{relativeTime(activeNotif.created_at)}</Text>
+                    <Text style={[styles.detailTime, { color: theme.textSecondary }]}>{relativeTime(activeNotif.created_at, t)}</Text>
                     <View style={[styles.detailBodyCard, { backgroundColor: theme.cardBackground }]}>
                         <Text style={[styles.detailBody, { color: theme.text }]}>{activeNotif.body}</Text>
                     </View>
@@ -267,8 +269,8 @@ export default function NotificationsScreen({ navigation }) {
                                 });
                             }}
                         >
-                            <Ionicons name="navigate" size={16} color="#FFF" />
-                            <Text style={styles.acceptBtnText}>Abrir en Google Maps</Text>
+                            <Icon name="navigate" size={16} color="#FFF" />
+                            <Text style={styles.acceptBtnText}>{t('notifications.openMaps')}</Text>
                         </TouchableOpacity>
                     )}
                 </ScrollView>
@@ -284,26 +286,26 @@ export default function NotificationsScreen({ navigation }) {
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                    <Ionicons name="arrow-back" size={22} color={theme.text} />
+                    <Icon name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
                 <View style={{ alignItems: 'center' }}>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>Notificaciones</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>{t('notifications.title')}</Text>
                     {unreadCount > 0 && (
-                        <Text style={styles.unreadBadgeText}>{unreadCount} sin leer</Text>
+                        <Text style={styles.unreadBadgeText}>{t('notifications.unread', { count: unreadCount })}</Text>
                     )}
                 </View>
                 <TouchableOpacity onPress={markAllAsRead} style={styles.iconBtn}>
-                    <Ionicons name="checkmark-done-outline" size={22} color={COLORS.primary} />
+                    <Icon name="checkmark-done-outline" size={22} color={COLORS.primary} />
                 </TouchableOpacity>
             </View>
 
             {/* Selection toolbar */}
             {selectedIds.size > 0 && (
                 <View style={styles.toolbar}>
-                    <Text style={styles.toolbarText}>{selectedIds.size} seleccionadas</Text>
+                    <Text style={styles.toolbarText}>{t('notifications.selected', { count: selectedIds.size })}</Text>
                     <TouchableOpacity onPress={markSelectedAsRead} style={styles.toolbarBtn}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.primary} />
-                        <Text style={styles.toolbarBtnText}>Marcar como leídas</Text>
+                        <Icon name="checkmark-circle-outline" size={16} color={COLORS.primary} />
+                        <Text style={styles.toolbarBtnText}>{t('notifications.markAsRead')}</Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -311,10 +313,10 @@ export default function NotificationsScreen({ navigation }) {
             {/* Select all */}
             <TouchableOpacity style={[styles.selectAllRow, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]} onPress={selectAll}>
                 <View style={[styles.checkbox, allSelected && styles.checkboxActive]}>
-                    {allSelected && <Ionicons name="checkmark" size={13} color="#FFF" />}
+                    {allSelected && <Icon name="checkmark" size={13} color="#FFF" />}
                 </View>
                 <Text style={[styles.selectAllText, { color: theme.text }]}>
-                    {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                    {allSelected ? t('notifications.deselectAll') : t('notifications.selectAll')}
                 </Text>
             </TouchableOpacity>
 
@@ -338,13 +340,13 @@ export default function NotificationsScreen({ navigation }) {
                             {/* Checkbox */}
                             <TouchableOpacity onPress={() => toggleSelect(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                                 <View style={[styles.checkbox, selectedIds.has(item.id) && styles.checkboxActive]}>
-                                    {selectedIds.has(item.id) && <Ionicons name="checkmark" size={13} color="#FFF" />}
+                                    {selectedIds.has(item.id) && <Icon name="checkmark" size={13} color="#FFF" />}
                                 </View>
                             </TouchableOpacity>
 
                             {/* Icon */}
                             <View style={[styles.notifIconBox, { backgroundColor: item.iconBg || COLORS.primaryBg }]}>
-                                <Ionicons name={item.icon || 'notifications-outline'} size={20} color={item.iconColor || COLORS.primary} />
+                                <Icon name={item.icon || 'notifications-outline'} size={20} color={item.iconColor || COLORS.primary} />
                                 {!item.read && <View style={styles.unreadDot} />}
                             </View>
 
@@ -357,7 +359,7 @@ export default function NotificationsScreen({ navigation }) {
                                     >
                                         {item.title}
                                     </Text>
-                                    <Text style={[styles.notifTime, { color: theme.textSecondary }]}>{relativeTime(item.created_at)}</Text>
+                                    <Text style={[styles.notifTime, { color: theme.textSecondary }]}>{relativeTime(item.created_at, t)}</Text>
                                 </View>
                                 <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
 
@@ -367,11 +369,11 @@ export default function NotificationsScreen({ navigation }) {
                                 {item.type === 'friend_request' && (
                                     <View style={styles.bookingActions}>
                                         <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptFriend(item)}>
-                                            <Ionicons name="checkmark" size={13} color="#FFF" />
-                                            <Text style={styles.acceptBtnText}>Aceptar</Text>
+                                            <Icon name="checkmark" size={13} color="#FFF" />
+                                            <Text style={styles.acceptBtnText}>{t('common.accept')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectFriend(item)}>
-                                            <Text style={styles.rejectBtnText}>Rechazar</Text>
+                                            <Text style={styles.rejectBtnText}>{t('common.reject')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
@@ -389,20 +391,20 @@ export default function NotificationsScreen({ navigation }) {
                                             });
                                         }}
                                     >
-                                        <Ionicons name="navigate" size={13} color="#FFF" />
-                                        <Text style={styles.acceptBtnText}>Ver ubicación</Text>
+                                        <Icon name="navigate" size={13} color="#FFF" />
+                                        <Text style={styles.acceptBtnText}>{t('notifications.viewLocation')}</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
 
-                            <Ionicons name="chevron-forward" size={15} color={theme.border} />
+                            <Icon name="chevron-forward" size={15} color={theme.border} />
                         </TouchableOpacity>
                     )}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <Text style={{ fontSize: 56 }}>🔔</Text>
-                             <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin notificaciones</Text>
-                             <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Cuando recibas alertas aparecerán aquí.</Text>
+                             <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('notifications.noNotifications')}</Text>
+                             <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>{t('notifications.noNotificationsDesc')}</Text>
                         </View>
                     }
                 />

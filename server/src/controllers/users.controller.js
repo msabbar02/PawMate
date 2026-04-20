@@ -48,13 +48,31 @@ const getUserById = async (req, res) => {
  * Update user
  * PUT /api/users/:id
  */
+const ALLOWED_USER_FIELDS = [
+    'fullName', 'firstName', 'lastName', 'phone', 'bio', 'city', 'province', 'country',
+    'avatar', 'photoURL', 'birthDate', 'gender', 'latitude', 'longitude',
+    'isOnline', 'lastSeen', 'isWalking', 'walkingPets', 'fcmToken', 'expoPushToken',
+    'language', 'preferences', 'address',
+];
+const ADMIN_ONLY_FIELDS = ['role', 'is_banned', 'verificationStatus', 'isVerified'];
+
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
 
         if (req.user.uid !== id && !req.user.isAdmin) {
             return sendError(res, 'Unauthorized', 403);
+        }
+
+        const allowedKeys = req.user.isAdmin
+            ? [...ALLOWED_USER_FIELDS, ...ADMIN_ONLY_FIELDS]
+            : ALLOWED_USER_FIELDS;
+        const updates = {};
+        for (const key of allowedKeys) {
+            if (req.body[key] !== undefined) updates[key] = req.body[key];
+        }
+        if (Object.keys(updates).length === 0) {
+            return sendError(res, 'No valid fields to update', 400);
         }
 
         const { error } = await supabase

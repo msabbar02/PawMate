@@ -206,6 +206,13 @@ export const AuthProvider = ({ children }) => {
             handleAuthChange(session);
             if (_evt === 'SIGNED_IN' && session?.user) {
                 logSystemAction(session.user.id, session.user.email, 'USER_LOGIN', 'Auth', { event: _evt });
+                // Send welcome email for new users (created in the last 60 seconds)
+                const createdAt = new Date(session.user.created_at).getTime();
+                const now = Date.now();
+                if (now - createdAt < 60000) {
+                    const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.fullName || '';
+                    sendWelcomeEmail(session.user.email, fullName).catch(() => {});
+                }
             } else if (_evt === 'SIGNED_OUT') {
                 logSystemAction(user?.id || 'Sistema', user?.email || 'Sistema', 'USER_LOGOUT', 'Auth', { event: _evt });
             }
