@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Float, Sphere, MeshDistortMaterial } from '@react-three/drei';
+import * as THREE from 'three';
 import {
-  faHeart, faShield, faBell, faUsers, faLocationArrow,
-  faArrowRight, faCircleCheck, faDownload,
-  faBars, faXmark, faStar, faQrcode,
-  faWandMagicSparkles, faArrowDown, faPaw,
-  faMoon, faSun
-} from '@fortawesome/free-solid-svg-icons';
+  Download, Menu, X, Sun, Moon, ArrowDown, MapPin,
+  Shield, Star, Heart, Brain, Users,
+  Mail, Globe, ChevronRight, Sparkles, Target,
+  Rocket, Zap, Clock, Phone, Smartphone
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import './App.css';
 import ConfirmPage from './pages/ConfirmPage';
@@ -17,20 +18,20 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 
 /* ─── Animation Variants ──────────────────────── */
 const fadeUp = {
-  hidden: { opacity: 0, y: 50 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } },
+  hidden: { opacity: 0, y: 40 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] } },
 };
 const scaleIn = {
-  hidden: { opacity: 0, scale: 0.9 },
+  hidden: { opacity: 0, scale: 0.92 },
   show: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
 };
-const stagger = (delay = 0.12) => ({
+const stagger = (delay = 0.1) => ({
   hidden: {},
   show: { transition: { staggerChildren: delay } },
 });
 
-function AnimatedSection({ children, className, delay = 0.12 }) {
-  const [ref, inView] = useInView({ threshold: 0.08, triggerOnce: true });
+function AnimatedSection({ children, className, delay = 0.1 }) {
+  const [ref, inView] = useInView({ threshold: 0.06, triggerOnce: true });
   return (
     <motion.div ref={ref} variants={stagger(delay)} initial="hidden" animate={inView ? 'show' : 'hidden'} className={className}>
       {children}
@@ -38,49 +39,145 @@ function AnimatedSection({ children, className, delay = 0.12 }) {
   );
 }
 
-/* ─── Counter Hook ─────────────────────────────── */
-function useCounter(end, duration = 2000, inView) {
-  const [count, setCount] = useState(0);
+/* ─── Custom Paw Cursor ────────────────────────── */
+function usePawCursor() {
   useEffect(() => {
-    if (!inView) return;
-    let start = 0;
-    const step = end / (duration / 16);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= end) { setCount(end); clearInterval(timer); }
-      else setCount(Math.floor(start));
-    }, 16);
-    return () => clearInterval(timer);
-  }, [inView, end, duration]);
-  return count;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 100 100'><circle cx='35' cy='22' r='10' fill='%23F5A623'/><circle cx='65' cy='22' r='10' fill='%23F5A623'/><circle cx='18' cy='46' r='8' fill='%23FF6B35'/><circle cx='82' cy='46' r='8' fill='%23FF6B35'/><ellipse cx='50' cy='64' rx='20' ry='18' fill='%23F5A623'/></svg>`;
+    document.body.style.cursor = `url("data:image/svg+xml,${svg}") 14 14, auto`;
+    return () => { document.body.style.cursor = ''; };
+  }, []);
 }
 
-/* ─── Theme Hook ───────────────────────────────── */
-function useTheme() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('pawmate-theme') === 'dark';
+/* ─── Theme Hook Removed ─────────────────────── */
+/* ═══════════════════════════════════════════════════
+   THREE.JS 3D COMPONENTS
+   ═══════════════════════════════════════════════════ */
+
+/* Floating 3D Paw Pad */
+function PawPad({ position, scale = 1, speed = 1, color = '#F5A623' }) {
+  const ref = useRef();
+  useFrame((state) => {
+    if (ref.current) {
+      ref.current.rotation.x = Math.sin(state.clock.elapsedTime * speed * 0.5) * 0.3;
+      ref.current.rotation.y = state.clock.elapsedTime * speed * 0.3;
+      ref.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * speed) * 0.3;
     }
-    return false;
+  });
+  return (
+    <group ref={ref} position={position} scale={scale}>
+      {/* Main pad */}
+      <mesh position={[0, -0.15, 0]}>
+        <sphereGeometry args={[0.5, 32, 32]} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0.1} />
+      </mesh>
+      {/* Toes */}
+      {[[-0.35, 0.35, 0.1], [0.35, 0.35, 0.1], [-0.2, 0.55, 0.15], [0.2, 0.55, 0.15]].map((p, i) => (
+        <mesh key={i} position={p}>
+          <sphereGeometry args={[0.18, 16, 16]} />
+          <meshStandardMaterial color={i < 2 ? '#FF6B35' : color} roughness={0.3} metalness={0.1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* Animated gradient sphere */
+function GlowOrb({ position, color = '#F5A623', size = 1 }) {
+  return (
+    <Float speed={2} floatIntensity={1.5} rotationIntensity={0.5}>
+      <Sphere args={[size, 64, 64]} position={position}>
+        <MeshDistortMaterial
+          color={color}
+          roughness={0.15}
+          metalness={0.3}
+          distort={0.4}
+          speed={2}
+          transparent
+          opacity={0.6}
+        />
+      </Sphere>
+    </Float>
+  );
+}
+
+/* Floating particles */
+function Particles({ count = 60 }) {
+  const points = useRef();
+  const positions = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 20;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 20;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 10;
+    }
+    return pos;
+  }, [count]);
+
+  useFrame((state) => {
+    if (points.current) {
+      points.current.rotation.y = state.clock.elapsedTime * 0.02;
+      points.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.01) * 0.1;
+    }
   });
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-    localStorage.setItem('pawmate-theme', dark ? 'dark' : 'light');
-  }, [dark]);
-
-  return [dark, () => setDark(prev => !prev)];
+  return (
+    <points ref={points}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial size={0.04} color="#F5A623" transparent opacity={0.6} sizeAttenuation />
+    </points>
+  );
 }
+
+/* Hero 3D Scene */
+function HeroScene() {
+  return (
+    <Canvas camera={{ position: [0, 0, 7], fov: 60 }} style={{ position: 'absolute', inset: 0 }}>
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 5, 5]} intensity={0.8} color="#FFF3E0" />
+      <pointLight position={[-3, 2, 3]} intensity={0.5} color="#FF6B35" />
+      <pointLight position={[3, -2, 2]} intensity={0.4} color="#F5A623" />
+
+      <PawPad position={[-3.5, 1.5, -1]} scale={0.6} speed={0.8} />
+      <PawPad position={[3.8, -1, -2]} scale={0.5} speed={0.6} color="#FF6B35" />
+      <PawPad position={[-2, -2, -1.5]} scale={0.4} speed={1.1} />
+      <PawPad position={[2.5, 2.5, -3]} scale={0.35} speed={0.7} color="#FF6B35" />
+
+      <GlowOrb position={[-4, 0, -3]} color="#F5A623" size={1.2} />
+      <GlowOrb position={[4.5, -1.5, -4]} color="#FF6B35" size={0.9} />
+      <GlowOrb position={[0, 3, -5]} color="#F5A623" size={0.7} />
+
+      <Particles count={80} />
+    </Canvas>
+  );
+}
+
+/* Section 3D Background — abstract floating orbs */
+function SectionScene({ color1 = '#F5A623', color2 = '#FF6B35' }) {
+  return (
+    <Canvas camera={{ position: [0, 0, 5], fov: 50 }} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      <ambientLight intensity={0.3} />
+      <pointLight position={[3, 3, 3]} intensity={0.4} color={color1} />
+      <GlowOrb position={[-3, 1, -2]} color={color1} size={0.8} />
+      <GlowOrb position={[3, -1, -3]} color={color2} size={0.6} />
+      <Particles count={30} />
+    </Canvas>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   PAGE COMPONENTS
+   ═══════════════════════════════════════════════════ */
 
 /* ─── Navbar ───────────────────────────────────── */
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dark, toggleTheme] = useTheme();
   const { t, i18n } = useTranslation();
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
+    const onScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -90,14 +187,20 @@ function Navbar() {
     setMenuOpen(false);
   };
 
-  const links = [[t('nav.home'), 'hero'], [t('nav.features'), 'features'], [t('nav.app'), 'showcase'], [t('nav.testimonials'), 'testimonials']];
+  const links = [
+    [t('nav.home'), 'hero'],
+    [t('nav.about'), 'about'],
+    [t('nav.mission'), 'mission'],
+    [t('nav.future'), 'future'],
+    [t('nav.contact'), 'contact'],
+  ];
 
   return (
     <motion.nav
       className={`navbar ${scrolled ? 'scrolled' : ''}`}
-      initial={{ y: -100, opacity: 0 }}
+      initial={{ y: -80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, delay: 0.2 }}
+      transition={{ duration: 0.5, delay: 0.1 }}
     >
       <div className="navbar-inner">
         <div className="nav-logo" onClick={() => scrollTo('hero')}>
@@ -110,16 +213,16 @@ function Navbar() {
           ))}
         </ul>
         <div className="nav-actions">
-          <button className="theme-toggle" onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')} aria-label="Language">{i18n.language === 'es' ? 'EN' : 'ES'}</button>
-          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-            {dark ? <FontAwesomeIcon icon={faSun} style={{ fontSize: 18 }} /> : <FontAwesomeIcon icon={faMoon} style={{ fontSize: 18 }} />}
+          <button className="nav-btn-icon" onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')} aria-label="Language">
+            <Globe size={18} />
+            <span>{i18n.language === 'es' ? 'EN' : 'ES'}</span>
           </button>
-          <motion.button className="btn-nav-cta" onClick={() => scrollTo('cta')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            {t('nav.downloadApp')}
+          <motion.button className="btn-primary btn-sm" onClick={() => scrollTo('download')} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+            <Download size={16} /> {t('nav.download')}
           </motion.button>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
-          {menuOpen ? <FontAwesomeIcon icon={faXmark} style={{ fontSize: 22 }} /> : <FontAwesomeIcon icon={faBars} style={{ fontSize: 22 }} />}
+          {menuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
       <AnimatePresence>
@@ -128,14 +231,13 @@ function Navbar() {
             {links.map(([label, id]) => (
               <a key={id} className="mobile-link" onClick={() => scrollTo(id)}>{label}</a>
             ))}
-            <a className="mobile-link" onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')}>
-              🌐 {i18n.language === 'es' ? 'EN' : 'ES'}
-            </a>
-            <a className="mobile-link" onClick={toggleTheme}>
-              {dark ? <FontAwesomeIcon icon={faSun} style={{ fontSize: 16 }} /> : <FontAwesomeIcon icon={faMoon} style={{ fontSize: 16 }} />} {dark ? t('nav.lightMode') : t('nav.darkMode')}
-            </a>
-            <button className="btn-primary mobile-cta" onClick={() => scrollTo('cta')}>
-              <FontAwesomeIcon icon={faDownload} style={{ fontSize: 16 }} /> {t('nav.downloadApp')}
+            <div className="mobile-row">
+              <a className="mobile-link" onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')}>
+                <Globe size={16} /> {i18n.language === 'es' ? 'English' : 'Español'}
+              </a>
+            </div>
+            <button className="btn-primary mobile-cta" onClick={() => scrollTo('download')}>
+              <Download size={16} /> {t('nav.download')}
             </button>
           </motion.div>
         )}
@@ -147,191 +249,142 @@ function Navbar() {
 /* ─── Hero ─────────────────────────────────────── */
 function Hero() {
   const { t } = useTranslation();
-  const words = [t('hero.word1'), t('hero.word2'), t('hero.word3'), t('hero.word4')];
-  const [wordIndex, setWordIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => setWordIndex(prev => (prev + 1) % words.length), 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <section className="hero" id="hero">
-      <div className="hero-bg-grid" />
-      <div className="hero-paw-pattern" />
-      <div className="hero-glow hero-glow-1" />
-      <div className="hero-glow hero-glow-2" />
-
+      <div className="hero-3d">
+        <Suspense fallback={null}>
+          <HeroScene />
+        </Suspense>
+      </div>
+      <div className="hero-gradient-overlay" />
       <div className="hero-inner">
-        <div className="hero-text">
-          <AnimatedSection>
-            <motion.div variants={fadeUp}>
-              <div className="hero-badge">
-                <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 14 }} />
-                <span>{t('hero.badge')}</span>
-              </div>
-            </motion.div>
-            <motion.h1 variants={fadeUp}>
-              {t('hero.titlePrefix')}{' '}
-              <span className="hero-accent-wrapper">
-                <AnimatePresence mode="wait">
-                  <motion.span key={words[wordIndex]} className="accent"
-                    initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.4 }}
-                  >
-                    {words[wordIndex]}
-                  </motion.span>
-                </AnimatePresence>
-              </span>
-            </motion.h1>
-            <motion.p className="hero-desc" variants={fadeUp}>
-              {t('hero.desc')}
-            </motion.p>
-            <motion.div className="hero-buttons" variants={fadeUp}>
-              <motion.button className="btn-primary btn-lg" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <FontAwesomeIcon icon={faDownload} style={{ fontSize: 20 }} /> {t('hero.downloadFree')}
-              </motion.button>
-              <motion.button className="btn-ghost" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                {t('hero.learnMore')} <FontAwesomeIcon icon={faArrowDown} style={{ fontSize: 16 }} />
-              </motion.button>
-            </motion.div>
-            <motion.div className="hero-metrics" variants={fadeUp}>
-              <div className="metric">
-                <div className="metric-value">10K+</div>
-                <div className="metric-label">{t('hero.activeUsers')}</div>
-              </div>
-              <div className="metric-divider" />
-              <div className="metric">
-                <div className="metric-value">4.9</div>
-                <div className="metric-stars">
-                  {[...Array(5)].map((_, i) => <FontAwesomeIcon key={i} icon={faStar} style={{ fontSize: 14, color: 'var(--gold)' }} />)}
-                </div>
-              </div>
-              <div className="metric-divider" />
-              <div className="metric">
-                <div className="metric-value">50K+</div>
-                <div className="metric-label">{t('hero.trackedWalks')}</div>
-              </div>
-            </motion.div>
-          </AnimatedSection>
-        </div>
-
-        <div className="hero-visual">
-          <AnimatedSection>
-            <motion.div className="hero-phone-wrapper" variants={scaleIn}>
-              <img src="/premium_hero.png" alt="PawMate App" className="hero-phone-img" />
-              <motion.div className="hero-float-card hero-float-top"
-                animate={{ y: [0, -10, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                <div className="float-icon">📍</div>
-                <div><div className="float-title">{t('hero.gpsActive')}</div><div className="float-sub">{t('hero.gpsPrecision')}</div></div>
-              </motion.div>
-              <motion.div className="hero-float-card hero-float-bottom"
-                animate={{ y: [0, 8, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-              >
-                <div className="float-icon">🧡</div>
-                <div><div className="float-title">{t('hero.healthUpToDate')}</div><div className="float-sub">{t('hero.healthSub')}</div></div>
-              </motion.div>
-            </motion.div>
-          </AnimatedSection>
-        </div>
+        <AnimatedSection className="hero-content">
+          <motion.div className="hero-badge" variants={fadeUp}>
+            <Sparkles size={14} />
+            <span>{t('hero.tagline')}</span>
+          </motion.div>
+          <motion.h1 variants={fadeUp}>
+            {t('hero.title1')}<br />
+            <span className="text-gradient">{t('hero.title2')}</span>
+          </motion.h1>
+          <motion.p className="hero-desc" variants={fadeUp}>
+            {t('hero.desc')}
+          </motion.p>
+          <motion.div className="hero-actions" variants={fadeUp}>
+            <motion.button
+              className="btn-primary btn-lg btn-glow"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <Download size={20} /> {t('hero.downloadBtn')}
+            </motion.button>
+            <motion.button
+              className="btn-glass btn-lg"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              {t('hero.learnMore')} <ChevronRight size={18} />
+            </motion.button>
+          </motion.div>
+        </AnimatedSection>
       </div>
-
-      <div className="hero-scroll-hint">
-        <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-          <FontAwesomeIcon icon={faArrowDown} style={{ fontSize: 20 }} />
-        </motion.div>
-      </div>
+      <motion.div
+        className="hero-scroll"
+        animate={{ y: [0, 10, 0] }}
+        transition={{ duration: 2.5, repeat: Infinity }}
+      >
+        <ArrowDown size={22} />
+      </motion.div>
     </section>
   );
 }
 
-/* ─── Marquee Trust Band ───────────────────────── */
-function TrustBand() {
+/* ─── About Us ─────────────────────────────────── */
+function About() {
   const { t } = useTranslation();
-  const items = [
-    ['🔒', t('trust.secureData')], ['⚡', t('trust.realSync')], ['🐾', t('trust.allSpecies')],
-    ['🌍', t('trust.leaderSpain')], ['📱', t('trust.nativeApp')], ['🏥', t('trust.vetHistory')],
-    ['🎯', t('trust.highPrecisionGps')], ['👥', t('trust.activeCommunity')],
-  ];
   return (
-    <div className="marquee-band">
-      <div className="marquee-track">
-        {[...items, ...items].map(([icon, text], i) => (
-          <div key={i} className="marquee-item">
-            <span className="marquee-icon">{icon}</span><span>{text}</span>
+    <section className="section about-section" id="about">
+      <div className="container">
+        <AnimatedSection className="section-header">
+          <motion.div variants={fadeUp} className="section-badge">
+            <Heart size={14} /> {t('about.label')}
+          </motion.div>
+          <motion.h2 variants={fadeUp}>
+            {t('about.title1')}<br /><span className="text-gradient">{t('about.title2')}</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="section-desc">{t('about.desc')}</motion.p>
+        </AnimatedSection>
+
+        <AnimatedSection className="about-grid">
+          <motion.div className="about-image-group" variants={scaleIn}>
+            <div className="about-img about-img-main">
+              <img src="/community_dogs.png" alt="PawMate Community" />
+            </div>
+            <div className="about-img about-img-secondary">
+              <img src="/caring_puppy.png" alt="Caring for puppy" />
+            </div>
+          </motion.div>
+          <div className="about-cards">
+            <motion.div className="glass-card" variants={fadeUp}>
+              <div className="card-icon"><Heart size={24} /></div>
+              <h3>{t('about.card1Title')}</h3>
+              <p>{t('about.card1Desc')}</p>
+            </motion.div>
+            <motion.div className="glass-card" variants={fadeUp}>
+              <div className="card-icon"><Users size={24} /></div>
+              <h3>{t('about.card2Title')}</h3>
+              <p>{t('about.card2Desc')}</p>
+            </motion.div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Features ─────────────────────────────────── */
-function Features() {
-  const { t } = useTranslation();
-  const features = [
-    { icon: <FontAwesomeIcon icon={faLocationArrow} style={{ fontSize: 26 }} />, title: t('features.gpsTitle'), desc: t('features.gpsDesc'), color: '#F5A623', bg: 'rgba(245, 166, 35, 0.1)' },
-    { icon: <FontAwesomeIcon icon={faHeart} style={{ fontSize: 26 }} />, title: t('features.healthTitle'), desc: t('features.healthDesc'), color: '#FF6B35', bg: 'rgba(255, 107, 53, 0.1)' },
-    { icon: <FontAwesomeIcon icon={faQrcode} style={{ fontSize: 26 }} />, title: t('features.qrTitle'), desc: t('features.qrDesc'), color: '#1A1A2E', bg: 'rgba(26, 26, 46, 0.08)' },
-    { icon: <FontAwesomeIcon icon={faBell} style={{ fontSize: 26 }} />, title: t('features.remindersTitle'), desc: t('features.remindersDesc'), color: '#E8941E', bg: 'rgba(232, 148, 30, 0.1)' },
-    { icon: <FontAwesomeIcon icon={faShield} style={{ fontSize: 26 }} />, title: t('features.caregiversTitle'), desc: t('features.caregiversDesc'), color: '#F5A623', bg: 'rgba(245, 166, 35, 0.1)' },
-    { icon: <FontAwesomeIcon icon={faUsers} style={{ fontSize: 26 }} />, title: t('features.communityTitle'), desc: t('features.communityDesc'), color: '#FF6B35', bg: 'rgba(255, 107, 53, 0.1)' },
-  ];
-  return (
-    <section className="features-section" id="features">
-      <div className="container">
-        <AnimatedSection className="features-header">
-          <motion.div variants={fadeUp} className="section-label"><FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 14 }} /> {t('features.label')}</motion.div>
-          <motion.h2 variants={fadeUp}>{t('features.title1')}<br /><span className="text-accent">{t('features.title2')}</span></motion.h2>
-          <motion.p variants={fadeUp} className="section-desc">{t('features.desc')}</motion.p>
-        </AnimatedSection>
-        <AnimatedSection className="features-grid">
-          {features.map((f, i) => (
-            <motion.div key={i} className="feature-card" variants={fadeUp} whileHover={{ y: -8, transition: { duration: 0.3 } }}>
-              <div className="feature-icon" style={{ background: f.bg, color: f.color }}>{f.icon}</div>
-              <h3>{f.title}</h3>
-              <p>{f.desc}</p>
-              <div className="feature-link">{t('features.learnMore')} <FontAwesomeIcon icon={faArrowRight} style={{ fontSize: 14 }} /></div>
-            </motion.div>
-          ))}
         </AnimatedSection>
       </div>
     </section>
   );
 }
 
-/* ─── Showcase ──────────────────────────────────── */
-function Showcase() {
+/* ─── Mission / Objetivo ───────────────────────── */
+function Mission() {
   const { t } = useTranslation();
+  const points = [
+    { icon: <Shield size={22} />, text: t('mission.point1') },
+    { icon: <MapPin size={22} />, text: t('mission.point2') },
+    { icon: <Star size={22} />, text: t('mission.point3') },
+    { icon: <Zap size={22} />, text: t('mission.point4') },
+    { icon: <Clock size={22} />, text: t('mission.point5') },
+    { icon: <Phone size={22} />, text: t('mission.point6') },
+  ];
   return (
-    <section className="showcase-section" id="showcase">
-      <div className="container">
-        <div className="showcase-grid">
-          <AnimatedSection className="showcase-content">
-            <motion.div variants={fadeUp} className="section-label"><FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 14 }} /> {t('showcase.label')}</motion.div>
-            <motion.h2 variants={fadeUp}>{t('showcase.title1')}<br /><span className="text-accent">{t('showcase.title2')}</span></motion.h2>
-            <motion.p variants={fadeUp} className="showcase-desc">
-              {t('showcase.desc')}
-            </motion.p>
-            <motion.ul className="showcase-checks" variants={stagger(0.1)}>
-              {[t('showcase.check1'), t('showcase.check2'), t('showcase.check3'), t('showcase.check4'), t('showcase.check5')].map((item) => (
-                <motion.li key={item} variants={fadeUp}>
-                  <FontAwesomeIcon icon={faCircleCheck} style={{ fontSize: 18 }} className="check-icon" /><span>{item}</span>
+    <section className="section mission-section" id="mission">
+      <div className="section-3d-bg">
+        <Suspense fallback={null}>
+          <SectionScene />
+        </Suspense>
+      </div>
+      <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="mission-layout">
+          <AnimatedSection className="mission-visual">
+            <motion.div className="mission-img-wrap" variants={scaleIn}>
+              <img src="/active_lifestyle.png" alt="Active lifestyle with dog" />
+            </motion.div>
+          </AnimatedSection>
+          <AnimatedSection className="mission-content">
+            <motion.div variants={fadeUp} className="section-badge">
+              <Target size={14} /> {t('mission.label')}
+            </motion.div>
+            <motion.h2 variants={fadeUp}>
+              {t('mission.title1')}<br /><span className="text-gradient">{t('mission.title2')}</span>
+            </motion.h2>
+            <motion.p variants={fadeUp} className="mission-desc">{t('mission.desc')}</motion.p>
+            <motion.ul className="mission-points" variants={stagger(0.08)}>
+              {points.map((p, i) => (
+                <motion.li key={i} variants={fadeUp} className="mission-point">
+                  <div className="point-icon">{p.icon}</div>
+                  <span>{p.text}</span>
                 </motion.li>
               ))}
             </motion.ul>
-            <motion.div variants={fadeUp}>
-              <motion.button className="btn-primary" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                {t('showcase.exploreFeatures')} <FontAwesomeIcon icon={faArrowRight} style={{ fontSize: 16 }} />
-              </motion.button>
-            </motion.div>
-          </AnimatedSection>
-          <AnimatedSection className="showcase-visual">
-            <motion.div className="showcase-img-wrap" variants={scaleIn}>
-              <img src="/premium_lifestyle.png" alt="PawMate Lifestyle" />
-              <div className="showcase-img-overlay" />
-            </motion.div>
           </AnimatedSection>
         </div>
       </div>
@@ -339,29 +392,35 @@ function Showcase() {
   );
 }
 
-/* ─── Stats ────────────────────────────────────── */
-function Stats() {
+/* ─── Future Ideas ─────────────────────────────── */
+function Future() {
   const { t } = useTranslation();
-  const [ref, inView] = useInView({ threshold: 0.3, triggerOnce: true });
-  const c1 = useCounter(10000, 2000, inView);
-  const c2 = useCounter(500, 1500, inView);
-  const c3 = useCounter(50000, 2000, inView);
-  const c4 = useCounter(98, 1200, inView);
-  const stats = [
-    { value: c1.toLocaleString(), suffix: '+', label: t('stats.activePets'), icon: <FontAwesomeIcon icon={faPaw} style={{ fontSize: 24 }} /> },
-    { value: c2.toLocaleString(), suffix: '+', label: t('stats.proCaregivers'), icon: <FontAwesomeIcon icon={faShield} style={{ fontSize: 24 }} /> },
-    { value: c3.toLocaleString(), suffix: '+', label: t('stats.trackedWalks'), icon: <FontAwesomeIcon icon={faLocationArrow} style={{ fontSize: 24 }} /> },
-    { value: c4.toString(), suffix: '%', label: t('stats.satisfaction'), icon: <FontAwesomeIcon icon={faHeart} style={{ fontSize: 24 }} /> },
+  const ideas = [
+    { icon: <Brain size={28} />, title: t('future.idea1Title'), desc: t('future.idea1Desc'), color: '#F5A623' },
+    { icon: <Smartphone size={28} />, title: t('future.idea2Title'), desc: t('future.idea2Desc'), color: '#FF6B35' },
+    { icon: <Zap size={28} />, title: t('future.idea3Title'), desc: t('future.idea3Desc'), color: '#E8951A' },
   ];
   return (
-    <section className="stats-section" ref={ref}>
+    <section className="section future-section" id="future">
       <div className="container">
-        <AnimatedSection className="stats-grid">
-          {stats.map((s, i) => (
-            <motion.div key={i} className="stat-card" variants={fadeUp}>
-              <div className="stat-icon">{s.icon}</div>
-              <div className="stat-number">{s.value}{s.suffix}</div>
-              <div className="stat-label">{s.label}</div>
+        <AnimatedSection className="section-header">
+          <motion.div variants={fadeUp} className="section-badge">
+            <Rocket size={14} /> {t('future.label')}
+          </motion.div>
+          <motion.h2 variants={fadeUp}>
+            {t('future.title1')}<br /><span className="text-gradient">{t('future.title2')}</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="section-desc">{t('future.desc')}</motion.p>
+        </AnimatedSection>
+        <AnimatedSection className="future-grid">
+          {ideas.map((idea, i) => (
+            <motion.div key={i} className="future-card glass-card" variants={fadeUp} whileHover={{ y: -8, transition: { duration: 0.25 } }}>
+              <div className="future-icon" style={{ color: idea.color, background: `${idea.color}18` }}>
+                {idea.icon}
+              </div>
+              <h3>{idea.title}</h3>
+              <p>{idea.desc}</p>
+              <div className="future-tag">Coming Soon</div>
             </motion.div>
           ))}
         </AnimatedSection>
@@ -370,73 +429,83 @@ function Stats() {
   );
 }
 
-/* ─── Testimonials ─────────────────────────────── */
-function Testimonials() {
+/* ─── Contact ──────────────────────────────────── */
+function Contact() {
   const { t } = useTranslation();
-  const testimonials = [
-    { text: t('testimonials.t1'), name: t('testimonials.t1name'), role: t('testimonials.t1role'), rating: 5 },
-    { text: t('testimonials.t2'), name: t('testimonials.t2name'), role: t('testimonials.t2role'), rating: 5 },
-    { text: t('testimonials.t3'), name: t('testimonials.t3name'), role: t('testimonials.t3role'), rating: 5 },
-    { text: t('testimonials.t4'), name: t('testimonials.t4name'), role: t('testimonials.t4role'), rating: 5 },
-    { text: t('testimonials.t5'), name: t('testimonials.t5name'), role: t('testimonials.t5role'), rating: 5 },
-  ];
   return (
-    <section className="testimonials-section" id="testimonials">
+    <section className="section contact-section" id="contact">
       <div className="container">
-        <AnimatedSection className="testimonials-header">
-          <motion.div variants={fadeUp} className="section-label"><FontAwesomeIcon icon={faStar} style={{ fontSize: 14 }} /> {t('testimonials.label')}</motion.div>
-          <motion.h2 variants={fadeUp}>{t('testimonials.title1')} <span className="text-accent">{t('testimonials.title2')}</span></motion.h2>
-          <motion.p variants={fadeUp} className="section-desc">{t('testimonials.desc')}</motion.p>
+        <AnimatedSection className="section-header">
+          <motion.div variants={fadeUp} className="section-badge">
+            <Mail size={14} /> {t('contact.label')}
+          </motion.div>
+          <motion.h2 variants={fadeUp}>
+            {t('contact.title1')}<br /><span className="text-gradient">{t('contact.title2')}</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="section-desc">{t('contact.desc')}</motion.p>
         </AnimatedSection>
-        <AnimatedSection className="testimonials-grid">
-          {testimonials.map((t, i) => (
-            <motion.div key={i} className="testimonial-card" variants={fadeUp} whileHover={{ y: -6 }}>
-              <div className="testimonial-stars">
-                {[...Array(t.rating)].map((_, j) => <FontAwesomeIcon key={j} icon={faStar} style={{ fontSize: 16, color: 'var(--gold)' }} />)}
-              </div>
-              <p className="testimonial-text">"{t.text}"</p>
-              <div className="testimonial-author">
-                <div className="testimonial-avatar">{t.name.charAt(0)}</div>
-                <div>
-                  <div className="testimonial-name">{t.name}</div>
-                  <div className="testimonial-role">{t.role}</div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+        <AnimatedSection className="contact-grid">
+          <motion.a href="mailto:noreply@apppawmate.com" className="contact-card glass-card" variants={fadeUp} whileHover={{ y: -4 }}>
+            <div className="contact-icon"><Mail size={28} /></div>
+            <h3>{t('contact.emailLabel')}</h3>
+            <p>{t('contact.emailGeneral')}</p>
+            <p className="contact-sub">{t('contact.emailSupport')}</p>
+          </motion.a>
+          <motion.a href="https://instagram.com/apppawmate" target="_blank" rel="noopener" className="contact-card glass-card" variants={fadeUp} whileHover={{ y: -4 }}>
+            <div className="contact-icon"><Globe size={28} /></div>
+            <h3>{t('contact.socialLabel')}</h3>
+            <p>@apppawmate</p>
+          </motion.a>
+          <motion.div className="contact-card glass-card" variants={fadeUp} whileHover={{ y: -4 }}>
+            <div className="contact-icon"><MapPin size={28} /></div>
+            <h3>{t('contact.locationLabel')}</h3>
+            <p>{t('contact.location')}</p>
+          </motion.div>
         </AnimatedSection>
       </div>
     </section>
   );
 }
 
-/* ─── CTA ──────────────────────────────────────── */
-function CTA() {
+/* ─── Download CTA ─────────────────────────────── */
+function DownloadSection() {
   const { t } = useTranslation();
   return (
-    <section className="cta-section" id="cta">
-      <div className="cta-bg-pattern" />
-      <div className="cta-glow" />
-      <div className="container cta-inner">
+    <section className="download-section" id="download">
+      <div className="download-3d">
+        <Suspense fallback={null}>
+          <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
+            <ambientLight intensity={0.3} />
+            <pointLight position={[3, 3, 3]} color="#F5A623" intensity={0.8} />
+            <PawPad position={[0, 0, 0]} scale={1.2} speed={0.5} />
+            <GlowOrb position={[-3, 1, -2]} color="#FF6B35" size={0.6} />
+            <GlowOrb position={[3, -1, -2]} color="#F5A623" size={0.5} />
+            <Particles count={40} />
+          </Canvas>
+        </Suspense>
+      </div>
+      <div className="container download-inner">
         <AnimatedSection>
-          <motion.div className="section-label cta-label" variants={fadeUp}><FontAwesomeIcon icon={faDownload} style={{ fontSize: 14 }} /> {t('cta.label')}</motion.div>
-          <motion.h2 variants={fadeUp}>{t('cta.title1')}<br />{t('cta.title2')}</motion.h2>
-          <motion.p variants={fadeUp} className="cta-desc">
-            {t('cta.desc')}
+          <motion.div className="section-badge download-badge" variants={fadeUp}>
+            <Download size={14} /> {t('nav.download')}
+          </motion.div>
+          <motion.h2 variants={fadeUp}>
+            {t('download.title1')}<br />{t('download.title2')}
+          </motion.h2>
+          <motion.p variants={fadeUp} className="download-desc">
+            {t('download.desc')}
           </motion.p>
-          <motion.div className="cta-buttons" variants={fadeUp}>
-            <motion.button className="btn-white btn-lg" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <FontAwesomeIcon icon={faDownload} style={{ fontSize: 18 }} /> App Store
-            </motion.button>
-            <motion.button className="btn-white-outline btn-lg" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <FontAwesomeIcon icon={faDownload} style={{ fontSize: 18 }} /> Google Play
-            </motion.button>
+          <motion.div className="download-actions" variants={fadeUp}>
+            <motion.a
+              href="#"
+              className="btn-download"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.96 }}
+            >
+              <Download size={22} /> {t('download.btn')}
+            </motion.a>
           </motion.div>
-          <motion.div className="cta-badges" variants={fadeUp}>
-            <div className="cta-badge">⭐ {t('cta.reviews')}</div>
-            <div className="cta-badge">🔥 {t('cta.downloads')}</div>
-            <div className="cta-badge">🛡️ {t('cta.secure')}</div>
-          </motion.div>
+          <motion.p className="download-note" variants={fadeUp}>{t('download.note')}</motion.p>
         </AnimatedSection>
       </div>
     </section>
@@ -449,32 +518,15 @@ function Footer() {
   return (
     <footer className="footer">
       <div className="container">
-        <div className="footer-grid">
+        <div className="footer-content">
           <div className="footer-brand">
             <div className="nav-logo"><span className="logo-icon">🐾</span><span className="logo-text">PawMate</span></div>
             <p>{t('footer.desc')}</p>
-            <div className="footer-socials">
-              {[['📷', 'Instagram'], ['🐦', 'Twitter'], ['💼', 'LinkedIn']].map(([icon, label], i) => (
-                <a key={i} className="social-btn" title={label}>{icon}</a>
-              ))}
-            </div>
-          </div>
-          <div className="footer-col">
-            <h4>{t('footer.product')}</h4>
-            <ul><li><a href="#">GPS Tracking</a></li><li><a href="#">{t('features.healthTitle')}</a></li><li><a href="#">Paw-Port QR</a></li><li><a href="#">{t('features.communityTitle')}</a></li></ul>
-          </div>
-          <div className="footer-col">
-            <h4>{t('footer.company')}</h4>
-            <ul><li><a href="#">{t('footer.aboutUs')}</a></li><li><a href="#">{t('footer.contact')}</a></li><li><a href="#">{t('footer.blog')}</a></li><li><a href="#">{t('footer.press')}</a></li></ul>
-          </div>
-          <div className="footer-col">
-            <h4>{t('footer.legal')}</h4>
-            <ul><li><a href="#">{t('footer.privacy')}</a></li><li><a href="#">{t('footer.terms')}</a></li><li><a href="#">{t('footer.cookies')}</a></li><li><a href="#">GDPR</a></li></ul>
           </div>
         </div>
         <div className="footer-bottom">
           <span>{t('footer.copyright')} <strong>Mohamed Sabbar</strong></span>
-          <span className="footer-made">{t('footer.madeWith')}</span>
+          <span>{t('footer.madeWith')}</span>
         </div>
       </div>
     </footer>
@@ -483,16 +535,16 @@ function Footer() {
 
 /* ─── Landing Page ─────────────────────────────── */
 function LandingPage() {
+  usePawCursor();
   return (
     <>
       <Navbar />
       <Hero />
-      <TrustBand />
-      <Features />
-      <Showcase />
-      <Stats />
-      <Testimonials />
-      <CTA />
+      <About />
+      <Mission />
+      <Future />
+      <Contact />
+      <DownloadSection />
       <Footer />
     </>
   );

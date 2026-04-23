@@ -2,7 +2,9 @@ const { sendSuccess, sendError } = require('../utils/response');
 
 /* --- Shared helpers --- */
 
-const FROM_DEFAULT = process.env.SMTP_FROM || 'hola@apppawmate.com';
+const FROM_DEFAULT  = process.env.SMTP_FROM         || 'noreply@apppawmate.com';
+const FROM_SUPPORT  = process.env.SMTP_FROM_SUPPORT  || 'support@apppawmate.com';
+const FROM_ADMIN    = process.env.SMTP_FROM_ADMIN    || 'admin@apppawmate.com';
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -104,11 +106,11 @@ const sendWelcomeEmail = async (req, res) => {
         Para acceder a todas las funciones, verifica tu cuenta en la sección de Ajustes de la app.
       </p>
       <p style="color:#64748b;font-size:14px;margin:0;">
-        ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@apppawmate.com" style="color:#6366f1;">soporte@apppawmate.com</a>
+        ¿Necesitas ayuda? Escríbenos a <a href="mailto:support@apppawmate.com" style="color:#6366f1;">support@apppawmate.com</a>
       </p>`,
             });
 
-            const text = `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\nAhora puedes encontrar cuidadores, agendar reservas y mucho más.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? soporte@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`;
+            const text = `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\nAhora puedes encontrar cuidadores, agendar reservas y mucho más.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? support@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`;
 
             await transporter.sendMail({
                 from: `"PawMate" <${FROM_DEFAULT}>`,
@@ -232,7 +234,7 @@ const handleAuthEmail = async (req, res) => {
       ${expiryNote()}`,
             });
             await transporter.sendMail({
-                from: `"PawMate Seguridad" <${FROM_DEFAULT}>`, to: user.email,
+                from: `"PawMate Seguridad" <${FROM_SUPPORT}>`, to: user.email,
                 subject: 'Confirma tu cambio de email · PawMate 🔒', html,
                 text: `Hola ${userName},\n\nConfirma el cambio: ${confirmUrl}\n\n© ${new Date().getFullYear()} PawMate`,
             });
@@ -252,7 +254,7 @@ const handleAuthEmail = async (req, res) => {
       ${expiryNote()}`,
                 });
                 await transporter.sendMail({
-                    from: `"PawMate Seguridad" <${FROM_DEFAULT}>`,
+                    from: `"PawMate Seguridad" <${FROM_SUPPORT}>`,
                     to: user.new_email || user.email_change_send_to || user.email,
                     subject: 'Confirma tu nuevo email · PawMate 🔒', html: htmlNew,
                     text: `Hola ${userName},\n\nConfirma: ${newConfirmUrl}\n\n© ${new Date().getFullYear()} PawMate`,
@@ -277,7 +279,7 @@ const handleAuthEmail = async (req, res) => {
       ${expiryNote()}`,
             });
             await transporter.sendMail({
-                from: `"PawMate Soporte" <${FROM_DEFAULT}>`, to: user.email,
+                from: `"PawMate Soporte" <${FROM_SUPPORT}>`, to: user.email,
                 subject: 'Restablecer tu contraseña · PawMate 🔑', html,
                 text: `Hola ${userName},\n\nRestablece: ${confirmUrl}\n\nExpira en 24h.\n\n© ${new Date().getFullYear()} PawMate`,
             });
@@ -308,4 +310,4 @@ const handleAuthEmail = async (req, res) => {
     }
 };
 
-module.exports = { sendWelcomeEmail, handleAuthEmail, createTransporter, FROM_DEFAULT };
+module.exports = { sendWelcomeEmail, handleAuthEmail, createTransporter, FROM_DEFAULT, FROM_SUPPORT, FROM_ADMIN };

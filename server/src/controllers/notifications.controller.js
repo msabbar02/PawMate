@@ -1,6 +1,6 @@
 const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
-const { createTransporter, FROM_DEFAULT } = require('./email.controller');
+const { createTransporter, FROM_DEFAULT, FROM_SUPPORT } = require('./email.controller');
 
 /**
  * Notificar al dueño por email cuando el cuidador acepta o rechaza la reserva.
