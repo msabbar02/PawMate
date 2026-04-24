@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +8,7 @@ import './UsersPage.css';
 
 export default function ReportsPage() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -153,7 +155,7 @@ export default function ReportsPage() {
                                                 <td><span className={`status-badge ${report.status === 'resolved' ? 'activa' : 'pendiente'}`}>{report.status === 'resolved' ? t('reports.statusResolved') : t('reports.statusPending')}</span></td>
                                                 <td>
                                                     <div className="action-buttons">
-                                                        <button className="action-btn view" onClick={() => openViewModal(report)} title={t('reports.viewDetails')} style={{ color: '#3b82f6' }}><FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} /></button>
+                                                        <button className="action-btn view" onClick={() => navigate(`/reports/${report.id}`)} title={t('reports.viewDetails')} style={{ color: '#3b82f6' }}><FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} /></button>
                                                         {report.status !== 'resolved' && (
                                                             <button className="btn-secondary" onClick={() => handleResolveReport(report.id)} style={{ padding: '4px 8px', fontSize: '12px', marginRight: '8px' }}>
                                                                 <FontAwesomeIcon icon={faCircleCheck} style={{ fontSize: 14, marginRight: '4px', verticalAlign: 'middle' }} /> {t('reports.resolve')}

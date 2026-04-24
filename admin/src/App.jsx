@@ -6,10 +6,15 @@ import LoginPage from './pages/LoginPage';
 import AdminLayout from './components/AdminLayout';
 import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
+import UserDetailPage from './pages/UserDetailPage';
 import PetsPage from './pages/PetsPage';
+import PetDetailPage from './pages/PetDetailPage';
 import ReservationsPage from './pages/ReservationsPage';
+import ReservationDetailPage from './pages/ReservationDetailPage';
 import MessagesPage from './pages/MessagesPage';
+import ConversationDetailPage from './pages/ConversationDetailPage';
 import ReportsPage from './pages/ReportsPage';
+import ReportDetailPage from './pages/ReportDetailPage';
 import LogsPage from './pages/LogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminsPage from './pages/AdminsPage';
@@ -32,10 +37,15 @@ function App() {
       }>
         <Route index element={<DashboardPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/:id" element={<UserDetailPage />} />
         <Route path="pets" element={<PetsPage />} />
+        <Route path="pets/:id" element={<PetDetailPage />} />
         <Route path="reservations" element={<ReservationsPage />} />
+        <Route path="reservations/:id" element={<ReservationDetailPage />} />
         <Route path="messages" element={<MessagesPage />} />
+        <Route path="messages/:id" element={<ConversationDetailPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="reports/:id" element={<ReportDetailPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admins" element={<AdminsPage />} />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +8,7 @@ import './UsersPage.css'; // Shared table styles
 
 export default function ReservationsPage() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -181,7 +183,7 @@ export default function ReservationsPage() {
                                             </td>
                                             <td>
                                                 <div className="action-buttons">
-                                                    <button className="action-btn view" onClick={() => openViewModal(res)} title={t('reservations.viewDetails')} style={{ color: '#3b82f6' }}>
+                                                    <button className="action-btn view" onClick={() => navigate(`/reservations/${res.id}`)} title={t('reservations.viewDetails')} style={{ color: '#3b82f6' }}>
                                                         <FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} />
                                                     </button>
                                                     <button className="action-btn edit" onClick={() => openEditModal(res)} title={t('reservations.changeStatus')}>

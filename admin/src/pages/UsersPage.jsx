@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +8,7 @@ import './UsersPage.css';
 
 export default function UsersPage() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -239,7 +241,7 @@ export default function UsersPage() {
                                         </td>
                                         <td>
                                             <div className="action-buttons">
-                                                <button className="action-btn view" onClick={() => openViewModal(user)} title={t('users.viewDetails')} style={{ color: '#3b82f6' }}>
+                                                <button className="action-btn view" onClick={() => navigate(`/users/${user.id}`)} title={t('users.viewDetails')} style={{ color: '#3b82f6' }}>
                                                     <FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} />
                                                 </button>
                                                 <button className="action-btn edit" onClick={() => openEditModal(user)} title={t('users.editUser')}>

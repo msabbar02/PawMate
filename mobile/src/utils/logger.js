@@ -34,13 +34,14 @@ export const logActivity = async (userId, title, description = '', type = 'syste
  * @param {Object} details - Detalles adicionales (opcional).
  */
 export const logSystemAction = async (userId, userEmail, actionType, entity, details = {}) => {
+    if (!userId || !userEmail) return; // never log without a real user
     try {
         await supabase.from('system_logs').insert([
             {
-                userId: userId || 'Sistema',
-                userEmail: userEmail || 'Sistema',
-                actionType: actionType,
-                entity: entity,
+                userId,
+                userEmail,
+                actionType,
+                entity,
                 details: typeof details === 'string' ? details : JSON.stringify(details),
                 created_at: new Date().toISOString(),
             }

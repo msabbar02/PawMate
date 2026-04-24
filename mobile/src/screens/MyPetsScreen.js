@@ -134,6 +134,7 @@ export default function PawMatePetsCenter() {
     const [editingReminder, setEditingReminder] = useState(null);
     const [reminderForm, setReminderForm] = useState({
         title: '', description: '', eventTime: new Date(), notificationAdvance: 15,
+        category: 'general',
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
@@ -649,6 +650,104 @@ export default function PawMatePetsCenter() {
     // ─────────────────────────────────────────────────
     // REMINDER CRUD
     // ─────────────────────────────────────────────────
+
+    // Smart category detector based on keywords in title/description
+    const REMINDER_CATEGORIES = [
+        { key: 'vaccine',  label: '💉 Vacuna',     color: '#3b82f6', icon: 'medkit-outline',
+          keywords: ['vacuna', 'vaccine', 'rabia', 'parvo', 'moquillo', 'leptospirosis', 'puppy', 'refuerzo', 'recuerdo', 'booster'] },
+        { key: 'medical',  label: '🩺 Médico',     color: '#ef4444', icon: 'medical-outline',
+          keywords: ['vet', 'veterinario', 'medico', 'médico', 'cita', 'revisión', 'revision', 'consulta', 'cirugía', 'cirugia', 'dolor', 'sangre', 'analítica', 'analisis', 'análisis', 'ecograf', 'rayos', 'castración', 'castracion', 'esteriliz'] },
+        { key: 'parasite', label: '🐛 Antiparasitario', color: '#a855f7', icon: 'bug-outline',
+          keywords: ['antiparasit', 'desparasit', 'pulga', 'garrapata', 'gusano', 'pipeta', 'collar', 'flea', 'tick', 'frontline'] },
+        { key: 'food',     label: '🍖 Comida',     color: '#f59e0b', icon: 'restaurant-outline',
+          keywords: ['comida', 'pienso', 'food', 'alimento', 'snack', 'premio'] },
+        { key: 'walk',     label: '🦮 Paseo',      color: '#22c55e', icon: 'walk-outline',
+          keywords: ['paseo', 'walk', 'ejercicio', 'parque', 'playa', 'correr'] },
+        { key: 'grooming', label: '✂️ Aseo',       color: '#06b6d4', icon: 'cut-outline',
+          keywords: ['baño', 'baño', 'bath', 'peluquería', 'peluqueria', 'corte', 'uñas', 'unas', 'pelo', 'cepill'] },
+        { key: 'birthday', label: '🎂 Cumpleaños', color: '#ec4899', icon: 'gift-outline',
+          keywords: ['cumple', 'cumpleaños', 'cumpleanos', 'birthday', 'aniversario'] },
+        { key: 'general',  label: '📌 General',    color: '#94a3b8', icon: 'bookmark-outline', keywords: [] },
+    ];
+
+    const detectReminderCategory = (title = '', description = '') => {
+        const text = `${title} ${description}`.toLowerCase();
+        for (const cat of REMINDER_CATEGORIES) {
+            if (cat.keywords.some(kw => text.includes(kw))) return cat.key;
+        }
+        return 'general';
+    };
+
+    const REMINDER_TEMPLATES = [
+        { title: 'Vacuna anual',         category: 'vaccine',  daysAhead: 365 },
+        { title: 'Antiparasitario',      category: 'parasite', daysAhead: 30 },
+        { title: 'Revisión veterinaria', category: 'medical',  daysAhead: 180 },
+        { title: 'Baño',                 category: 'grooming', daysAhead: 14 },
+        { title: 'Corte de uñas',        category: 'grooming', daysAhead: 21 },
+    ];
+
+    const applyTemplate = (tpl) => {
+        const newDate = new Date();
+        newDate.setDate(newDate.getDate() + tpl.daysAhead);
+        newDate.setHours(10, 0, 0, 0);
+        setReminderForm(r => ({
+            ...r,
+            title: tpl.title,
+            category: tpl.category,
+            eventTime: newDate,
+        }));
+    };
+
+    // Append a vaccine entry to pets.vaccines (jsonb array)
+    const addToHealthRecord = async (reminder) => {
+        if (!selectedPet) return;
+        try {
+            if (reminder.category === 'vaccine') {
+                const vaccines = selectedPet.vaccines || [];
+                const newVaccine = {
+                    id: Date.now().toString(),
+                    name: reminder.title,
+                    notes: reminder.description || '',
+                    date: new Date().toISOString(),
+                    nextDueDate: reminder.eventTime,
+                };
+                const updated = [...vaccines, newVaccine];
+                await supabase.from('pets').update({ vaccines: updated }).eq('id', selectedPet.id);
+                setPets(prev => prev.map(p => p.id === selectedPet.id ? { ...p, vaccines: updated } : p));
+                setSelectedPet(p => p ? { ...p, vaccines: updated } : p);
+                Alert.alert('✅ Añadido', `"${reminder.title}" se añadió al historial de vacunas de ${selectedPet.name}.`);
+            } else if (reminder.category === 'medical' || reminder.category === 'parasite') {
+                // Append to medicalConditions (text). Prefix the entry with the date.
+                const stamp = new Date().toLocaleDateString();
+                const entry = `[${stamp}] ${reminder.title}${reminder.description ? ` — ${reminder.description}` : ''}`;
+                const newConditions = selectedPet.medicalConditions
+                    ? `${selectedPet.medicalConditions}\n${entry}`
+                    : entry;
+                await supabase.from('pets').update({ medicalConditions: newConditions }).eq('id', selectedPet.id);
+                setPets(prev => prev.map(p => p.id === selectedPet.id ? { ...p, medicalConditions: newConditions } : p));
+                setSelectedPet(p => p ? { ...p, medicalConditions: newConditions } : p);
+                Alert.alert('✅ Añadido', `Se añadió al historial médico de ${selectedPet.name}.`);
+            }
+        } catch (e) {
+            console.error('addToHealthRecord error:', e);
+            Alert.alert(t('common.error'), 'No se pudo añadir al historial.');
+        }
+    };
+
+    const promptAddToHealth = (reminder) => {
+        const labels = {
+            vaccine:  { title: '💉 ¿Añadir al historial de vacunas?', msg: `Detectamos que es una vacuna. ¿Quieres registrar "${reminder.title}" en las vacunas de ${selectedPet?.name}?` },
+            medical:  { title: '🩺 ¿Añadir al historial médico?',     msg: `¿Quieres registrar "${reminder.title}" en las condiciones médicas de ${selectedPet?.name}?` },
+            parasite: { title: '🐛 ¿Añadir al historial?',             msg: `¿Quieres registrar este antiparasitario en el historial de ${selectedPet?.name}?` },
+        };
+        const meta = labels[reminder.category];
+        if (!meta) return;
+        Alert.alert(meta.title, meta.msg, [
+            { text: 'Ahora no', style: 'cancel' },
+            { text: 'Sí, añadir', onPress: () => addToHealthRecord(reminder) },
+        ]);
+    };
+
     const openReminderForm = (reminder = null) => {
         if (reminder) {
             setEditingReminder(reminder);
@@ -656,10 +755,11 @@ export default function PawMatePetsCenter() {
                 title: reminder.title, description: reminder.description,
                 eventTime: reminder.eventTime ? new Date(reminder.eventTime) : new Date(),
                 notificationAdvance: reminder.notificationAdvance ?? 15,
+                category: reminder.category || detectReminderCategory(reminder.title, reminder.description),
             });
         } else {
             setEditingReminder(null);
-            setReminderForm({ title: '', description: '', eventTime: new Date(), notificationAdvance: 15 });
+            setReminderForm({ title: '', description: '', eventTime: new Date(), notificationAdvance: 15, category: 'general' });
         }
         setIsReminderModalVisible(true);
     };
@@ -668,11 +768,16 @@ export default function PawMatePetsCenter() {
         if (!reminderForm.title.trim()) return Alert.alert(t('common.error'), t('pets.reminderTitle'));
         const triggerTime = new Date(reminderForm.eventTime);
         triggerTime.setMinutes(triggerTime.getMinutes() - reminderForm.notificationAdvance);
+        // Auto-detect category if user did not pick one
+        const finalCategory = reminderForm.category && reminderForm.category !== 'general'
+            ? reminderForm.category
+            : detectReminderCategory(reminderForm.title, reminderForm.description);
         const data = {
             title: reminderForm.title,
             description: reminderForm.description,
             notificationAdvance: reminderForm.notificationAdvance,
             eventTime: reminderForm.eventTime.toISOString(),
+            category: finalCategory,
         };
         const currentReminders = selectedPet.reminders || [];
         const newReminders = editingReminder
@@ -680,11 +785,18 @@ export default function PawMatePetsCenter() {
             : [...currentReminders, { id: Date.now().toString(), ...data }];
         try {
             await supabase.from('pets').update({ reminders: newReminders }).eq('id', selectedPet.id);
+            // Sync local state immediately so UI reflects the change
+            setPets(prev => prev.map(p => p.id === selectedPet.id ? { ...p, reminders: newReminders } : p));
+            setSelectedPet(p => p ? { ...p, reminders: newReminders } : p);
             setIsReminderModalVisible(false);
             if (triggerTime.getTime() > Date.now()) {
                 scheduleReminder(reminderForm.title, reminderForm.description, triggerTime);
             } else {
                 Alert.alert(t('pets.reminderSaved'), t('pets.reminderSavedMsg'));
+            }
+            // 🩺 Smart prompt: ask user to add to health record if relevant (only on create, not edit)
+            if (!editingReminder && ['vaccine', 'medical', 'parasite'].includes(finalCategory)) {
+                setTimeout(() => promptAddToHealth({ ...data }), 600);
             }
         } catch { Alert.alert(t('common.error'), t('pets.reminderSaveError')); }
     };
@@ -693,6 +805,8 @@ export default function PawMatePetsCenter() {
         const filtered = (selectedPet.reminders || []).filter(r => r.id !== id);
         try {
             await supabase.from('pets').update({ reminders: filtered }).eq('id', selectedPet.id);
+            setPets(prev => prev.map(p => p.id === selectedPet.id ? { ...p, reminders: filtered } : p));
+            setSelectedPet(p => p ? { ...p, reminders: filtered } : p);
             setIsReminderModalVisible(false);
         } catch { Alert.alert(t('common.error'), t('pets.reminderDeleteError')); }
     };
@@ -1087,14 +1201,16 @@ export default function PawMatePetsCenter() {
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    selectedPet.reminders.map((rem, i) => (
+                    selectedPet.reminders.map((rem, i) => {
+                        const cat = REMINDER_CATEGORIES.find(c => c.key === (rem.category || 'general')) || REMINDER_CATEGORIES[REMINDER_CATEGORIES.length - 1];
+                        return (
                         <TouchableOpacity
                             key={rem.id}
                             style={[styles.agendaItem, i === selectedPet.reminders.length - 1 && { borderBottomWidth: 0 }]}
                             onPress={() => openReminderForm(rem)}
                         >
-                            <View style={styles.agendaIconBox}>
-                                <Icon name="notifications-outline" size={17} color={COLORS.secondary} />
+                            <View style={[styles.agendaIconBox, { backgroundColor: `${cat.color}22`, borderLeftWidth: 3, borderLeftColor: cat.color }]}>
+                                <Icon name={cat.icon} size={17} color={cat.color} />
                             </View>
                             <View style={styles.agendaTextWrap}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1105,12 +1221,65 @@ export default function PawMatePetsCenter() {
                                             : ''}
                                     </Text>
                                 </View>
+                                <Text style={[styles.agendaDesc, { color: cat.color, fontWeight: '600', fontSize: 11, marginTop: 2 }]}>
+                                    {cat.label}
+                                </Text>
                                 <Text style={styles.agendaDesc}>{rem.description || t('pets.noDescription')}</Text>
                             </View>
                         </TouchableOpacity>
-                    ))
+                        );
+                    })
                 )}
             </View>
+
+            {/* ── Registered vaccines (synced from reminders or added manually) ── */}
+            {selectedPet?.vaccines && selectedPet.vaccines.length > 0 && (
+                <>
+                    <View style={[styles.listHeaderRow, { paddingHorizontal: 2, marginTop: 18 }]}>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{`💉 ${t('pets.vaccines') || 'Vacunas'}`}</Text>
+                    </View>
+                    <View style={[styles.agendaCard, { backgroundColor: theme.cardBackground }]}>
+                        {selectedPet.vaccines.map((vac, i) => (
+                            <View
+                                key={vac.id}
+                                style={[styles.agendaItem, i === selectedPet.vaccines.length - 1 && { borderBottomWidth: 0 }]}
+                            >
+                                <View style={[styles.agendaIconBox, { backgroundColor: '#3b82f622', borderLeftWidth: 3, borderLeftColor: '#3b82f6' }]}>
+                                    <Icon name="medkit-outline" size={17} color="#3b82f6" />
+                                </View>
+                                <View style={styles.agendaTextWrap}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={styles.agendaTitle}>{vac.name}</Text>
+                                        <TouchableOpacity
+                                            onPress={() => Alert.alert(
+                                                'Eliminar vacuna',
+                                                `¿Eliminar "${vac.name}" del historial?`,
+                                                [
+                                                    { text: 'Cancelar', style: 'cancel' },
+                                                    { text: 'Eliminar', style: 'destructive', onPress: async () => {
+                                                        const updated = selectedPet.vaccines.filter(v => v.id !== vac.id);
+                                                        await supabase.from('pets').update({ vaccines: updated }).eq('id', selectedPet.id);
+                                                        setPets(prev => prev.map(p => p.id === selectedPet.id ? { ...p, vaccines: updated } : p));
+                                                        setSelectedPet(p => p ? { ...p, vaccines: updated } : p);
+                                                    } },
+                                                ]
+                                            )}
+                                        >
+                                            <Icon name="trash-outline" size={15} color={COLORS.danger} />
+                                        </TouchableOpacity>
+                                    </View>
+                                    {vac.nextDueDate && (
+                                        <Text style={styles.agendaDesc}>
+                                            Próxima dosis: {new Date(vac.nextDueDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </Text>
+                                    )}
+                                    {vac.notes ? <Text style={styles.agendaDesc}>{vac.notes}</Text> : null}
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                </>
+            )}
         </View>
     );
 
@@ -1666,17 +1835,78 @@ export default function PawMatePetsCenter() {
                         <TextInput
                             style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             value={reminderForm.title}
-                            onChangeText={t => setReminderForm(r => ({ ...r, title: t }))}
+                            onChangeText={txt => setReminderForm(r => ({
+                                ...r,
+                                title: txt,
+                                // Auto-detect category as user types (only if user hasn't manually picked a non-general one)
+                                category: r.category === 'general' || !r.category
+                                    ? detectReminderCategory(txt, r.description)
+                                    : r.category,
+                            }))}
                             placeholder={t('pets.reminderTitlePlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                         />
+
+                        {/* Quick templates — only shown when creating a new reminder */}
+                        {!editingReminder && (
+                            <>
+                                <FormLabel text="⚡ Plantillas rápidas" />
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                                    {REMINDER_TEMPLATES.map(tpl => (
+                                        <TouchableOpacity
+                                            key={tpl.title}
+                                            onPress={() => applyTemplate(tpl)}
+                                            style={{
+                                                paddingHorizontal: 14, paddingVertical: 8,
+                                                borderRadius: 18, marginRight: 8,
+                                                backgroundColor: theme.cardBackground,
+                                                borderWidth: 1, borderColor: theme.border,
+                                            }}
+                                        >
+                                            <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>{tpl.title}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </>
+                        )}
+
+                        {/* Category chips */}
+                        <FormLabel text="🏷️ Categoría" />
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                            {REMINDER_CATEGORIES.map(cat => {
+                                const active = reminderForm.category === cat.key;
+                                return (
+                                    <TouchableOpacity
+                                        key={cat.key}
+                                        onPress={() => setReminderForm(r => ({ ...r, category: cat.key }))}
+                                        style={{
+                                            paddingHorizontal: 14, paddingVertical: 8,
+                                            borderRadius: 18, marginRight: 8,
+                                            backgroundColor: active ? cat.color : theme.cardBackground,
+                                            borderWidth: 1.5,
+                                            borderColor: active ? cat.color : theme.border,
+                                        }}
+                                    >
+                                        <Text style={{ color: active ? '#fff' : theme.text, fontSize: 13, fontWeight: '600' }}>
+                                            {cat.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
 
                         <FormLabel text={t('pets.descriptionLabel')} />
                         <TextInput
                             style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
                             multiline
                             value={reminderForm.description}
-                            onChangeText={t => setReminderForm(r => ({ ...r, description: t }))}
+                            onChangeText={txt => setReminderForm(r => ({
+                                ...r,
+                                description: txt,
+                                category: r.category === 'general' || !r.category
+                                    ? detectReminderCategory(r.title, txt)
+                                    : r.category,
+                            }))}
                             placeholder={t('pets.additionalNotesPlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                         />

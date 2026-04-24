@@ -15,7 +15,7 @@ router.get('/:id', getUserById);
 // Update user
 router.put('/:id', updateUser);
 
-// Delete user (admin only)
-router.delete('/:id', isAdmin, deleteUser);
+// Delete user (self or admin — controller enforces the check)
+router.delete('/:id', deleteUser);
 
 module.exports = router;

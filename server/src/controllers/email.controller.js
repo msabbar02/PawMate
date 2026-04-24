@@ -24,7 +24,7 @@ function createTransporter() {
     }
 
     return nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+        host: process.env.SMTP_HOST || 'localhost',
         port: parseInt(process.env.SMTP_PORT || '587', 10),
         secure: false,
         auth: {

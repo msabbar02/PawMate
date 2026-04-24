@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +8,7 @@ import './UsersPage.css'; // Inheriting shared list styles
 
 export default function MessagesPage() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [threads, setThreads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -157,7 +159,7 @@ export default function MessagesPage() {
                                             </p>
                                         </td>
                                         <td>
-                                            <button className="btn-secondary" onClick={() => openThreadModal(thread)} style={{ padding: '6px 12px', fontSize: '13px' }}>
+                                            <button className="btn-secondary" onClick={() => navigate(`/messages/${thread.id}`)} style={{ padding: '6px 12px', fontSize: '13px' }}>
                                                 {t('messages.viewChat')}
                                             </button>
                                         </td>

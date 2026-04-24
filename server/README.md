@@ -5,9 +5,12 @@ API REST para la plataforma PawMate.
 ## 🚀 Tecnologías
 
 - **Node.js** + **Express**
-- **Supabase** (Auth JWT + PostgreSQL)
-- **Brevo** (SMTP para emails transaccionales)
-- **Stripe** (pagos y reembolsos)
+- **Supabase** (Auth JWT + PostgreSQL con service key)
+- **BillionMail** (servidor SMTP self-hosted para emails transaccionales)
+- **Nodemailer** (cliente SMTP)
+- **Stripe** (pagos, reembolsos y webhooks)
+- **express-rate-limit** (protección contra abuso de API — 200 req/15 min)
+- **jsonwebtoken** (verificación del hook de Supabase Auth)
 - **CORS** + **dotenv**
 
 ## 📂 Estructura
@@ -15,17 +18,18 @@ API REST para la plataforma PawMate.
 ```
 server/
 ├── src/
-│   ├── index.js                    # Punto de entrada Express
+│   ├── index.js                    # Punto de entrada Express + rate limiting + raw body webhook
 │   ├── config/
 │   │   └── supabase.js             # Cliente Supabase Admin
 │   ├── controllers/
-│   │   ├── auth.controller.js      # Verificar token, obtener perfil
-│   │   ├── users.controller.js     # CRUD de usuarios
+│   │   ├── auth.controller.js      # Verificar token, obtener perfil (sin campos sensibles)
+│   │   ├── email.controller.js     # Emails HTML de auth (signup, magic link, recovery, cambio email)
+│   │   ├── users.controller.js     # CRUD usuarios con filtrado de campos por rol y paginación
 │   │   ├── pets.controller.js      # CRUD de mascotas
-│   │   ├── notifications.controller.js # Emails de reserva (Brevo)
-│   │   └── payment.controller.js   # Stripe PaymentIntent + reembolsos
+│   │   ├── notifications.controller.js # Emails HTML de reserva via BillionMail SMTP
+│   │   └── payment.controller.js   # Stripe PaymentIntent + reembolsos + webhook
 │   ├── middleware/
-│   │   ├── auth.middleware.js      # Verificar JWT de Supabase
+│   │   ├── auth.middleware.js      # Verificar JWT de Supabase + check isAdmin
 │   │   └── error.middleware.js     # Manejo global de errores + 404
 │   ├── routes/
 │   │   ├── index.js                # Router principal + health check
@@ -47,27 +51,38 @@ server/
 
 ### Autenticación
 - `POST /api/auth/verify-token` — Verificar token JWT de Supabase
-- `GET /api/auth/profile` — Obtener perfil del usuario autenticado
+- `GET /api/auth/profile` — Perfil propio (sin URLs de documentos de verificación)
 
 ### Usuarios (requiere auth)
-- `GET /api/users` — Listar usuarios (solo admin)
-- `GET /api/users/:id` — Obtener usuario por ID
+- `GET /api/users?limit=50&offset=0&role=caregiver&search=` — Listar con paginación (admin)
+- `GET /api/users/:id` — Perfil de usuario (campos públicos para otros, todos para uno mismo)
 - `PUT /api/users/:id` — Actualizar usuario
-- `DELETE /api/users/:id` — Eliminar usuario (solo admin)
+- `DELETE /api/users/:id` — Eliminar usuario (admin, no puede auto-eliminarse)
 
 ### Mascotas (requiere auth)
-- `GET /api/pets` — Listar mascotas del usuario
+- `GET /api/pets` — Listar mascotas del usuario autenticado
 - `POST /api/pets` — Crear mascota
 - `GET /api/pets/:id` — Obtener mascota por ID
 - `PUT /api/pets/:id` — Actualizar mascota
 - `DELETE /api/pets/:id` — Eliminar mascota
 
-### Notificaciones
-- `POST /api/notifications/reservation-status` — Enviar email al dueño cuando el cuidador acepta/rechaza reserva
+### Notificaciones (requiere auth)
+- `POST /api/notifications/reservation-status` — Email HTML al dueño y al cuidador sobre el estado de la reserva
+- `POST /api/notifications/welcome-email` — Email de bienvenida al nuevo usuario
+- `POST /api/notifications/auth-email` — Hook de Supabase Auth (usa su propio JWT)
 
-### Pagos (requiere auth)
-- `POST /api/payments/payment-intent` — Crear PaymentIntent de Stripe
-- `POST /api/payments/refund` — Reembolsar pago
+### Pagos
+- `POST /api/payments/payment-intent` *(auth)* — Crear PaymentIntent de Stripe con validación de reserva
+- `POST /api/payments/refund` *(auth)* — Reembolsar pago + actualizar `paymentStatus: 'refunded'` en DB
+- `POST /api/payments/webhook` *(Stripe, sin auth)* — Webhook para `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
+
+## 🔒 Seguridad
+
+- **Rate limiting**: 200 req / 15 min por IP en todas las rutas `/api/*`
+- **Campos sensibles**: `idFrontUrl`, `idBackUrl`, `selfieUrl`, `certDocUrl`, `fcmToken`, `expoPushToken` nunca se exponen a otros usuarios
+- **Pago idempotente**: verifica que la reserva no esté ya pagada antes de crear un PaymentIntent
+- **Doble reembolso**: previene reembolsos duplicados verificando `paymentStatus !== 'refunded'`
+- **Stripe webhook**: verifica firma con `STRIPE_WEBHOOK_SECRET`; raw body parser en `/api/payments/webhook`
 
 ## 🔧 Instalación
 
@@ -87,15 +102,21 @@ NODE_ENV=development
 SUPABASE_URL=https://tu-proyecto.supabase.co
 SUPABASE_SERVICE_KEY=tu-service-role-key
 
-# Brevo SMTP (emails)
-BREVO_SMTP_HOST=smtp-relay.brevo.com
-BREVO_SMTP_PORT=587
-BREVO_SMTP_USER=tu-email@brevo.com
-BREVO_SMTP_PASS=tu-api-key
-BREVO_FROM_EMAIL=noreply@pawmate.com
+# BillionMail SMTP (self-hosted)
+SMTP_HOST=mail.tudominio.com
+SMTP_PORT=587
+SMTP_USER=noreply@apppawmate.com
+SMTP_PASS=tu-smtp-password
+SMTP_FROM=noreply@apppawmate.com
+SMTP_FROM_SUPPORT=support@apppawmate.com
+SMTP_FROM_ADMIN=admin@apppawmate.com
 
 # Stripe
-STRIPE_SECRET_KEY=sk_...
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Supabase Auth hook JWT (para /api/notifications/auth-email)
+SUPABASE_AUTH_HOOK_SECRET=v1,whsec_...
 ```
 
 ## ▶️ Ejecutar

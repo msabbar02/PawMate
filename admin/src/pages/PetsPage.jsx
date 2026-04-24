@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +8,7 @@ import './UsersPage.css'; // Inheriting shared table styles
 
 export default function PetsPage() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [pets, setPets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -197,7 +199,7 @@ export default function PetsPage() {
                                         </td>
                                         <td>
                                             <div className="action-buttons">
-                                                <button className="action-btn view" onClick={() => openViewModal(pet)} title={t('pets.viewDetails')} style={{ color: '#3b82f6' }}>
+                                                <button className="action-btn view" onClick={() => navigate(`/pets/${pet.id}`)} title={t('pets.viewDetails')} style={{ color: '#3b82f6' }}>
                                                     <FontAwesomeIcon icon={faEye} style={{ fontSize: 18 }} />
                                                 </button>
                                                 <button className="action-btn edit" onClick={() => openEditModal(pet)} title={t('pets.editPet')}>

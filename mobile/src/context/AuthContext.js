@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Alert, AppState } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 import { supabase } from '../config/supabase';
 import { registerForPushNotifications } from '../utils/pushNotifications';
 import { logSystemAction } from '../utils/logger';
@@ -26,6 +26,8 @@ export const AuthProvider = ({ children }) => {
     const channelsRef = useRef([]);
     const presenceIntervalRef = useRef(null);
     const userDataRef = useRef(null);
+    // Keep a ref to the last logged-in user so SIGNED_OUT can log the real id/email
+    const lastUserRef = useRef(null);
 
     // Keep ref in sync for use in callbacks
     useEffect(() => { userDataRef.current = userData; }, [userData]);
@@ -205,16 +207,27 @@ export const AuthProvider = ({ children }) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
             handleAuthChange(session);
             if (_evt === 'SIGNED_IN' && session?.user) {
-                logSystemAction(session.user.id, session.user.email, 'USER_LOGIN', 'Auth', { event: _evt });
-                // Send welcome email for new users (created in the last 60 seconds)
+                lastUserRef.current = { id: session.user.id, email: session.user.email };
                 const createdAt = new Date(session.user.created_at).getTime();
                 const now = Date.now();
-                if (now - createdAt < 60000) {
+                const isNewUser = now - createdAt < 60000;
+                logSystemAction(
+                    session.user.id,
+                    session.user.email,
+                    isNewUser ? 'USER_SIGNUP' : 'USER_LOGIN',
+                    'Auth',
+                    { event: _evt, platform: Platform.OS, version: Platform.Version }
+                );
+                if (isNewUser) {
                     const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.fullName || '';
                     sendWelcomeEmail(session.user.email, fullName).catch(() => {});
                 }
             } else if (_evt === 'SIGNED_OUT') {
-                logSystemAction(user?.id || 'Sistema', user?.email || 'Sistema', 'USER_LOGOUT', 'Auth', { event: _evt });
+                const prev = lastUserRef.current;
+                if (prev?.id && prev?.email) {
+                    logSystemAction(prev.id, prev.email, 'USER_LOGOUT', 'Auth', { event: _evt, platform: Platform.OS });
+                }
+                lastUserRef.current = null;
             }
         });
 

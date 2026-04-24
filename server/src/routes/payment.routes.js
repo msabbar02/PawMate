@@ -3,10 +3,11 @@ const router = express.Router();
 const paymentController = require('../controllers/payment.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
 
-// In a real app we might want to ensure only authenticated users can call these
-// For now we'll put verifyToken on them if it exists. We assume it's imported correctly.
-// Also we would normally validate bodies
+// Stripe webhook — must use raw body (set in index.js before express.json)
+// No auth middleware: Stripe calls this, not the app user
+router.post('/webhook', paymentController.handleStripeWebhook);
 
+// Protected payment routes
 router.post('/payment-intent', verifyToken, paymentController.createPaymentIntent);
 router.post('/refund', verifyToken, paymentController.refundPayment);
 

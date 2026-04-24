@@ -16,6 +16,7 @@ import * as Contacts from 'expo-contacts';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from '../context/LanguageContext';
 import { COLORS } from '../constants/colors';
+import { deleteAccount } from '../config/api';
 
 const APP_VERSION = '1.0.0';
 
@@ -377,10 +378,10 @@ export default function SettingsScreen({ navigation }) {
                 text: t('common.delete'), style: 'destructive',
                 onPress: async () => {
                     try {
-                        await supabase.from('users').delete().eq('id', user.id);
+                        await deleteAccount(user.id);
                         await supabase.auth.signOut();
-                    } catch {
-                        Alert.alert(t('common.error'), t('settings.deleteAccountReauth'));
+                    } catch (e) {
+                        Alert.alert(t('common.error'), e.message || t('settings.deleteAccountReauth'));
                     }
                 },
             },

@@ -1,14 +1,37 @@
+import { supabase } from './supabase';
+
 // Base URL del backend PawMate. En producción usa tu URL real.
 // En Android emulador usa http://10.0.2.2:3000 en lugar de localhost.
 export const API_BASE_URL = typeof __DEV__ !== 'undefined' && __DEV__
     ? 'http://localhost:3000'
     : 'https://api.apppawmate.com';
 
+/** Helper: get current Supabase JWT to authenticate server calls */
+async function getAuthToken() {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        return session?.access_token ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/** Helper: build auth headers (returns empty object if no token) */
+async function authHeaders() {
+    const token = await getAuthToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Notify owner/caregiver by email when a reservation status changes.
+ * Requires auth — called by participants of the reservation.
+ */
 export const notifyReservationStatus = async (reservationId) => {
     try {
+        const headers = await authHeaders();
         const res = await fetch(`${API_BASE_URL}/api/notifications/reservation-status`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify({ reservationId }),
         });
         return res.ok;
@@ -18,11 +41,33 @@ export const notifyReservationStatus = async (reservationId) => {
     }
 };
 
+/**
+ * Delete the current user's account (profile row + auth user).
+ * The server handles both deletions using the service key.
+ */
+export const deleteAccount = async (userId) => {
+    const headers = await authHeaders();
+    const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...headers },
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Error al eliminar la cuenta');
+    }
+    return true;
+};
+
+/**
+ * Send welcome email after user signs up.
+ * Requires auth — user session must exist.
+ */
 export const sendWelcomeEmail = async (email, fullName) => {
     try {
+        const headers = await authHeaders();
         const res = await fetch(`${API_BASE_URL}/api/notifications/welcome-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify({ email, fullName }),
         });
         return res.ok;
