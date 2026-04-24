@@ -111,7 +111,7 @@
     "verificationStatus": "Verification Status",
     "fullAddress": "Full Address",
     "securityPrivacy": "Security Privacy:",
-    "securityPrivacyText": "Due to Firebase Authentication architecture, user passwords are strongly encrypted (hashed) and are never exposed in the Firestore database. It is impossible to view the actual password.",
+    "securityPrivacyText": "Due to Supabase Auth architecture, user passwords are strongly encrypted (bcrypt hashed) and are never exposed in the database. It is impossible to view the actual password.",
     "loadingAdditionalInfo": "Loading additional server information...",
     "linkedPets": "Linked Pets",
     "speciesLabel": "Species:",

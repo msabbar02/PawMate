@@ -111,7 +111,7 @@
     "verificationStatus": "Estado de Verificación",
     "fullAddress": "Dirección Completa",
     "securityPrivacy": "Privacidad de Seguridad:",
-    "securityPrivacyText": "Por arquitectura de Firebase Authentication, las contraseñas de los usuarios están fuertemente encriptadas (hash) y nunca se exponen en la base de datos de Firestore. Es imposible visualizar la contraseña real.",
+    "securityPrivacyText": "Por arquitectura de Supabase Auth, las contraseñas de los usuarios están fuertemente encriptadas (hash bcrypt) y nunca se exponen en la base de datos. Es imposible visualizar la contraseña real.",
     "loadingAdditionalInfo": "Cargando información adicional del servidor...",
     "linkedPets": "Mascotas Vinculadas",
     "speciesLabel": "Especie:",

@@ -12,7 +12,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
-import { uploadImageToStorage, saveAvatarToFirestore } from '../utils/storageHelpers';
+import { uploadImageToStorage, saveAvatar } from '../utils/storageHelpers';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
 
@@ -55,7 +55,7 @@ export default function ProfileScreen({ navigation }) {
     const { t, lang } = useTranslation();
 
     // ── Editable fields state (initialized from userData)
-    // NOTE: Firestore uses 'avatar' for photo, 'address' sub-object for location
+    // NOTE: 'avatar' field stores the photo, 'address' sub-object stores location
     const [firstName,    setFirstName]    = useState(userData?.firstName    || userData?.fullName?.split(' ')[0] || '');
     const [lastName,     setLastName]     = useState(userData?.lastName     || userData?.fullName?.split(' ').slice(1).join(' ') || '');
     const [phone,        setPhone]        = useState(userData?.phone        || '');
@@ -171,8 +171,8 @@ export default function ProfileScreen({ navigation }) {
         setPhotoUri(localUri); // optimistic UI
         setUploadingPhoto(true);
         try {
-            // Save as base64 directly to Supabase storage by using saveAvatarToFirestore (now maps to Supabase)
-            const base64Url = await saveAvatarToFirestore(localUri, user.id);
+            // Save avatar (base64 or uploaded) to Supabase storage
+            const base64Url = await saveAvatar(localUri, user.id);
             setPhotoUri(base64Url);
             await refreshUserData();
         } catch (e) {

@@ -604,7 +604,7 @@ VITE_SUPABASE_ANON_KEY=
 | - | ----------------------------------------- | ------------------------------------------- |
 | 1 | RLS policies =`USING (true)`              | Reescribir policies por tabla con ownership |
 | 2 | `updateUser` permite cambiar `role`       | Whitelist de campos editables               |
-| 3 | API keys hardcodeadas (Firebase, Weather) | Mover a variables de entorno                |
+| 3 | API keys hardcodeadas (Weather)            | Mover a variables de entorno                |
 
 ### 🟠 Altos
 
@@ -627,8 +627,6 @@ VITE_SUPABASE_ANON_KEY=
 
 ### 🟢 Bajos
 
-- Firebase config muerto en admin (eliminar)
-- Función mal nombrada `saveAvatarToFirestore` (usa Supabase)
 - `Math.random()` como key en LogsPage
 
 

@@ -144,7 +144,7 @@ export default function PawMatePetsCenter() {
     const [walkRoute, setWalkRoute] = useState([]);
     const [walkDistance, setWalkDistance] = useState(0);
     const [walkTimer, setWalkTimer] = useState(0);
-    const [walks, setWalks] = useState([]); // ALL walks from Firestore
+    const [walks, setWalks] = useState([]); // ALL walks from Supabase
 
     const locationSub = useRef(null);
     const timerRef = useRef(null);

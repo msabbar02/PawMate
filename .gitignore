@@ -5,11 +5,10 @@
 # ============================================
 # SENSITIVE FILES - NEVER COMMIT
 # ============================================
-# Firebase & Google Services
-**/google-services.json
-**/GoogleService-Info.plist
-**/firebaseConfig.js
-**/firebase-adminsdk-*.json
+# Supabase
+**/supabase/.branches/
+**/supabase/.temp/
+**/supabase-service-key*
 
 # Environment Variables
 # .env files tracked intentionally (private repo)
@@ -24,6 +23,7 @@
 **/*credentials*
 **/*apikey*
 **/secrets/
+**/serviceAccountKey*.json
 
 # ============================================
 # NODE MODULES & DEPENDENCIES

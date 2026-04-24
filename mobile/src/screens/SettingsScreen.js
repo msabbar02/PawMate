@@ -47,7 +47,7 @@ No vendemos tu información personal a terceros. Compartimos datos solo con:
 • Servicios de emergencia cuando activas el botón SOS.
 
 5. SEGURIDAD
-Implementamos medidas técnicas y organizativas para proteger tu datos, incluyendo cifrado en tránsito (HTTPS) y en reposo (Firebase Security Rules).
+Implementamos medidas técnicas y organizativas para proteger tu datos, incluyendo cifrado en tránsito (HTTPS) y en reposo, y políticas de seguridad a nivel de fila (Row Level Security) en Supabase.
 
 6. TUS DERECHOS
 Tienes derecho a:

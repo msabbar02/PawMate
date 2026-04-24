@@ -113,7 +113,7 @@ export async function uploadGalleryPhoto(localUri, userId) {
 }
 
 // Legacy alias — kept for backward compat
-export async function saveAvatarToFirestore(localUri, userId) {
+export async function saveAvatar(localUri, userId) {
     if (!localUri) return null;
     if (!localUri.startsWith('http')) {
         return await uploadImageToStorage(localUri, `avatars/${userId}/${Date.now()}.jpg`);

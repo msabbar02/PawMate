@@ -35,7 +35,6 @@ PawMate/
 | **Plataforma** | Expo | ~54.0 |
 | **Navegación** | React Navigation (Bottom Tabs + Native Stack) | 7.x |
 | **Base de datos / Auth** | Supabase JS (PostgreSQL + Auth + Realtime + Storage) | 2.x |
-| **Mensajería / Storage** | Firebase (Firestore + Auth + Storage) | SDK modular |
 | **Pagos** | Stripe React Native | 0.50.3 |
 | **Mapas & GPS** | react-native-maps (Google Maps) | 1.20.1 |
 | **Notificaciones push** | Expo Notifications | ~0.32 |
@@ -76,7 +75,6 @@ PawMate/
 | **Framework** | React | 18.2.0 |
 | **Router** | React Router DOM | v6 |
 | **Base de datos / Auth** | Supabase JS (PostgreSQL + Auth) | 2.x |
-| **Mensajería / Storage** | Firebase (Firestore + Auth + Storage) | SDK modular |
 | **Iconos** | Lucide React + FontAwesome | — |
 | **i18n** | i18next + react-i18next (ES / EN) | — |
 | **Deploy** | Vercel | — |
@@ -104,7 +102,6 @@ PawMate/
 | Servicio | Uso |
 |----------|-----|
 | **Supabase** | PostgreSQL · Auth · Realtime · Storage (base de datos principal) |
-| **Firebase** | Firestore (mensajería) · Auth · Storage |
 | **Stripe** | Procesamiento de pagos (PaymentIntent + reembolsos) |
 | **BillionMail** | Servidor SMTP self-hosted para emails transaccionales |
 | **Vercel** | Despliegue: landing web, admin y backend (serverless) |
@@ -116,7 +113,7 @@ PawMate/
 ## 🎯 Funcionalidades Principales
 
 ### 📱 App Móvil
-- ✅ Autenticación con Supabase Auth + Firebase Auth (Email/Password, Google OAuth)
+- ✅ Autenticación con Supabase Auth (Email/Password, Google OAuth)
 - ✅ Perfiles completos de mascotas (fotos, historial médico, chip NFC)
 - ✅ Seguimiento GPS en tiempo real de paseos con mapa, distancia, duración y velocidad
 - ✅ Modo oscuro personalizado en Google Maps
@@ -196,7 +193,7 @@ cd mobile
 npm install
 npx expo start --clear --tunnel
 ```
-> Requiere `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` y credenciales de Firebase
+> Requiere `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
 
 ### Backend
 ```bash
