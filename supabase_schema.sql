@@ -6,11 +6,38 @@
 -- ══════════════════════════════════════════
 -- MIGRATION: Run these on existing databases
 -- ══════════════════════════════════════════
+-- USERS
 -- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS iban text;
 -- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "completedServices" integer DEFAULT 0;
--- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "walkActive" boolean DEFAULT false;
 -- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "galleryPhotos" jsonb DEFAULT '[]'::jsonb;
 -- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "acceptedSpecies" jsonb DEFAULT '[]'::jsonb;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "isWalking" boolean DEFAULT false;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "walkingPetId" uuid;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "walkingPets" uuid[] DEFAULT '{}';
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "expoPushToken" text;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "lastSeen" timestamp with time zone;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_seen timestamp with time zone;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_banned boolean DEFAULT false;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS "isVerified" boolean DEFAULT false;
+-- ALTER TABLE public.users ADD COLUMN IF NOT EXISTS gender text;
+-- RESERVATIONS
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "walkActive" boolean DEFAULT false;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "petId" uuid REFERENCES public.pets(id) ON DELETE SET NULL;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "paymentIntentId" text;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "completedAt" timestamp with time zone;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "paymentReleased" boolean DEFAULT false;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "paymentReleasedAt" timestamp with time zone;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "ownerAvatar" text;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "caregiverAvatar" text;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "startDateTime" timestamp with time zone;
+-- ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS "endDateTime" timestamp with time zone;
+-- REPORTS
+-- ALTER TABLE public.reports ADD COLUMN IF NOT EXISTS "reporterUserId" uuid REFERENCES public.users(id) ON DELETE SET NULL;
+-- ALTER TABLE public.reports ADD COLUMN IF NOT EXISTS "reportedUserId" uuid REFERENCES public.users(id) ON DELETE SET NULL;
+-- CONVERSATIONS
+-- ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS "user1Id" uuid REFERENCES public.users(id) ON DELETE CASCADE;
+-- ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS "user2Id" uuid REFERENCES public.users(id) ON DELETE CASCADE;
+-- ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
 
 -- ══════════════════════════════════════════
 -- 1. USERS
@@ -64,6 +91,19 @@ CREATE TABLE IF NOT EXISTS public.users (
   "isGroupWalking" boolean DEFAULT false,
   iban text,
   "completedServices" integer DEFAULT 0,
+  "galleryPhotos" jsonb DEFAULT '[]'::jsonb,
+  -- Estado en tiempo real
+  "isWalking" boolean DEFAULT false,
+  "walkingPetId" uuid,
+  "walkingPets" uuid[] DEFAULT '{}',
+  -- Push notifications
+  "expoPushToken" text,
+  -- Sesión / moderación
+  "lastSeen" timestamp with time zone,
+  last_seen timestamp with time zone,
+  is_banned boolean DEFAULT false,
+  "isVerified" boolean DEFAULT false,
+  gender text,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -118,14 +158,26 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   date timestamp with time zone,
   "startTime" text,
   "endTime" text,
-  status text DEFAULT 'pendiente',          -- 'pendiente', 'aceptada', 'activa', 'completada', 'cancelada'
+  status text DEFAULT 'pendiente',          -- 'pendiente', 'aceptada', 'activa', 'in_progress', 'completada', 'cancelada'
   price numeric,
   "totalPrice" numeric DEFAULT 0,
   notes text,
   "paymentStatus" text,
+  "paymentIntentId" text,
+  "paymentReleased" boolean DEFAULT false,
+  "paymentReleasedAt" timestamp with time zone,
   "qrCode" text,
   "reviewedByOwner" boolean DEFAULT false,
   "walkActive" boolean DEFAULT false,
+  "completedAt" timestamp with time zone,
+  -- Compatibilidad: petId individual + petIds array
+  "petId" uuid REFERENCES public.pets(id) ON DELETE SET NULL,
+  -- Avatares para mostrar en historial sin join
+  "ownerAvatar" text,
+  "caregiverAvatar" text,
+  -- Fechas combinadas
+  "startDateTime" timestamp with time zone,
+  "endDateTime" timestamp with time zone,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -136,12 +188,16 @@ CREATE TABLE IF NOT EXISTS public.conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "ownerId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
   "caregiverId" uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  -- Aliases genéricos (admin: chats que no son owner-caregiver)
+  "user1Id" uuid REFERENCES public.users(id) ON DELETE CASCADE,
+  "user2Id" uuid REFERENCES public.users(id) ON DELETE CASCADE,
   "ownerName" text,
   "caregiverName" text,
   "ownerAvatar" text,
   "caregiverAvatar" text,
   "lastMessage" text,
   "lastMessageAt" timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
   created_at timestamp with time zone DEFAULT now(),
   UNIQUE("ownerId", "caregiverId")
 );
@@ -213,6 +269,9 @@ CREATE TABLE IF NOT EXISTS public.walks (
 CREATE TABLE IF NOT EXISTS public.reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "userId" uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  -- Quien reportó / quien fue reportado (admin moderation)
+  "reporterUserId" uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  "reportedUserId" uuid REFERENCES public.users(id) ON DELETE SET NULL,
   "reporterName" text,
   "reporterEmail" text,
   reason text,
@@ -340,6 +399,8 @@ CREATE POLICY "system_logs_all" ON public.system_logs FOR ALL USING (true) WITH 
 -- ══════════════════════════════════════════
 -- LIMPIEZA: borrar tablas que ya no se usan
 -- ══════════════════════════════════════════
-DROP TABLE IF EXISTS public.posts CASCADE;
 DROP TABLE IF EXISTS public.friends CASCADE;
 DROP TABLE IF EXISTS public."friendRequests" CASCADE;
+-- NOTA: la tabla 'posts' es usada por admin/CommunityPage.jsx para moderación.
+-- Si la mantienes, crea aquí la definición. Si quitas la pestaña Comunidad, descomenta:
+-- DROP TABLE IF EXISTS public.posts CASCADE;
