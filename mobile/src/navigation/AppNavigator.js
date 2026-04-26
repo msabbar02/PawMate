@@ -115,13 +115,18 @@ const MainTabNavigator = () => {
                     let iconName;
                     if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
                     else if (route.name === 'Mascotas') iconName = focused ? 'paw' : 'paw-outline';
+                    else if (route.name === 'Cuidadores') iconName = focused ? 'people' : 'people-outline';
                     else if (route.name === 'Reservas') {
                         iconName = isLocked ? 'lock-closed' : (focused ? 'calendar' : 'calendar-outline');
                     }
                     else if (route.name === 'Ajustes') iconName = focused ? 'settings' : 'settings-outline';
 
                     const activeColor = '#F5A623';
-                    const routeLabel = route.name === 'Reservas' ? 'Reservas' : route.name === 'Mascotas' ? 'Mascotas' : route.name === 'Ajustes' ? 'Ajustes' : 'Inicio';
+                    const routeLabel = route.name === 'Reservas' ? 'Reservas'
+                        : route.name === 'Mascotas' ? 'Mascotas'
+                        : route.name === 'Cuidadores' ? (role === 'caregiver' ? 'Panel' : 'Cuidadores')
+                        : route.name === 'Ajustes' ? 'Ajustes'
+                        : 'Inicio';
 
                     if (focused) {
                         return (
@@ -192,6 +197,13 @@ const MainTabNavigator = () => {
                 component={MyPetsScreen}
                 options={{ tabBarLabel: 'Mascotas' }}
             />
+            {role && role !== 'normal' && (
+                <Tab.Screen
+                    name="Cuidadores"
+                    component={CaregiverTabScreen}
+                    options={{ tabBarLabel: role === 'caregiver' ? 'Panel' : 'Cuidadores' }}
+                />
+            )}
             <Tab.Screen
                 name="Reservas"
                 component={BookingTabScreen}

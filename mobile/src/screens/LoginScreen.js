@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -13,6 +13,7 @@ import {
     ScrollView,
     Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
@@ -20,23 +21,31 @@ import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
 
+const SAVED_ACCOUNTS_KEY = '@pawmate_saved_accounts';
+const MAX_SAVED_ACCOUNTS = 5;
+
 WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
-const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error }) => (
+const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error, inputRef }) => (
     <View style={styles.inputWrapper}>
         <View style={[styles.inputContainer, error && styles.inputError]}>
             <Icon name={icon} size={20} color={COLORS.textLight} style={styles.inputIcon} />
             <TextInput
+                ref={inputRef}
                 style={styles.input}
                 placeholder={placeholder}
                 placeholderTextColor={COLORS.textLight}
                 value={value}
                 onChangeText={onChangeText}
                 secureTextEntry={secureTextEntry}
-                autoCapitalize={isPassword ? 'none' : 'none'}
+                autoCapitalize="none"
+                autoCorrect={false}
                 keyboardType={fieldName === 'email' ? 'email-address' : 'default'}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
             />
             {isPassword && (
                 <TouchableOpacity
@@ -55,6 +64,8 @@ export default function LoginScreen({ navigation }) {
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [savedAccounts, setSavedAccounts] = useState([]);
+    const passwordInputRef = useRef(null);
 
     const [formData, setFormData] = useState({
         email: '',
@@ -62,6 +73,40 @@ export default function LoginScreen({ navigation }) {
     });
 
     const [errors, setErrors] = useState({});
+
+    // ── Load saved accounts ──
+    useEffect(() => {
+        (async () => {
+            try {
+                const raw = await AsyncStorage.getItem(SAVED_ACCOUNTS_KEY);
+                if (raw) setSavedAccounts(JSON.parse(raw));
+            } catch { /* ignore */ }
+        })();
+    }, []);
+
+    const persistAccount = async (email) => {
+        try {
+            const raw = await AsyncStorage.getItem(SAVED_ACCOUNTS_KEY);
+            const list = raw ? JSON.parse(raw) : [];
+            const filtered = list.filter(e => e.toLowerCase() !== email.toLowerCase());
+            const next = [email, ...filtered].slice(0, MAX_SAVED_ACCOUNTS);
+            await AsyncStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+        } catch { /* ignore */ }
+    };
+
+    const removeAccount = async (email) => {
+        try {
+            const next = savedAccounts.filter(e => e !== email);
+            setSavedAccounts(next);
+            await AsyncStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+        } catch { /* ignore */ }
+    };
+
+    const pickAccount = (email) => {
+        setFormData({ email, password: '' });
+        setErrors({});
+        setTimeout(() => passwordInputRef.current?.focus(), 150);
+    };
 
     const validateForm = () => {
         let isValid = true;
@@ -94,11 +139,13 @@ export default function LoginScreen({ navigation }) {
         setErrors({});
 
         try {
+            const cleanEmail = formData.email.toLowerCase().trim();
             const { error } = await supabase.auth.signInWithPassword({
-                email: formData.email,
+                email: cleanEmail,
                 password: formData.password
             });
             if (error) throw error;
+            await persistAccount(cleanEmail);
             // El onAuthStateChanged general se encargará de la redirección
         } catch (error) {
             console.error("Supabase Login Error:", error.message);
@@ -144,6 +191,10 @@ export default function LoginScreen({ navigation }) {
                 options: {
                     redirectTo,
                     skipBrowserRedirect: true,
+                    queryParams: {
+                        prompt: 'select_account',
+                        access_type: 'offline',
+                    },
                 },
             });
             if (error) throw error;
@@ -228,6 +279,44 @@ export default function LoginScreen({ navigation }) {
                         </View>
 
                         <View style={styles.formContainer}>
+                            {savedAccounts.length > 0 && (
+                                <View style={styles.savedAccountsBox}>
+                                    <Text style={styles.savedAccountsTitle}>Cuentas guardadas</Text>
+                                    {savedAccounts.map((email) => {
+                                        const isActive = formData.email.toLowerCase() === email.toLowerCase();
+                                        return (
+                                            <View key={email} style={[styles.savedAccountRow, isActive && styles.savedAccountRowActive]}>
+                                                <TouchableOpacity
+                                                    style={styles.savedAccountMain}
+                                                    onPress={() => pickAccount(email)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={styles.savedAccountAvatar}>
+                                                        <Text style={styles.savedAccountInitial}>{email.charAt(0).toUpperCase()}</Text>
+                                                    </View>
+                                                    <Text style={styles.savedAccountEmail} numberOfLines={1}>{email}</Text>
+                                                    {isActive && <Icon name="checkmark-circle" size={18} color={COLORS.primary} />}
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.savedAccountRemove}
+                                                    onPress={() => removeAccount(email)}
+                                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                                >
+                                                    <Icon name="close" size={16} color={COLORS.textLight} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })}
+                                    <TouchableOpacity
+                                        style={styles.useAnotherAccount}
+                                        onPress={() => { setFormData({ email: '', password: '' }); setErrors({}); }}
+                                    >
+                                        <Icon name="add-circle-outline" size={16} color={COLORS.primary} />
+                                        <Text style={styles.useAnotherAccountText}>Usar otra cuenta</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
                             <InputField
                                 icon="mail-outline"
                                 placeholder={t('login.email')}
@@ -253,6 +342,7 @@ export default function LoginScreen({ navigation }) {
                                     if (errors.password) setErrors({ ...errors, password: null });
                                 }}
                                 onTogglePassword={() => setShowPassword(!showPassword)}
+                                inputRef={passwordInputRef}
                             />
 
                             <TouchableOpacity style={styles.forgotPassword} onPress={handleResetPassword}>
@@ -352,4 +442,15 @@ const styles = StyleSheet.create({
     oauthButtonsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 14 },
     oauthBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: COLORS.background, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 14, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
     oauthBtnText: { marginLeft: 8, fontWeight: '700', color: COLORS.secondary, fontSize: 14 },
+    savedAccountsBox: { marginBottom: 18, padding: 12, backgroundColor: COLORS.surface, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
+    savedAccountsTitle: { fontSize: 12, fontWeight: '800', color: COLORS.textLight, marginBottom: 10, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+    savedAccountRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.background, borderRadius: 10, marginBottom: 6, borderWidth: 1, borderColor: 'transparent' },
+    savedAccountRowActive: { borderColor: COLORS.primary, backgroundColor: '#FFF7ED' },
+    savedAccountMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10, gap: 10 },
+    savedAccountAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
+    savedAccountInitial: { color: '#fff', fontWeight: '800', fontSize: 14 },
+    savedAccountEmail: { flex: 1, fontSize: 13, color: COLORS.secondary, fontWeight: '600' },
+    savedAccountRemove: { padding: 12 },
+    useAnotherAccount: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4, paddingVertical: 8 },
+    useAnotherAccountText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
 });
