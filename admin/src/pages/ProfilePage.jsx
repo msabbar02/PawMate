@@ -45,13 +45,13 @@ export default function ProfilePage() {
             const ext = file.name.split('.').pop();
             const path = `avatars/${adminUser.id}.${ext}`;
             const { error: uploadError } = await supabase.storage
-                .from('avatars')
+                .from('pawmate')
                 .upload(path, file, { upsert: true });
 
             if (uploadError) throw uploadError;
 
             const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
+                .from('pawmate')
                 .getPublicUrl(path);
 
             await supabase.from('users').update({ photoURL: publicUrl }).eq('id', adminUser.id);

@@ -139,24 +139,34 @@ export default function CaregiverDashboardScreen({ navigation }) {
 
     const handleToggleOnline = async () => {
         const newVal = !userData?.isOnline;
-        try {
-            // Optimistic UI update — change locally immediately
-            updateUserOptimistic({ isOnline: newVal });
-            const update = { isOnline: newVal };
-            if (newVal) {
+        console.log('[ToggleOnline:Dashboard] click. uid=', user?.id, 'current=', userData?.isOnline, 'new=', newVal);
+        // Optimistic UI update first
+        updateUserOptimistic({ isOnline: newVal });
+        const update = { isOnline: newVal };
+        if (newVal) {
+            try {
                 const { status } = await Location.requestForegroundPermissionsAsync();
+                console.log('[ToggleOnline:Dashboard] location permission=', status);
                 if (status === 'granted') {
                     const loc = await Location.getCurrentPositionAsync({});
                     update.latitude = loc.coords.latitude;
                     update.longitude = loc.coords.longitude;
                 }
+            } catch (locErr) {
+                console.warn('[ToggleOnline:Dashboard] location error:', locErr?.message);
             }
-            const { error } = await supabase.from('users').update(update).eq('id', user.id);
-            if (error) throw error;
-        } catch (e) {
-            // Revert on error
+        }
+        console.log('[ToggleOnline:Dashboard] sending update=', update);
+        const { data, error } = await supabase.from('users').update(update).eq('id', user.id).select();
+        console.log('[ToggleOnline:Dashboard] result data=', data, 'error=', error);
+        if (error) {
             updateUserOptimistic({ isOnline: !newVal });
-            Alert.alert('Error', 'No se pudo cambiar el estado online.');
+            Alert.alert('Error toggle online', `${error.message}\nCode: ${error.code}\nDetails: ${error.details || '-'}`);
+            return;
+        }
+        if (!data || data.length === 0) {
+            updateUserOptimistic({ isOnline: !newVal });
+            Alert.alert('Error toggle online', 'La query no actualizó ninguna fila. Posible problema de RLS o id incorrecto.');
         }
     };
 
