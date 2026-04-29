@@ -88,6 +88,60 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
+    // ── Wake-up handler: if the tab was hidden for >30s, refresh the session
+    //    and reconnect realtime so navigations don't hang on a stale socket. ──
+    useEffect(() => {
+        let lastHiddenAt = 0;
+        let waking = false;
+
+        const wake = async () => {
+            if (waking) return;
+            waking = true;
+            try {
+                // Refresh JWT in case it expired while the tab was hidden
+                await Promise.race([
+                    supabase.auth.refreshSession(),
+                    new Promise((resolve) => setTimeout(resolve, 4000)), // hard cap
+                ]);
+                // Tear down and reopen the realtime websocket
+                try {
+                    supabase.realtime.disconnect();
+                    supabase.realtime.connect();
+                } catch (err) {
+                    console.warn('Realtime reconnect failed:', err);
+                }
+                // Tell pages they can refetch fresh data
+                window.dispatchEvent(new Event('pawmate:wake'));
+            } catch (err) {
+                console.warn('Wake-up refresh failed:', err);
+            } finally {
+                waking = false;
+            }
+        };
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                lastHiddenAt = Date.now();
+                return;
+            }
+            const hiddenMs = lastHiddenAt ? Date.now() - lastHiddenAt : 0;
+            lastHiddenAt = 0;
+            if (hiddenMs > 30 * 1000) wake();
+        };
+
+        const onOnline = () => wake();
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('online', onOnline);
+        window.addEventListener('focus', onVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('online', onOnline);
+            window.removeEventListener('focus', onVisibilityChange);
+        };
+    }, []);
+
     const login = async (email, password) => {
         try {
             const trimmedEmail = email.trim().toLowerCase();
