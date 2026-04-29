@@ -96,11 +96,40 @@ export const AuthProvider = ({ children }) => {
                 const uid = session.user.id;
 
                 // Fetch initial user data
-                const { data: profile, error } = await supabase
+                let { data: profile, error } = await supabase
                     .from('users')
                     .select('*')
                     .eq('id', uid)
                     .single();
+
+                // Fallback: if no row exists in public.users (trigger missing/failed), create it
+                if (!profile && (error?.code === 'PGRST116' || error?.details?.includes('0 rows'))) {
+                    const meta = session.user.user_metadata || {};
+                    const fullName = meta.full_name || meta.name || meta.fullName || '';
+                    const [firstName, ...rest] = fullName.split(' ');
+                    const lastName = rest.join(' ');
+                    const newRow = {
+                        id: uid,
+                        email: session.user.email || meta.email || '',
+                        firstName: meta.firstName || firstName || '',
+                        lastName: meta.lastName || lastName || '',
+                        fullName: fullName,
+                        photoURL: meta.avatar_url || meta.picture || null,
+                        avatar: meta.avatar_url || meta.picture || null,
+                        role: 'normal',
+                    };
+                    const { data: inserted, error: insertErr } = await supabase
+                        .from('users')
+                        .insert(newRow)
+                        .select()
+                        .single();
+                    if (insertErr) {
+                        console.error('Failed to auto-create user profile:', insertErr);
+                    } else {
+                        profile = inserted;
+                        error = null;
+                    }
+                }
 
                 if (profile && !error) {
                     // ── Ban check on login ──

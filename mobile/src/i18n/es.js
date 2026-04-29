@@ -75,6 +75,7 @@ export default {
         home: 'Inicio',
         pets: 'Mascotas',
         caregivers: 'Cuidadores',
+        panel: 'Panel',
         bookings: 'Reservas',
         settings: 'Ajustes',
     },

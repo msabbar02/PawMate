@@ -2,7 +2,7 @@
 import {
     StyleSheet, View, Text, TouchableOpacity,
     Image, ActivityIndicator, Platform, Modal, Animated,
-    FlatList, Alert,
+    FlatList, Alert, Linking,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { useTranslation } from '../context/LanguageContext';
 import { supabase } from '../config/supabase';
 import { logActivity, logSystemAction } from '../utils/logger';
 
@@ -47,6 +48,7 @@ const formatDuration = (secs) => {
 export default function HomeScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = useContext(ThemeContext);
+    const { t } = useTranslation();
 
     const [location, setLocation] = useState(null);
     const [cityName, setCityName] = useState('');
@@ -74,12 +76,63 @@ export default function HomeScreen({ navigation }) {
 
     const mapRef = useRef(null);
 
+    // Owner location for caregiver (active reservation)
+    const [ownerLocation, setOwnerLocation] = useState(null);
+    const [ownerInfo, setOwnerInfo] = useState(null);
+
+    // Fetch owner location for caregiver with active/accepted reservation
+    useEffect(() => {
+        if (userData?.role !== 'caregiver' || !user?.id) return;
+        const fetchActiveOwner = async () => {
+            const { data } = await supabase
+                .from('reservations')
+                .select('ownerId, ownerName, ownerAvatar, ownerAddress')
+                .eq('caregiverId', user.id)
+                .in('status', ['aceptada', 'activa', 'in_progress'])
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+            if (!data) { setOwnerLocation(null); setOwnerInfo(null); return; }
+            // Try to get owner's real-time location from users table
+            const { data: owner } = await supabase
+                .from('users')
+                .select('latitude,longitude,fullName,avatar,photoURL,address')
+                .eq('id', data.ownerId)
+                .single();
+            if (owner?.latitude && owner?.longitude) {
+                setOwnerLocation({ latitude: Number(owner.latitude), longitude: Number(owner.longitude) });
+                setOwnerInfo({ name: owner.fullName || data.ownerName, avatar: owner.avatar || owner.photoURL || data.ownerAvatar });
+            } else {
+                setOwnerLocation(null);
+                setOwnerInfo(null);
+            }
+        };
+        fetchActiveOwner();
+    }, [isCaregiver, user?.id]);
+
+    // Search bar handler
+    // (search bar removed)
+
+    // Open Google Maps navigation to owner
+    const handleNavigateToOwner = () => {
+        if (!ownerLocation) return;
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${ownerLocation.latitude},${ownerLocation.longitude}&travelmode=driving`;
+        Linking.openURL(url).catch(() => {
+            Alert.alert('Error', 'No se pudo abrir Google Maps.');
+        });
+    };
+
     useEffect(() => {
         (async () => {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') return;
 
-            const currentLoc = await Location.getCurrentPositionAsync({});
+            const currentLoc = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+                timeInterval: 5000,
+                mayShowUserSettingsDialog: false,
+            }).catch(() => null);
+            if (!currentLoc) return;
             const { latitude, longitude } = currentLoc.coords;
             setLocation({ latitude, longitude });
 
@@ -345,6 +398,21 @@ export default function HomeScreen({ navigation }) {
                         {isWalking && walkRoute.length > 1 && (
                             <Polyline coordinates={walkRoute} strokeColor="#FF6B35" strokeWidth={4} />
                         )}
+                        {ownerLocation && isCaregiver && (
+                            <Marker coordinate={ownerLocation} title={ownerInfo?.name || 'Dueño'} description="Ubicación del dueño">
+                                <View style={{ alignItems: 'center' }}>
+                                    <View style={{ width: 50, height: 50, borderRadius: 25, borderWidth: 3, borderColor: '#f43f5e', overflow: 'hidden', backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, elevation: 10 }}>
+                                        {ownerInfo?.avatar
+                                            ? <Image source={{ uri: ownerInfo.avatar }} style={{ width: '100%', height: '100%' }} />
+                                            : <View style={{ flex: 1, backgroundColor: '#fee2e2', justifyContent: 'center', alignItems: 'center' }}><Text style={{ fontSize: 22 }}>🏠</Text></View>
+                                        }
+                                    </View>
+                                    <View style={{ backgroundColor: '#f43f5e', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 4 }}>
+                                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>📍 Dueño</Text>
+                                    </View>
+                                </View>
+                            </Marker>
+                        )}
                     </MapView>
                 ) : (
                     <View style={[styles.map, styles.mapLoading, { backgroundColor: isDarkMode ? '#1d2c4d' : '#f8fafc' }]}>
@@ -394,6 +462,22 @@ export default function HomeScreen({ navigation }) {
                     <Ionicons name="locate" size={20} color={COLORS.primary} />
                 </TouchableOpacity>
 
+                {/* BOTÓN CÓMO LLEGAR AL DUEÑO (solo cuidadores con reserva activa) */}
+                {isCaregiver && ownerLocation && (
+                    <TouchableOpacity
+                        style={styles.navigateBtn}
+                        onPress={handleNavigateToOwner}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="navigate" size={18} color="#FFF" style={{ marginRight: 8 }} />
+                        <View>
+                            <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>Cómo llegar</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{ownerInfo?.name || 'Dueño'}</Text>
+                        </View>
+                        <Ionicons name="open-outline" size={16} color="rgba(255,255,255,0.8)" style={{ marginLeft: 8 }} />
+                    </TouchableOpacity>
+                )}
+
                 {/* CURVA INFERIOR DEL MAPA */}
                 {panelOpen && <View style={[styles.mapCurveBottom, { backgroundColor: theme.background }]} />}
             </Animated.View>
@@ -412,16 +496,16 @@ export default function HomeScreen({ navigation }) {
                 <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF', marginTop: 4, position: 'relative', top: 0, left: 16, right: 16 }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
-                            <Ionicons name="chatbubbles" size={22} color="#0ea5e9" />
+                            <Ionicons name="chatbubbles" size={18} color="#0ea5e9" />
                         </View>
-                        <Text style={[styles.actionBtnText, { color: theme.text }]}>Mensajes</Text>
+                        <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.messages')}</Text>
                     </TouchableOpacity>
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'Reservas' })}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                            <Ionicons name="calendar" size={22} color="#f59e0b" />
+                            <Ionicons name="calendar" size={18} color="#f59e0b" />
                         </View>
-                        <Text style={[styles.actionBtnText, { color: theme.text }]}>Reservas</Text>
+                        <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.bookings')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -577,14 +661,16 @@ const styles = StyleSheet.create({
 
     gpsBtn: { position: 'absolute', bottom: 50, width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5 },
 
+    navigateBtn: { position: 'absolute', bottom: 110, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f43f5e', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 12, shadowColor: '#f43f5e', shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
+
     // Dashboard Section
     bottomSection: { flex: 0.5, position: 'relative' },
     
     // Quick Action Bar (Floating)
-    actionBar: { position: 'absolute', top: -38, left: 24, right: 24, flexDirection: 'row', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12, zIndex: 20 },
-    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 10 },
-    actionIconBox: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-    actionBtnText: { fontSize: 16, fontWeight: '800' },
+    actionBar: { position: 'absolute', top: -32, left: 28, right: 28, flexDirection: 'row', borderRadius: 22, padding: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12, zIndex: 20 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 8 },
+    actionIconBox: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+    actionBtnText: { fontSize: 14, fontWeight: '800' },
     actionDivider: { width: 1, height: '60%', alignSelf: 'center', opacity: 0.5 },
 
     // Dashboard content

@@ -87,8 +87,16 @@ export default function UserDetailPage() {
 
     const handleDelete = async () => {
         if (!window.confirm('¿Seguro que quieres ELIMINAR este usuario? Esta acción es irreversible.')) return;
-        const { error } = await supabase.from('users').delete().eq('id', id);
-        if (error) { alert('Error: ' + error.message); return; }
+        const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid: id });
+        if (rpcError) {
+            console.error('admin_delete_user RPC error:', rpcError);
+            alert(
+                'No se pudo borrar el usuario.\n\n' +
+                'Causa: ' + (rpcError.message || rpcError.details || 'desconocida') + '\n\n' +
+                'SOLUCIÓN: Ejecuta supabase_schema.sql en el SQL Editor de Supabase.'
+            );
+            return;
+        }
         navigate('/users');
     };
 

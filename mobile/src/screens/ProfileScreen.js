@@ -203,7 +203,7 @@ export default function ProfileScreen({ navigation }) {
         if (!firstName.trim()) return Alert.alert(t('common.error'), t('profile.nameRequired'));
         setSaving(true);
         try {
-            await supabase.from('users').update({
+            const { data, error } = await supabase.from('users').update({
                 firstName:    firstName.trim(),
                 lastName:     lastName.trim(),
                 fullName:     `${firstName.trim()} ${lastName.trim()}`.trim(),
@@ -221,13 +221,17 @@ export default function ProfileScreen({ navigation }) {
                 birthDate:    birthDate.toISOString(),
                 saveWalks,
                 saveLocation,
-            }).eq('id', user.id);
+            }).eq('id', user.id).select();
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                throw new Error('No se actualizó ninguna fila. Revisa los permisos (RLS) en Supabase para la tabla users.');
+            }
             await refreshUserData();
             Alert.alert(t('profile.saved'), t('profile.savedMsg'), [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
         } catch (e) {
-            Alert.alert(t('common.error'), t('profile.saveError'));
+            Alert.alert(t('common.error'), e?.message || t('profile.saveError'));
         } finally {
             setSaving(false);
         }

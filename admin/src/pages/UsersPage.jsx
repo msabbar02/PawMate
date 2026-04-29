@@ -69,15 +69,22 @@ export default function UsersPage() {
     };
 
     const handleDeleteUser = async (userId) => {
-        if (window.confirm(t('users.confirmDelete'))) {
-            try {
-                const { error } = await supabase.from('users').delete().eq('id', userId);
-                if (error) throw error;
-                setUsers(prev => prev.filter(u => u.id !== userId));
-            } catch (error) {
-                console.error("Error deleting user:", error);
-                alert(t('users.errorDelete'));
+        if (!window.confirm(t('users.confirmDelete'))) return;
+        try {
+            const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid: userId });
+            if (rpcError) {
+                console.error('admin_delete_user RPC error:', rpcError);
+                alert(
+                    'No se pudo borrar el usuario.\n\n' +
+                    'Causa: ' + (rpcError.message || rpcError.details || 'desconocida') + '\n\n' +
+                    'SOLUCIÓN: Ejecuta el script SQL completo (supabase_schema.sql) en el SQL Editor de Supabase para crear la función admin_delete_user.'
+                );
+                return;
             }
+            setUsers(prev => prev.filter(u => u.id !== userId));
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert(t('users.errorDelete') + (error?.message ? `\n\n${error.message}` : ''));
         }
     };
 

@@ -547,7 +547,7 @@ export default function PawMatePetsCenter() {
             }
         } catch (e) {
             console.error('handleSavePet error:', e);
-            Alert.alert(t('common.error'), t('pets.saveError'));
+            Alert.alert(t('common.error'), e?.message || e?.error_description || t('pets.saveError'));
         }
     };
 
@@ -2077,7 +2077,7 @@ const styles = StyleSheet.create({
     // ── List View ──────────────────────────────────
     scrollList: { padding: 20, paddingTop: Platform.OS === 'ios' ? 70 : 40 },
     listHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
-    screenTitle: { fontSize: 34, fontWeight: '900', color: COLORS.text, letterSpacing: -0.8 },
+    screenTitle: { fontSize: 28, fontWeight: '900', color: COLORS.text, letterSpacing: -0.5 },
     addBtn: {
         width: 46, height: 46, borderRadius: 23, backgroundColor: COLORS.primary,
         justifyContent: 'center', alignItems: 'center',

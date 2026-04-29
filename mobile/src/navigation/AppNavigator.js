@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -104,6 +105,7 @@ function BookingTabScreen() {
 const MainTabNavigator = () => {
     const { userData } = useContext(AuthContext);
     const { theme } = useContext(ThemeContext);
+    const { t } = useTranslation();
     const role = userData?.role;
     const isLocked = !role || role === 'normal';
 
@@ -122,11 +124,11 @@ const MainTabNavigator = () => {
                     else if (route.name === 'Ajustes') iconName = focused ? 'settings' : 'settings-outline';
 
                     const activeColor = '#F5A623';
-                    const routeLabel = route.name === 'Reservas' ? 'Reservas'
-                        : route.name === 'Mascotas' ? 'Mascotas'
-                        : route.name === 'Cuidadores' ? (role === 'caregiver' ? 'Panel' : 'Cuidadores')
-                        : route.name === 'Ajustes' ? 'Ajustes'
-                        : 'Inicio';
+                    const routeLabel = route.name === 'Reservas' ? t('tabs.bookings')
+                        : route.name === 'Mascotas' ? t('tabs.pets')
+                        : route.name === 'Cuidadores' ? (role === 'caregiver' ? t('tabs.panel') : t('tabs.caregivers'))
+                        : route.name === 'Ajustes' ? t('tabs.settings')
+                        : t('tabs.home');
 
                     if (focused) {
                         return (
@@ -190,12 +192,12 @@ const MainTabNavigator = () => {
             <Tab.Screen
                 name="Home"
                 component={HomeScreen}
-                options={{ tabBarLabel: 'Inicio' }}
+                options={{ tabBarLabel: t('tabs.home') }}
             />
             <Tab.Screen
                 name="Mascotas"
                 component={MyPetsScreen}
-                options={{ tabBarLabel: 'Mascotas' }}
+                options={{ tabBarLabel: t('tabs.pets') }}
             />
             {role && role !== 'normal' && (
                 <Tab.Screen
@@ -207,12 +209,12 @@ const MainTabNavigator = () => {
             <Tab.Screen
                 name="Reservas"
                 component={BookingTabScreen}
-                options={{ tabBarLabel: 'Reservas' }}
+                options={{ tabBarLabel: t('tabs.bookings') }}
             />
             <Tab.Screen
                 name="Ajustes"
                 component={SettingsScreen}
-                options={{ tabBarLabel: 'Ajustes' }}
+                options={{ tabBarLabel: t('tabs.settings') }}
             />
         </Tab.Navigator>
     );

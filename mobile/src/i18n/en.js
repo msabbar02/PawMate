@@ -75,6 +75,7 @@ export default {
         home: 'Home',
         pets: 'Pets',
         caregivers: 'Caregivers',
+        panel: 'Panel',
         bookings: 'Bookings',
         settings: 'Settings',
     },

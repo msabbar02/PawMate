@@ -183,7 +183,6 @@ export default function LoginScreen({ navigation }) {
     const handleGoogleLogin = async () => {
         try {
             setLoading(true);
-            // Custom scheme — iOS intercepts this redirect before any page loads
             const redirectTo = 'pawmate://login';
             console.log('Google OAuth redirect URI:', redirectTo);
             const { data, error } = await supabase.auth.signInWithOAuth({
@@ -200,31 +199,40 @@ export default function LoginScreen({ navigation }) {
             if (error) throw error;
             console.log('OAuth URL:', data.url);
 
-            const result = await WebBrowser.openAuthSessionAsync(data.url, 'pawmate://');
+            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {
+                showInRecents: true,
+                preferEphemeralSession: false,
+            });
             console.log('Auth result:', result.type, result.url);
-            if (result.type === 'success' && result.url) {
-                const url = result.url;
-                // PKCE: extract code from query params
-                const codeMatch = url.match(/[?&]code=([^&#]+)/);
-                if (codeMatch) {
-                    const code = decodeURIComponent(codeMatch[1]);
-                    console.log('Got auth code, exchanging for session...');
-                    const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
-                    if (sessionError) throw sessionError;
+            if (result.type !== 'success' || !result.url) {
+                if (result.type === 'cancel' || result.type === 'dismiss') {
+                    return;
+                }
+                throw new Error('No se pudo completar la autenticación con Google.');
+            }
+            const url = result.url;
+            // PKCE: extract code from query params
+            const codeMatch = url.match(/[?&]code=([^&#]+)/);
+            if (codeMatch) {
+                const code = decodeURIComponent(codeMatch[1]);
+                console.log('Got auth code, exchanging for session...');
+                const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+                if (sessionError) throw sessionError;
+            } else {
+                // Fallback: try fragment tokens (implicit flow)
+                let params = {};
+                const hashIndex = url.indexOf('#');
+                if (hashIndex !== -1) {
+                    const fragment = url.substring(hashIndex + 1);
+                    params = Object.fromEntries(new URLSearchParams(fragment));
+                }
+                if (params.access_token && params.refresh_token) {
+                    await supabase.auth.setSession({
+                        access_token: params.access_token,
+                        refresh_token: params.refresh_token,
+                    });
                 } else {
-                    // Fallback: try fragment tokens (implicit flow)
-                    let params = {};
-                    const hashIndex = url.indexOf('#');
-                    if (hashIndex !== -1) {
-                        const fragment = url.substring(hashIndex + 1);
-                        params = Object.fromEntries(new URLSearchParams(fragment));
-                    }
-                    if (params.access_token && params.refresh_token) {
-                        await supabase.auth.setSession({
-                            access_token: params.access_token,
-                            refresh_token: params.refresh_token,
-                        });
-                    }
+                    throw new Error('No se recibió código de autenticación.');
                 }
             }
         } catch (error) {

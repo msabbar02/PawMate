@@ -21,49 +21,90 @@ import { deleteAccount } from '../config/api';
 const APP_VERSION = '1.0.0';
 
 const POLICY_TEXT = `POLÍTICA DE PRIVACIDAD DE PAWMATE
-Última actualización: marzo 2026
+Última actualización: abril 2026
 
-1. INTRODUCCIÓN
-PawMate ("nosotros", "nuestra aplicación") se compromete a proteger tu privacidad. Esta política describe cómo recopilamos, usamos y protegemos tu información personal.
+PawMate respeta tu privacidad y protege tus datos según el Reglamento General de Protección de Datos (RGPD) y la legislación española vigente.
 
-2. INFORMACIÓN QUE RECOPILAMOS
-• Datos de cuenta: nombre, correo electrónico, teléfono, foto de perfil.
-• Datos de mascotas: nombre, especie, raza, información médica que proporciones voluntariamente.
-• Datos de ubicación: coordenadas GPS durante paseos activos (solo cuando la app está en uso).
-• Datos de reservas: fechas, tipo de servicio, precios.
-• Contenido de reservas: historial de servicios contratados.
+────────────────────────────────────────
+1. RESPONSABLE DEL TRATAMIENTO
+────────────────────────────────────────
+PawMate
+Email de contacto: soporte@pawmate.app
+Privacidad: privacidad@pawmate.app
 
-3. USO DE LA INFORMACIÓN
-Utilizamos tu información para:
-• Facilitar la conexión entre dueños de mascotas y cuidadores.
-• Procesar pagos de manera segura a través de Stripe.
-• Enviar notificaciones sobre tus reservas y actividad en la app.
-• Mejorar nuestros servicios y personalizar tu experiencia.
+────────────────────────────────────────
+2. DATOS QUE RECOPILAMOS
+────────────────────────────────────────
+• Cuenta: nombre, email, teléfono y foto de perfil.
+• Mascotas: nombre, especie, raza, peso, edad e historial veterinario que tú decidas registrar.
+• Ubicación: solo durante paseos activos o cuando aceptas una reserva como cuidador. Nunca en segundo plano.
+• Reservas y pagos: fechas, servicios contratados y datos de transacción gestionados por Stripe (PawMate no almacena tu tarjeta).
+• Comunicaciones: mensajes intercambiados con otros usuarios dentro de la app.
+• Dispositivo: modelo, sistema operativo y token de notificaciones push.
 
-4. COMPARTIR INFORMACIÓN
-No vendemos tu información personal a terceros. Compartimos datos solo con:
-• Cuidadores/dueños involucrados en una reserva.
-• Stripe para procesamiento de pagos.
-• Servicios de emergencia cuando activas el botón SOS.
+────────────────────────────────────────
+3. PARA QUÉ USAMOS TUS DATOS
+────────────────────────────────────────
+• Conectarte con cuidadores y dueños de confianza.
+• Gestionar reservas, pagos y verificación de identidad.
+• Enviarte notificaciones relevantes sobre tu actividad.
+• Mejorar la seguridad y prevenir el fraude.
+• Cumplir con obligaciones legales.
 
+────────────────────────────────────────
+4. CON QUIÉN COMPARTIMOS TUS DATOS
+────────────────────────────────────────
+No vendemos ni cedemos tus datos a terceros con fines comerciales. Solo compartimos lo estrictamente necesario con:
+• Stripe (procesamiento de pagos seguro).
+• Supabase (almacenamiento cifrado de la base de datos).
+• Expo / Google FCM (notificaciones push).
+• El cuidador o dueño implicado en una reserva (datos de contacto básicos).
+• Autoridades competentes cuando exista una obligación legal.
+
+────────────────────────────────────────
 5. SEGURIDAD
-Implementamos medidas técnicas y organizativas para proteger tu datos, incluyendo cifrado en tránsito (HTTPS) y en reposo, y políticas de seguridad a nivel de fila (Row Level Security) en Supabase.
+────────────────────────────────────────
+• Cifrado en tránsito (HTTPS/TLS) y en reposo.
+• Políticas de seguridad a nivel de fila (Row Level Security) en Supabase.
+• Autenticación segura con tokens JWT.
+• Acceso restringido a datos por rol.
 
-6. TUS DERECHOS
+────────────────────────────────────────
+6. TUS DERECHOS (RGPD)
+────────────────────────────────────────
 Tienes derecho a:
 • Acceder a tus datos personales.
-• Corregir información inexacta.
-• Solicitar la eliminación de tu cuenta y datos.
-• Exportar tus datos.
+• Rectificar datos incorrectos.
+• Suprimir tu cuenta y todos tus datos asociados.
+• Limitar u oponerte al tratamiento.
+• Portabilidad de tus datos.
+• Retirar tu consentimiento en cualquier momento.
+• Reclamar ante la Agencia Española de Protección de Datos (www.aepd.es).
 
-Para ejercer estos derechos, contacta: soporte@pawmate.app
+Puedes ejercer estos derechos desde la propia app (Ajustes → Eliminar cuenta) o escribiendo a privacidad@pawmate.app.
 
-7. RETENCIÓN DE DATOS
-Conservamos tus datos mientras tu cuenta esté activa. Tras eliminar tu cuenta, los datos se borran en un plazo de 30 días, excepto los requeridos por ley.
+────────────────────────────────────────
+7. CONSERVACIÓN
+────────────────────────────────────────
+Conservamos tus datos mientras tu cuenta esté activa. Al eliminar la cuenta se borran en un máximo de 30 días, salvo los necesarios por obligación legal (facturación, prevención de fraude).
 
-8. CONTACTO
+────────────────────────────────────────
+8. MENORES
+────────────────────────────────────────
+PawMate no está dirigida a menores de 16 años. Si detectamos una cuenta de un menor, será eliminada de inmediato.
+
+────────────────────────────────────────
+9. CAMBIOS EN LA POLÍTICA
+────────────────────────────────────────
+Si modificamos esta política te avisaremos en la app antes de que entre en vigor.
+
+────────────────────────────────────────
+10. CONTACTO
+────────────────────────────────────────
 PawMate · soporte@pawmate.app
-Para consultas sobre privacidad: privacidad@pawmate.app`;
+Consultas de privacidad: privacidad@pawmate.app
+
+Gracias por confiar en PawMate 🐾`;
 
 export default function SettingsScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
@@ -724,19 +765,6 @@ export default function SettingsScreen({ navigation }) {
                         </SettingGroup>
                     </>
                 )}
-
-                {/* ── RECOMPENSAS ── */}
-                <SectionTitle>{t('settings.rewards')}</SectionTitle>
-                <SettingGroup>
-                    <SettingRow
-                        icon="gift-outline"
-                        iconBg="#FEF3C7"
-                        label={t('settings.inviteFriend')}
-                        sublabel={t('settings.inviteFriendDesc')}
-                        last
-                        onPress={() => setShowInviteModal(true)}
-                    />
-                </SettingGroup>
 
                 {/* ── INFORMACIÓN ── */}
                 <SectionTitle>{t('settings.info')}</SectionTitle>
