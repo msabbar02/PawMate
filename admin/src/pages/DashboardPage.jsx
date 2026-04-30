@@ -11,9 +11,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import {
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
-    BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line,
-    ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-    Treemap,
+    PieChart, Pie, Cell, Legend, Bar,
+    ComposedChart,
 } from 'recharts';
 import './DashboardPage.css';
 
@@ -190,6 +189,59 @@ function FilterGroup({ label, options, selected, onChange }) {
     );
 }
 
+// Top performers card with tabs (Caregivers / Owners) and revenue bars
+function TopPerformersCard({ caregivers, owners, onSelect }) {
+    const { t } = useTranslation();
+    const [tab, setTab] = useState('caregivers');
+    const list = tab === 'caregivers' ? caregivers : owners;
+    const max = Math.max(1, ...list.map(x => x.revenue || 0));
+    const accent = tab === 'caregivers' ? '#f59e0b' : '#3b82f6';
+    return (
+        <div className="chart-card glass-panel">
+            <div className="chart-header">
+                <div>
+                    <h3>
+                        <FontAwesomeIcon icon={faTrophy} style={{ color: accent, marginRight: 8 }} />
+                        {tab === 'caregivers' ? t('dashboard.topCaregivers') : t('dashboard.topOwners')}
+                    </h3>
+                    <span className="chart-sub">{t('dashboard.topPerformersSub')}</span>
+                </div>
+                <div className="top-tabs">
+                    <button className={`top-tab ${tab === 'caregivers' ? 'active' : ''}`} onClick={() => setTab('caregivers')}>
+                        {t('dashboard.topCaregivers')}
+                    </button>
+                    <button className={`top-tab ${tab === 'owners' ? 'active' : ''}`} onClick={() => setTab('owners')}>
+                        {t('dashboard.topOwners')}
+                    </button>
+                </div>
+            </div>
+            {list.length === 0 ? (
+                <div className="empty-chart">{t('dashboard.noData')}</div>
+            ) : (
+                <div className="top-list top-list-bars">
+                    {list.map((it, i) => {
+                        const pct = ((it.revenue || 0) / max) * 100;
+                        return (
+                            <div key={it.id} className="top-row top-row-bar" onClick={() => onSelect(it.id)}>
+                                <span className={`top-rank top-rank-${i+1}`}>{i+1}</span>
+                                <div className="top-bar-wrap">
+                                    <div className="top-bar-row">
+                                        <span className="top-name">{it.name}</span>
+                                        <span className="top-meta">€{(it.revenue || 0).toFixed(0)} · {it.count}</span>
+                                    </div>
+                                    <div className="top-bar-track">
+                                        <div className="top-bar-fill" style={{ width: `${pct}%`, background: accent }} />
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function DashboardPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -202,6 +254,8 @@ export default function DashboardPage() {
     const [serviceTypeFilter, setServiceTypeFilter] = useState(new Set(['all']));
     const [verifFilter, setVerifFilter] = useState(new Set(['all']));
     const [activitySearch, setActivitySearch] = useState('');
+    const [activityTypeFilter, setActivityTypeFilter] = useState('all'); // all|user|pet|reservation|report
+    const [activeTab, setActiveTab] = useState('all'); // 'all' | 'users' | 'pets' | 'reservations'
 
     const [users, setUsers] = useState([]);
     const [pets, setPets] = useState([]);
@@ -215,7 +269,7 @@ export default function DashboardPage() {
         try {
             const [u, p, r, rep] = await Promise.all([
                 supabase.from('users').select('id, role, created_at, "isOnline", "fullName", "firstName", email, "verificationStatus", is_banned'),
-                supabase.from('pets').select('id, species, created_at, "ownerId"'),
+                supabase.from('pets').select('id, name, species, created_at, "ownerId"'),
                 supabase.from('reservations').select('id, status, "serviceType", created_at, "ownerId", "caregiverId", "ownerName", "caregiverName", "totalPrice"'),
                 supabase.from('reports').select('id, status, created_at'),
             ]);
@@ -340,8 +394,6 @@ export default function DashboardPage() {
     const pendingReservations = useMemo(() => reservations.filter(r => r.status === 'pendiente').length, [reservations]);
 
     const speciesData = useMemo(() => groupBy(filteredPets, 'species').sort((a, b) => b.value - a.value), [filteredPets]);
-    const roleData = useMemo(() => groupBy(filteredUsers, 'role').sort((a, b) => b.value - a.value), [filteredUsers]);
-    const statusData = useMemo(() => groupBy(filteredReservations, 'status').sort((a, b) => b.value - a.value), [filteredReservations]);
 
     const dailySeries = useMemo(() => {
         const days = windowKey === '7d' ? 7 : windowKey === '30d' ? 30 : windowKey === 'all' ? 30 : 14;
@@ -359,26 +411,6 @@ export default function DashboardPage() {
         return dailySeries.map(d => ({ ...d, revenue: Number((map.get(d.date) || 0).toFixed(2)) }));
     }, [dailySeries, filteredReservations]);
 
-    // Hour-of-day distribution for radar chart (00–23)
-    const hourRadar = useMemo(() => {
-        const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}h`, value: 0 }));
-        filteredReservations.forEach(r => {
-            if (!r.created_at) return;
-            const h = new Date(r.created_at).getHours();
-            buckets[h].value++;
-        });
-        // Group into 8 × 3-hour bins for cleaner radar
-        const bins = [];
-        for (let i = 0; i < 24; i += 3) {
-            const sum = buckets.slice(i, i + 3).reduce((s, b) => s + b.value, 0);
-            bins.push({ hour: `${i}-${i+2}h`, value: sum });
-        }
-        return bins;
-    }, [filteredReservations]);
-
-    // Treemap of pets per species
-    const treemapPets = useMemo(() => speciesData.map(s => ({ name: s.name, size: s.value })), [speciesData]);
-
     const recentReservations = useMemo(() => {
         const q = activitySearch.trim().toLowerCase();
         const sorted = [...reservations].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -392,6 +424,54 @@ export default function DashboardPage() {
             : sorted;
         return filtered.slice(0, 8);
     }, [reservations, activitySearch]);
+
+    // ── Unified activity feed (users + pets + reservations + reports + payments) ──
+    const activityFeed = useMemo(() => {
+        const events = [];
+        users.forEach(u => events.push({
+            id: `u-${u.id}`, type: 'user', ts: u.created_at,
+            title: u.fullName || u.firstName || u.email || '—',
+            subtitle: `${t('dashboard.evtUserSignup')} · ${u.role || 'normal'}`,
+            entityId: u.id,
+        }));
+        pets.forEach(p => events.push({
+            id: `p-${p.id}`, type: 'pet', ts: p.created_at,
+            title: p.name || t('dashboard.pets'),
+            subtitle: `${t('dashboard.evtPetAdded')} · ${p.species || '—'}`,
+            entityId: p.id,
+        }));
+        reservations.forEach(r => {
+            events.push({
+                id: `r-${r.id}`, type: 'reservation', ts: r.created_at,
+                title: `${r.ownerName || '—'} → ${r.caregiverName || '—'}`,
+                subtitle: `${t('dashboard.evtReservation')} · ${r.serviceType === 'walking' ? t('dashboard.walkService') : t('dashboard.stayService')} · ${r.status || 'pendiente'}`,
+                status: r.status,
+                entityId: r.id,
+            });
+            // Payment event when totalPrice > 0 and accepted/completed
+            if ((r.status === 'aceptada' || r.status === 'completada' || r.status === 'completed') && Number(r.totalPrice) > 0) {
+                events.push({
+                    id: `pay-${r.id}`, type: 'payment', ts: r.created_at,
+                    title: `€${Number(r.totalPrice).toFixed(2)}`,
+                    subtitle: `${t('dashboard.evtPayment')} · ${r.ownerName || '—'}`,
+                    entityId: r.id,
+                });
+            }
+        });
+        reports.forEach(rp => events.push({
+            id: `rp-${rp.id}`, type: 'report', ts: rp.created_at,
+            title: t('dashboard.evtReport'),
+            subtitle: `${t('dashboard.statusLabel')} ${rp.status || 'pending'}`,
+            entityId: rp.id,
+        }));
+
+        const q = activitySearch.trim().toLowerCase();
+        return events
+            .filter(e => activityTypeFilter === 'all' || e.type === activityTypeFilter)
+            .filter(e => !q || (e.title + ' ' + e.subtitle).toLowerCase().includes(q))
+            .sort((a, b) => new Date(b.ts) - new Date(a.ts))
+            .slice(0, 25);
+    }, [users, pets, reservations, reports, activitySearch, activityTypeFilter, t]);
 
     const revenueInWindow = useMemo(() => (
         reservationsInWindow.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0)
@@ -468,33 +548,48 @@ export default function DashboardPage() {
             <div className="dash-header">
                 <h2 className="page-title">{t('dashboard.pageTitle')}</h2>
                 <div className="dash-window-filters">
-                    {WINDOWS.map(w => (
-                        <button
-                            key={w.key}
-                            className={`chip ${!usingCustomRange && windowKey === w.key ? 'chip-active' : ''}`}
-                            onClick={() => { setCustomRange({ from: '', to: '' }); setWindowKey(w.key); }}
+                    <div className="window-dropdown">
+                        <select
+                            value={usingCustomRange ? 'custom' : windowKey}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === 'custom') {
+                                    const today = new Date().toISOString().slice(0, 10);
+                                    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+                                    setCustomRange({ from: weekAgo, to: today });
+                                } else {
+                                    setCustomRange({ from: '', to: '' });
+                                    setWindowKey(v);
+                                }
+                            }}
+                            className="window-select"
                         >
-                            {w.key === 'all' ? t('dashboard.windowAll') : t('dashboard.windowLast', { key: w.key })}
-                        </button>
-                    ))}
-                    <div className={`chip chip-range ${usingCustomRange ? 'chip-active' : ''}`}>
-                        <FontAwesomeIcon icon={faCalendarPlus} style={{ fontSize: 11, marginRight: 6 }} />
-                        <input type="date" value={customRange.from}
-                            onChange={(e) => setCustomRange(p => ({ ...p, from: e.target.value }))} />
-                        <span style={{ margin: '0 4px' }}>→</span>
-                        <input type="date" value={customRange.to}
-                            onChange={(e) => setCustomRange(p => ({ ...p, to: e.target.value }))} />
-                        {usingCustomRange && (
+                            {WINDOWS.map(w => (
+                                <option key={w.key} value={w.key}>
+                                    {w.key === 'all' ? t('dashboard.windowAll') : t('dashboard.windowLast', { key: w.key })}
+                                </option>
+                            ))}
+                            <option value="custom">{t('dashboard.windowCustom')}</option>
+                        </select>
+                    </div>
+                    {usingCustomRange && (
+                        <div className="chip chip-range chip-active">
+                            <FontAwesomeIcon icon={faCalendarPlus} style={{ fontSize: 11, marginRight: 6 }} />
+                            <input type="date" value={customRange.from}
+                                onChange={(e) => setCustomRange(p => ({ ...p, from: e.target.value }))} />
+                            <span style={{ margin: '0 4px' }}>→</span>
+                            <input type="date" value={customRange.to}
+                                onChange={(e) => setCustomRange(p => ({ ...p, to: e.target.value }))} />
                             <button className="chip-clear" onClick={() => setCustomRange({ from: '', to: '' })} title={t('dashboard.clear')}>
                                 <FontAwesomeIcon icon={faXmark} style={{ fontSize: 10 }} />
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                     {refreshing && <span className="dash-refreshing" title={t('dashboard.refreshing')}>⟳</span>}
                 </div>
             </div>
 
-            {/* ── Stat cards ─────────────────────────────────────────────── */}
+            {/* ── Top stat cards ─────────────────────────────────────────── */}
             <div className="stats-grid">
                 <StatCard icon={faUsers} color="#3b82f6" bg="rgba(59,130,246,0.18)"
                     title={t('dashboard.totalUsers')} total={filteredVerifUsers.length}
@@ -502,7 +597,7 @@ export default function DashboardPage() {
                     sparkline={sparkSeries(filteredVerifUsers)}
                     onClick={() => navigate('/users')} />
                 <StatCard icon={faDog} color="#10b981" bg="rgba(16,185,129,0.18)"
-                    title={t('dashboard.pets')} total={filteredPets.length}
+                    title={t('dashboard.totalPets')} total={filteredPets.length}
                     inWindowCount={petsInWindow.length} prevWindowCount={prevPets} windowKey={windowKey}
                     sparkline={sparkSeries(filteredPets)}
                     onClick={() => navigate('/pets')} />
@@ -511,384 +606,208 @@ export default function DashboardPage() {
                     inWindowCount={reservationsInWindow.length} prevWindowCount={prevReservations} windowKey={windowKey}
                     sparkline={sparkSeries(filteredReservations)}
                     onClick={() => navigate('/reservations')} />
-                <StatCard icon={faTriangleExclamation} color="#ef4444" bg="rgba(239,68,68,0.18)"
+                <StatCard icon={faTriangleExclamation} color="#f59e0b" bg="rgba(245,158,11,0.18)"
                     title={t('dashboard.reports')} total={reports.length}
                     inWindowCount={reportsInWindow.length} prevWindowCount={prevReports} windowKey={windowKey}
                     sparkline={sparkSeries(reports)}
                     onClick={() => navigate('/reports')} />
                 <StatCard icon={faWifi} color="#22c55e" bg="rgba(34,197,94,0.18)"
                     title={t('dashboard.onlineCaregivers')} total={onlineCaregivers}
-                    inWindowCount={onlineCaregivers} windowKey={t('dashboard.windowNow')} />
-                <div className="stat-card glass-panel">
-                    <div className="stat-card-top">
-                        <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(245,158,11,0.18)', color: '#f59e0b' }}>
-                            <span style={{ fontSize: 22, fontWeight: 800 }}>€</span>
-                        </div>
-                    </div>
-                    <div className="stat-info">
-                        <h3>{t('dashboard.revenue', { key: windowKey })}</h3>
-                        <p className="stat-value">€{revenueInWindow.toFixed(2)}</p>
-                        <div className="stat-delta">
-                            <span className="stat-delta-meta">{t('dashboard.revenueMeta', { count: reservationsInWindow.length })}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {/* ── Alerts row ─────────────────────────────────────────────── */}
-            <div className="alerts-grid">
-                <div className={`alert-card glass-panel ${pendingVerifications > 0 ? 'alert-warn' : ''}`}
-                    onClick={() => navigate('/verifications')}>
-                    <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 20, color: '#f59e0b' }} />
-                    <div>
-                        <p className="alert-num">{pendingVerifications}</p>
-                        <p className="alert-label">{t('dashboard.pendingVerifications')}</p>
-                    </div>
-                </div>
-                <div className={`alert-card glass-panel ${pendingReports > 0 ? 'alert-danger' : ''}`}
-                    onClick={() => navigate('/reports')}>
-                    <FontAwesomeIcon icon={faCircleExclamation} style={{ fontSize: 20, color: '#ef4444' }} />
-                    <div>
-                        <p className="alert-num">{pendingReports}</p>
-                        <p className="alert-label">{t('dashboard.pendingReports')}</p>
-                    </div>
-                </div>
-                <div className={`alert-card glass-panel ${pendingReservations > 0 ? 'alert-info' : ''}`}
-                    onClick={() => navigate('/reservations')}>
-                    <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 20, color: '#3b82f6' }} />
-                    <div>
-                        <p className="alert-num">{pendingReservations}</p>
-                        <p className="alert-label">{t('dashboard.pendingReservations')}</p>
-                    </div>
-                </div>
-                <div className={`alert-card glass-panel ${bannedUsers > 0 ? 'alert-muted' : ''}`}
-                    onClick={() => navigate('/users')}>
-                    <FontAwesomeIcon icon={faBan} style={{ fontSize: 20, color: '#64748b' }} />
-                    <div>
-                        <p className="alert-num">{bannedUsers}</p>
-                        <p className="alert-label">{t('dashboard.bannedUsers')}</p>
-                    </div>
-                </div>
+                    inWindowCount={onlineCaregivers} prevWindowCount={null} windowKey={windowKey} />
+                <StatCard icon={faShieldHalved} color="#06b6d4" bg="rgba(6,182,212,0.18)"
+                    title={t('dashboard.revenue', { key: windowKey })} total={Math.round(revenueInWindow)}
+                    inWindowCount={reservationsInWindow.length} prevWindowCount={null} windowKey={windowKey}
+                    onClick={() => navigate('/reservations')} />
             </div>
 
-            {/* ── KPI mini-row ──────────────────────────────────────────────── */}
-            <div className="kpi-row glass-panel">
-                <div className="kpi-cell">
-                    <span className="kpi-label">{t('dashboard.kpiConversion')}</span>
-                    <span className="kpi-value" style={{ color: '#10b981' }}>{conversionRate}%</span>
-                </div>
-                <div className="kpi-cell">
-                    <span className="kpi-label">{t('dashboard.kpiCancel')}</span>
-                    <span className="kpi-value" style={{ color: '#ef4444' }}>{cancelRate}%</span>
-                </div>
-                <div className="kpi-cell">
-                    <span className="kpi-label">{t('dashboard.kpiAvgTicket')}</span>
-                    <span className="kpi-value">€{avgTicket.toFixed(2)}</span>
-                </div>
-                <div className="kpi-cell">
-                    <span className="kpi-label">{t('dashboard.kpiTotalRevenue')}</span>
-                    <span className="kpi-value">€{completedRes.reduce((s, r) => s + (Number(r.totalPrice) || 0), 0).toFixed(2)}</span>
-                </div>
-            </div>
-            {/* ── Sub-filters (multi-select) ─────────────────────────────── */}
-            <div className="dash-subfilters">
-                <FilterGroup
-                    label={t('dashboard.filterUsers')}
-                    options={[
-                        { v: 'all', l: t('dashboard.all') },
-                        { v: 'normal', l: t('dashboard.roleNormal') },
-                        { v: 'owner', l: t('dashboard.roleOwners') },
-                        { v: 'caregiver', l: t('dashboard.roleCaregivers') },
-                        { v: 'admin', l: t('dashboard.roleAdmins') },
-                    ]}
-                    selected={userRoleFilter} onChange={setUserRoleFilter}
-                />
-                <FilterGroup
-                    label={t('dashboard.filterVerification')}
-                    options={[
-                        { v: 'all', l: t('dashboard.all') },
-                        { v: 'verified', l: t('dashboard.verifVerified') },
-                        { v: 'pending', l: t('dashboard.verifPending') },
-                        { v: 'rejected', l: t('dashboard.verifRejected') },
-                        { v: 'unverified', l: t('dashboard.verifUnverified') },
-                    ]}
-                    selected={verifFilter} onChange={setVerifFilter}
-                />
-                <FilterGroup
-                    label={t('dashboard.filterPets')}
-                    options={[
-                        { v: 'all', l: t('dashboard.allFem') },
-                        ...speciesData.slice(0, 6).map(s => ({ v: s.name, l: `${s.name} (${s.value})` })),
-                    ]}
-                    selected={petSpeciesFilter} onChange={setPetSpeciesFilter}
-                />
-                <FilterGroup
-                    label={t('dashboard.filterStatus')}
-                    options={[
-                        { v: 'all', l: t('dashboard.allFem') },
-                        { v: 'pendiente', l: 'Pendiente' },
-                        { v: 'aceptada', l: 'Aceptada' },
-                        { v: 'activa', l: 'Activa' },
-                        { v: 'completada', l: 'Completada' },
-                        { v: 'cancelada', l: 'Cancelada' },
-                    ]}
-                    selected={resStatusFilter} onChange={setResStatusFilter}
-                />
-                <FilterGroup
-                    label={t('dashboard.filterService')}
-                    options={[
-                        { v: 'all', l: t('dashboard.allMasc') },
-                        { v: 'walking', l: t('dashboard.serviceWalk') },
-                        { v: 'stay', l: t('dashboard.serviceStay') },
-                    ]}
-                    selected={serviceTypeFilter} onChange={setServiceTypeFilter}
-                />
-                <button className="clear-filters-btn" onClick={() => {
-                    setUserRoleFilter(new Set(['all']));
-                    setPetSpeciesFilter(new Set(['all']));
-                    setResStatusFilter(new Set(['all']));
-                    setServiceTypeFilter(new Set(['all']));
-                    setVerifFilter(new Set(['all']));
-                }}>
-                    <FontAwesomeIcon icon={faFilter} style={{ marginRight: 6, fontSize: 11 }} />
-                    {t('dashboard.clearFilters')}
-                </button>
-            </div>
+            {/* ── 4-quadrant layout ──────────────────────────────────────── */}
+            <div className="quad-grid">
 
-            {/* ── Charts grid ────────────────────────────────────────────── */}
-            <div className="charts-grid">
-                <div className="chart-card glass-panel chart-wide">
-                    <div className="chart-header">
-                        <h3>{t('dashboard.chartDailyTitle')}</h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span className="chart-sub">{t('dashboard.chartDailySub', { count: dailySeries.length })}</span>
-                            <button className="icon-btn" title={t('dashboard.exportCsv')} onClick={exportCsv}>
-                                <FontAwesomeIcon icon={faDownload} style={{ fontSize: 13 }} />
-                            </button>
+                {/* ─── Q1 · USUARIOS (azul) ────────────────────────────── */}
+                <section className="quad quad-users">
+                    <header className="quad-header">
+                        <div className="quad-icon-wrap">
+                            <FontAwesomeIcon icon={faUsers} />
                         </div>
-                    </div>
-                    <ResponsiveContainer width="100%" height={260}>
-                        <AreaChart data={dailySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="gradUsers" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.5} />
-                                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="gradRes" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.5} />
-                                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="gradPets" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.5} />
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                            <XAxis dataKey="label" stroke="var(--text-muted)" fontSize={11} />
-                            <YAxis stroke="var(--text-muted)" fontSize={11} allowDecimals={false} />
-                            <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                            <Legend />
-                            <Area type="monotone" dataKey="users" name={t('dashboard.seriesUsers')} stroke="#3b82f6" fill="url(#gradUsers)" strokeWidth={2} />
-                            <Area type="monotone" dataKey="reservations" name={t('dashboard.seriesReservations')} stroke="#a855f7" fill="url(#gradRes)" strokeWidth={2} />
-                            <Area type="monotone" dataKey="pets" name={t('dashboard.seriesPets')} stroke="#10b981" fill="url(#gradPets)" strokeWidth={2} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-
-                <div className="chart-card glass-panel">
-                    <div className="chart-header"><h3>{t('dashboard.chartSpecies')}</h3></div>
-                    {speciesData.length === 0 ? (
-                        <div className="empty-chart">{t('dashboard.noData')}</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height={240}>
-                            <PieChart>
-                                <Pie data={speciesData} dataKey="value" nameKey="name" outerRadius={85} innerRadius={45} paddingAngle={2}>
-                                    {speciesData.map((s, i) => (
-                                        <Cell key={i} fill={SPECIES_COLORS[s.name] || `hsl(${(i * 53) % 360}, 60%, 55%)`} />
-                                    ))}
-                                </Pie>
-                                <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
-
-                <div className="chart-card glass-panel">
-                    <div className="chart-header"><h3>{t('dashboard.chartRoles')}</h3></div>
-                    <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={roleData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                            <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} />
-                            <YAxis stroke="var(--text-muted)" fontSize={11} allowDecimals={false} />
-                            <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                                {roleData.map((r, i) => (
-                                    <Cell key={i} fill={ROLE_COLORS[r.name] || '#64748b'} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-
-                <div className="chart-card glass-panel">
-                    <div className="chart-header"><h3>{t('dashboard.chartStatuses')}</h3></div>
-                    <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={statusData} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                            <XAxis type="number" stroke="var(--text-muted)" fontSize={11} allowDecimals={false} />
-                            <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={11} width={90} />
-                            <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                            <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                                {statusData.map((s, i) => (
-                                    <Cell key={i} fill={STATUS_COLORS[s.name] || '#64748b'} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-            {/* ── Top performers + Heatmap row ────────────────────────────────────── */}
-            <div className="charts-grid">
-                <div className="chart-card glass-panel">
-                    <div className="chart-header">
-                        <h3><FontAwesomeIcon icon={faTrophy} style={{ color: '#f59e0b', marginRight: 8 }} />{t('dashboard.topCaregivers')}</h3>
-                    </div>
-                    {topCaregivers.length === 0 ? (
-                        <div className="empty-chart">{t('dashboard.noData')}</div>
-                    ) : (
-                        <div className="top-list">
-                            {topCaregivers.map((c, i) => (
-                                <div key={c.id} className="top-row" onClick={() => navigate(`/users/${c.id}`)}>
-                                    <span className={`top-rank top-rank-${i+1}`}>{i+1}</span>
-                                    <span className="top-name">{c.name}</span>
-                                    <span className="top-meta">{c.count} · €{c.revenue.toFixed(0)}</span>
-                                </div>
-                            ))}
+                        <div>
+                            <h3 className="quad-title">{t('dashboard.tabUsers')}</h3>
+                            <p className="quad-sub">{filteredVerifUsers.length} {t('dashboard.totalUsers').toLowerCase()}</p>
                         </div>
-                    )}
-                </div>
-
-                <div className="chart-card glass-panel">
-                    <div className="chart-header">
-                        <h3><FontAwesomeIcon icon={faTrophy} style={{ color: '#3b82f6', marginRight: 8 }} />{t('dashboard.topOwners')}</h3>
-                    </div>
-                    {topOwners.length === 0 ? (
-                        <div className="empty-chart">{t('dashboard.noData')}</div>
-                    ) : (
-                        <div className="top-list">
-                            {topOwners.map((o, i) => (
-                                <div key={o.id} className="top-row" onClick={() => navigate(`/users/${o.id}`)}>
-                                    <span className={`top-rank top-rank-${i+1}`}>{i+1}</span>
-                                    <span className="top-name">{o.name}</span>
-                                    <span className="top-meta">{o.count} · €{o.revenue.toFixed(0)}</span>
-                                </div>
-                            ))}
+                        <div className="quad-trend">
+                            <span className="quad-big">+{usersInWindow.length}</span>
+                            <span className="quad-meta">{t('dashboard.deltaInWindow', { key: windowKey, pct: filteredVerifUsers.length > 0 ? Math.round((usersInWindow.length / filteredVerifUsers.length) * 100) : 0 })}</span>
                         </div>
-                    )}
-                </div>
-
-                <div className="chart-card glass-panel chart-wide">
-                    <div className="chart-header">
-                        <h3>{t('dashboard.heatmapTitle')}</h3>
-                        <span className="chart-sub">{t('dashboard.heatmapSub')}</span>
-                    </div>
-                    <div className="heatmap">
-                        <div className="heatmap-hours">
-                            <span></span>
-                            {Array.from({ length: 24 }, (_, h) => (
-                                <span key={h} className="heatmap-hour">{h % 3 === 0 ? h : ''}</span>
-                            ))}
-                        </div>
-                        {[t('dashboard.dayMon'), t('dashboard.dayTue'), t('dashboard.dayWed'), t('dashboard.dayThu'), t('dashboard.dayFri'), t('dashboard.daySat'), t('dashboard.daySun')].map((dayLabel, dayIdx) => (
-                            <div key={dayIdx} className="heatmap-row">
-                                <span className="heatmap-day">{dayLabel}</span>
-                                {heatmap.grid[dayIdx].map((v, h) => {
-                                    const intensity = v / heatmap.max;
-                                    const bg = v === 0
-                                        ? 'var(--surface-hover)'
-                                        : `rgba(99, 102, 241, ${0.15 + intensity * 0.85})`;
-                                    return (
-                                        <div key={h} className="heatmap-cell"
-                                            style={{ background: bg }}
-                                            title={`${dayLabel} ${h}:00 — ${v} reservas`}>
-                                            {v > 0 && intensity > 0.5 ? v : ''}
-                                        </div>
-                                    );
-                                })}
+                    </header>
+                    <div className="quad-body">
+                        <div className="quad-mini-stats">
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.onlineCaregivers')}</span>
+                                <span className="mini-value" style={{ color: '#22c55e' }}>{onlineCaregivers}</span>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── Power charts row: ComposedChart + Radar + Treemap ─────── */}
-            <div className="charts-grid">
-                <div className="chart-card glass-panel chart-wide">
-                    <div className="chart-header">
-                        <h3>{t('dashboard.composedTitle')}</h3>
-                        <span className="chart-sub">{t('dashboard.composedSub')}</span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={280}>
-                        <ComposedChart data={dailyRevenue}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                            <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
-                            <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={11} />
-                            <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={11} />
-                            <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                            <Legend />
-                            <Bar yAxisId="left" dataKey="reservations" name={t('dashboard.seriesReservations')} fill="#a855f7" radius={[6, 6, 0, 0]} />
-                            <Line yAxisId="right" type="monotone" dataKey="revenue" name="€ Revenue" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
-
-                <div className="chart-card glass-panel">
-                    <div className="chart-header">
-                        <h3>{t('dashboard.radarTitle')}</h3>
-                        <span className="chart-sub">{t('dashboard.radarSub')}</span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={280}>
-                        <RadarChart data={hourRadar}>
-                            <PolarGrid stroke="var(--border-color)" />
-                            <PolarAngleAxis dataKey="hour" stroke="var(--text-muted)" fontSize={11} />
-                            <PolarRadiusAxis stroke="var(--text-muted)" fontSize={10} />
-                            <Radar name={t('dashboard.seriesReservations')} dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.45} />
-                            <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
-                        </RadarChart>
-                    </ResponsiveContainer>
-                </div>
-
-                <div className="chart-card glass-panel">
-                    <div className="chart-header">
-                        <h3>{t('dashboard.treemapTitle')}</h3>
-                        <span className="chart-sub">{t('dashboard.treemapSub')}</span>
-                    </div>
-                    {treemapPets.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={280}>
-                            <Treemap data={treemapPets} dataKey="size" stroke="#fff" fill="#10b981"
-                                content={({ x, y, width, height, name, value, index }) => {
-                                    const colors = ['#10b981', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
-                                    if (width < 4 || height < 4) return null;
-                                    return (
-                                        <g>
-                                            <rect x={x} y={y} width={width} height={height}
-                                                fill={colors[index % colors.length]} stroke="var(--card-bg)" strokeWidth={2} />
-                                            {width > 60 && height > 28 && (
-                                                <text x={x + width / 2} y={y + height / 2} textAnchor="middle" fill="#fff" fontSize={12} fontWeight="600">
-                                                    {name} ({value})
-                                                </text>
-                                            )}
-                                        </g>
-                                    );
-                                }} />
-                        </ResponsiveContainer>
-                    ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--text-muted)' }}>
-                            {t('dashboard.noData')}
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.pendingVerifications')}</span>
+                                <span className="mini-value" style={{ color: '#f59e0b' }}>{pendingVerifications}</span>
+                            </div>
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.bannedUsers')}</span>
+                                <span className="mini-value" style={{ color: '#64748b' }}>{bannedUsers}</span>
+                            </div>
                         </div>
-                    )}
-                </div>
+                        <ResponsiveContainer width="100%" height={170}>
+                            <AreaChart data={dailySeries} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="qUsers" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.55} />
+                                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(59,130,246,0.12)" />
+                                <XAxis dataKey="label" stroke="var(--text-muted)" fontSize={10} />
+                                <YAxis stroke="var(--text-muted)" fontSize={10} allowDecimals={false} />
+                                <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
+                                <Area type="monotone" dataKey="users" name={t('dashboard.seriesUsers')} stroke="#3b82f6" fill="url(#qUsers)" strokeWidth={2.2} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </section>
+
+                {/* ─── Q2 · MASCOTAS (verde) ────────────────────────────── */}
+                <section className="quad quad-pets">
+                    <header className="quad-header">
+                        <div className="quad-icon-wrap">
+                            <FontAwesomeIcon icon={faDog} />
+                        </div>
+                        <div>
+                            <h3 className="quad-title">{t('dashboard.tabPets')}</h3>
+                            <p className="quad-sub">{filteredPets.length} {t('dashboard.pets').toLowerCase()}</p>
+                        </div>
+                        <div className="quad-trend">
+                            <span className="quad-big">+{petsInWindow.length}</span>
+                            <span className="quad-meta">{t('dashboard.deltaInWindow', { key: windowKey, pct: filteredPets.length > 0 ? Math.round((petsInWindow.length / filteredPets.length) * 100) : 0 })}</span>
+                        </div>
+                    </header>
+                    <div className="quad-body quad-body-center">
+                        {speciesData.length === 0 ? (
+                            <div className="empty-chart">{t('dashboard.noData')}</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height={230}>
+                                <PieChart>
+                                    <Pie data={speciesData} dataKey="value" nameKey="name" outerRadius={85} innerRadius={50} paddingAngle={3}
+                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                                        {speciesData.map((s, i) => (
+                                            <Cell key={i} fill={SPECIES_COLORS[s.name] || `hsl(${(i * 53) % 360}, 60%, 55%)`} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                </section>
+
+                {/* ─── Q3 · RESERVAS + INGRESOS (morado) ─────────────────── */}
+                <section className="quad quad-bookings">
+                    <header className="quad-header">
+                        <div className="quad-icon-wrap">
+                            <FontAwesomeIcon icon={faCalendarDays} />
+                        </div>
+                        <div>
+                            <h3 className="quad-title">{t('dashboard.tabReservations')} & €</h3>
+                            <p className="quad-sub">{filteredReservations.length} · €{revenueInWindow.toFixed(0)}</p>
+                        </div>
+                        <div className="quad-trend">
+                            <span className="quad-big">+{reservationsInWindow.length}</span>
+                            <span className="quad-meta">{t('dashboard.deltaInWindow', { key: windowKey, pct: filteredReservations.length > 0 ? Math.round((reservationsInWindow.length / filteredReservations.length) * 100) : 0 })}</span>
+                        </div>
+                        <button className="icon-btn icon-btn-ghost" title={t('dashboard.exportCsv')} onClick={exportCsv}>
+                            <FontAwesomeIcon icon={faDownload} style={{ fontSize: 13 }} />
+                        </button>
+                    </header>
+                    <div className="quad-body">
+                        <div className="quad-mini-stats">
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.kpiConversion')}</span>
+                                <span className="mini-value" style={{ color: '#10b981' }}>{conversionRate}%</span>
+                            </div>
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.kpiCancel')}</span>
+                                <span className="mini-value" style={{ color: '#ef4444' }}>{cancelRate}%</span>
+                            </div>
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.kpiAvgTicket')}</span>
+                                <span className="mini-value">€{avgTicket.toFixed(0)}</span>
+                            </div>
+                            <div className="mini-stat">
+                                <span className="mini-label">{t('dashboard.pendingReservations')}</span>
+                                <span className="mini-value" style={{ color: '#f59e0b' }}>{pendingReservations}</span>
+                            </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={170}>
+                            <ComposedChart data={dailyRevenue} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="qRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
+                                        <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(168,85,247,0.12)" />
+                                <XAxis dataKey="label" stroke="var(--text-muted)" fontSize={10} />
+                                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} allowDecimals={false} />
+                                <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={10} />
+                                <Tooltip contentStyle={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
+                                <Bar yAxisId="left" dataKey="reservations" name={t('dashboard.seriesReservations')} fill="#a855f7" radius={[4, 4, 0, 0]} barSize={14} />
+                                <Area yAxisId="right" type="monotone" dataKey="revenue" name="€" stroke="#10b981" fill="url(#qRevenue)" strokeWidth={2} />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                </section>
+
+                {/* ─── Q4 · OPERACIÓN — Heatmap + Alertas (ámbar) ───────── */}
+                <section className="quad quad-ops">
+                    <header className="quad-header">
+                        <div className="quad-icon-wrap">
+                            <FontAwesomeIcon icon={faTriangleExclamation} />
+                        </div>
+                        <div>
+                            <h3 className="quad-title">{t('dashboard.heatmapTitle')}</h3>
+                            <p className="quad-sub">{t('dashboard.heatmapSub')}</p>
+                        </div>
+                        <div className="quad-trend">
+                            <span className="quad-big">{reports.length}</span>
+                            <span className="quad-meta">{t('dashboard.reports').toLowerCase()}</span>
+                        </div>
+                    </header>
+                    <div className="quad-body">
+                        <div className="heatmap heatmap-compact">
+                            <div className="heatmap-hours">
+                                <span></span>
+                                {Array.from({ length: 24 }, (_, h) => (
+                                    <span key={h} className="heatmap-hour">{h % 4 === 0 ? h : ''}</span>
+                                ))}
+                            </div>
+                            {[t('dashboard.dayMon'), t('dashboard.dayTue'), t('dashboard.dayWed'), t('dashboard.dayThu'), t('dashboard.dayFri'), t('dashboard.daySat'), t('dashboard.daySun')].map((dayLabel, dayIdx) => (
+                                <div key={dayIdx} className="heatmap-row">
+                                    <span className="heatmap-day">{dayLabel}</span>
+                                    {heatmap.grid[dayIdx].map((v, h) => {
+                                        const intensity = v / heatmap.max;
+                                        const bg = v === 0
+                                            ? 'rgba(245, 158, 11, 0.06)'
+                                            : `rgba(245, 158, 11, ${0.18 + intensity * 0.82})`;
+                                        return (
+                                            <div key={h} className="heatmap-cell"
+                                                style={{ background: bg }}
+                                                title={`${dayLabel} ${h}:00 — ${v}`}>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
             </div>
+
             {/* ── Recent activity ────────────────────────────────────────── */}
             <div className="dashboard-sections">
                 <div className="recent-activity glass-panel">
@@ -904,37 +823,56 @@ export default function DashboardPage() {
                             />
                         </div>
                     </div>
-                    {recentReservations.length === 0 ? (
+                    <div className="activity-type-chips">
+                        {[
+                            { k: 'all', label: t('dashboard.all'), icon: faFilter, color: '#64748b' },
+                            { k: 'user', label: t('dashboard.tabUsers'), icon: faUsers, color: '#3b82f6' },
+                            { k: 'pet', label: t('dashboard.tabPets'), icon: faDog, color: '#10b981' },
+                            { k: 'reservation', label: t('dashboard.tabReservations'), icon: faCalendarDays, color: '#a855f7' },
+                            { k: 'payment', label: '€ ' + t('dashboard.kpiAvgTicket').split(' ')[0], icon: faDownload, color: '#06b6d4' },
+                            { k: 'report', label: t('dashboard.reports'), icon: faTriangleExclamation, color: '#f59e0b' },
+                        ].map(opt => (
+                            <button
+                                key={opt.k}
+                                className={`act-chip ${activityTypeFilter === opt.k ? 'act-chip-active' : ''}`}
+                                style={activityTypeFilter === opt.k ? { background: opt.color, color: '#fff', borderColor: opt.color } : { color: opt.color, borderColor: 'var(--border-color)' }}
+                                onClick={() => setActivityTypeFilter(opt.k)}
+                            >
+                                <FontAwesomeIcon icon={opt.icon} style={{ fontSize: 11 }} />
+                                <span>{opt.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {activityFeed.length === 0 ? (
                         <div className="empty-state">
                             <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 40 }} />
                             <p>{t('dashboard.noRecentActivity')}</p>
                         </div>
                     ) : (
                         <div className="activity-list">
-                            {recentReservations.map(activity => (
-                                <div className="activity-item" key={activity.id}
-                                    onClick={() => navigate(`/reservations/${activity.id}`)}
-                                    style={{ cursor: 'pointer' }}>
-                                    <div className="activity-avatar">
-                                        {activity.ownerName?.charAt(0) || '?'}
-                                    </div>
-                                    <div className="activity-details">
-                                        <p className="activity-text">
-                                            <strong>{activity.ownerName || t('dashboard.userFallback')}</strong>{' '}
-                                            {t('dashboard.hasBooked')}{' '}
-                                            {activity.serviceType === 'walking' ? t('dashboard.walkService') : t('dashboard.stayService')}{' '}
-                                            con <strong>{activity.caregiverName || t('dashboard.caregiverFallback')}</strong>
-                                        </p>
-                                        <span className="activity-meta">
-                                            {t('dashboard.statusLabel')}{' '}
-                                            <span className={`status-badge ${activity.status || 'pendiente'}`}>
-                                                {activity.status || t('dashboard.pendingStatus')}
+                            {activityFeed.map(ev => {
+                                const typeColor = { user: '#3b82f6', pet: '#10b981', reservation: '#a855f7', payment: '#06b6d4', report: '#f59e0b' }[ev.type] || '#64748b';
+                                const typeIcon = { user: faUsers, pet: faDog, reservation: faCalendarDays, payment: faDownload, report: faTriangleExclamation }[ev.type] || faCircleExclamation;
+                                const route = { user: `/users/${ev.entityId}`, pet: `/pets/${ev.entityId}`, reservation: `/reservations/${ev.entityId}`, payment: `/reservations/${ev.entityId}`, report: `/reports/${ev.entityId}` }[ev.type];
+                                return (
+                                    <div className="activity-item" key={ev.id}
+                                        onClick={() => route && navigate(route)}
+                                        style={{ cursor: route ? 'pointer' : 'default' }}>
+                                        <div className="activity-avatar" style={{ background: `${typeColor}22`, color: typeColor }}>
+                                            <FontAwesomeIcon icon={typeIcon} style={{ fontSize: 14 }} />
+                                        </div>
+                                        <div className="activity-details">
+                                            <p className="activity-text">
+                                                <strong>{ev.title}</strong>
+                                            </p>
+                                            <span className="activity-meta">
+                                                {ev.subtitle}
+                                                {ev.ts && (<>{' · '}{new Date(ev.ts).toLocaleString()}</>)}
                                             </span>
-                                            {' · '}{new Date(activity.created_at).toLocaleString()}
-                                        </span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

@@ -5,7 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGauge, faUsers, faDog, faCalendarDays, faCommentDots, faTriangleExclamation, faRightFromBracket, faBars, faXmark, faChartLine, faSun, faMoon, faShieldHeart, faShieldHalved, faWifi } from '@fortawesome/free-solid-svg-icons';
+import { faGauge, faUsers, faDog, faCalendarDays, faTriangleExclamation, faRightFromBracket, faBars, faXmark, faChartLine, faSun, faMoon, faShieldHeart, faShieldHalved, faWifi } from '@fortawesome/free-solid-svg-icons';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
@@ -64,7 +64,6 @@ export default function AdminLayout() {
         { path: '/users', label: t('sidebar.users'), icon: <FontAwesomeIcon icon={faUsers} style={{ fontSize: 20 }} /> },
         { path: '/pets', label: t('sidebar.pets'), icon: <FontAwesomeIcon icon={faDog} style={{ fontSize: 20 }} /> },
         { path: '/reservations', label: t('sidebar.reservations'), icon: <FontAwesomeIcon icon={faCalendarDays} style={{ fontSize: 20 }} /> },
-        { path: '/messages', label: t('sidebar.messages'), icon: <FontAwesomeIcon icon={faCommentDots} style={{ fontSize: 20 }} /> },
         { path: '/reports', label: t('sidebar.reports'), icon: <FontAwesomeIcon icon={faTriangleExclamation} style={{ fontSize: 20 }} /> },
         { path: '/logs', label: t('sidebar.logs'), icon: <FontAwesomeIcon icon={faChartLine} style={{ fontSize: 20 }} /> },
         { path: '/verifications', label: t('sidebar.verifications'), icon: <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 20 }} /> },

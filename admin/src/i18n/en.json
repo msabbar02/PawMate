@@ -58,6 +58,13 @@
     "pendingStatus": "pending",
     "windowAll": "All",
     "windowLast": "Last {{key}}",
+    "windowCustom": "Custom",
+    "timeWindow": "Period",
+    "evtUserSignup": "New user",
+    "evtPetAdded": "Pet added",
+    "evtReservation": "Reservation",
+    "evtPayment": "Payment",
+    "evtReport": "Report",
     "windowNow": "now",
     "refreshing": "Refreshing",
     "deltaInWindow": "in {{key}} · {{pct}}%",
@@ -119,7 +126,12 @@
     "radarTitle": "Activity by time slot",
     "radarSub": "Bookings grouped in 3h slots",
     "treemapTitle": "Pets distribution",
-    "treemapSub": "Size proportional to count per species"
+    "treemapSub": "Size proportional to count per species",
+    "topPerformersSub": "Ranked by total revenue",
+    "tabAll": "Overview",
+    "tabUsers": "Users",
+    "tabPets": "Pets",
+    "tabReservations": "Bookings"
   },
   "users": {
     "pageTitle": "User Management",

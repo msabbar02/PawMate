@@ -54,7 +54,9 @@ export default function ProfilePage() {
                 .from('pawmate')
                 .getPublicUrl(path);
 
-            await supabase.from('users').update({ photoURL: publicUrl }).eq('id', adminUser.id);
+            // Cache-bust: storage URL is stable when upserting same path, so append a version
+            const versionedUrl = `${publicUrl}?v=${Date.now()}`;
+            await supabase.from('users').update({ photoURL: versionedUrl }).eq('id', adminUser.id);
             await refreshProfile();
             setMessage({ text: t('profile.photoUpdated'), type: 'success' });
         } catch (err) {

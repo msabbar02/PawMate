@@ -58,6 +58,13 @@
     "pendingStatus": "pendiente",
     "windowAll": "Todo",
     "windowLast": "Últimas {{key}}",
+    "windowCustom": "Personalizado",
+    "timeWindow": "Periodo",
+    "evtUserSignup": "Nuevo usuario",
+    "evtPetAdded": "Mascota añadida",
+    "evtReservation": "Reserva",
+    "evtPayment": "Pago",
+    "evtReport": "Reporte",
     "windowNow": "ahora",
     "refreshing": "Actualizando",
     "deltaInWindow": "en {{key}} · {{pct}}%",
@@ -119,7 +126,12 @@
     "radarTitle": "Actividad por franja horaria",
     "radarSub": "Reservas agrupadas en bloques de 3h",
     "treemapTitle": "Distribución de mascotas",
-    "treemapSub": "Tamaño proporcional al número por especie"
+    "treemapSub": "Tamaño proporcional al número por especie",
+    "topPerformersSub": "Ordenado por ingresos generados",
+    "tabAll": "Vista general",
+    "tabUsers": "Usuarios",
+    "tabPets": "Mascotas",
+    "tabReservations": "Reservas"
   },
   "users": {
     "pageTitle": "Gestión de Usuarios",

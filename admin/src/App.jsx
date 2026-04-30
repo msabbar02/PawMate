@@ -11,8 +11,6 @@ import PetsPage from './pages/PetsPage';
 import PetDetailPage from './pages/PetDetailPage';
 import ReservationsPage from './pages/ReservationsPage';
 import ReservationDetailPage from './pages/ReservationDetailPage';
-import MessagesPage from './pages/MessagesPage';
-import ConversationDetailPage from './pages/ConversationDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import ReportDetailPage from './pages/ReportDetailPage';
 import LogsPage from './pages/LogsPage';
@@ -42,8 +40,6 @@ function App() {
         <Route path="pets/:id" element={<PetDetailPage />} />
         <Route path="reservations" element={<ReservationsPage />} />
         <Route path="reservations/:id" element={<ReservationDetailPage />} />
-        <Route path="messages" element={<MessagesPage />} />
-        <Route path="messages/:id" element={<ConversationDetailPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="reports/:id" element={<ReportDetailPage />} />
         <Route path="logs" element={<LogsPage />} />
