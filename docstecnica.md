@@ -73,7 +73,7 @@ flowchart TB
     subgraph Cloud["☁️ Servicios Cloud"]
         Supabase[(🗄️ Supabase<br/>Auth + PostgreSQL<br/>Storage + Realtime)]
         Stripe[💳 Stripe]
-        BillionMail[📧 BillionMail<br/>Hetzner VPS]
+        Resend[📧 Resend<br/>API Cloud]
         Expo[🔔 Expo Push]
     end
 
@@ -83,7 +83,7 @@ flowchart TB
     Mobile --> Server
     Server --> Supabase
     Server --> Stripe
-    Server --> BillionMail
+    Server --> Resend
     Mobile --> Expo
     Supabase -.Auth Hook.-> Server
 ```
@@ -96,7 +96,7 @@ flowchart TB
 | **Supabase como backend principal**      | Auth + DB + Storage + Realtime en uno. Reduce complejidad y coste.              |
 | **Express solo para tareas server-side** | Emails, pagos Stripe, lógica que requiere service-key (no exponer al cliente). |
 | **Cliente directo a Supabase**           | Latencia mínima, RLS protege los datos a nivel de fila.                        |
-| **BillionMail self-hosted**              | Control total del envío, sin coste por email, sin límites de proveedor.       |
+| **Resend cloud API**                     | Entrega fiable, dashboard de logs, sin servidor de correo propio.             |
 
 ---
 
@@ -132,7 +132,7 @@ graph LR
     A[Node.js] --> B[Express 4]
     B --> C[Supabase Service Key]
     B --> D[Stripe SDK]
-    B --> E[Nodemailer]
+    B --> E[Resend SDK]
     B --> F[express-rate-limit]
     B --> G[jsonwebtoken]
 ```
@@ -150,7 +150,7 @@ graph LR
 | **Storage**         | Supabase Storage Buckets                           |
 | **Realtime**        | Supabase Realtime (WebSockets)                     |
 | **Pagos**           | Stripe Connect                                     |
-| **Email**           | BillionMail SMTP (Hetzner)                         |
+| **Email**           | Resend (API cloud)                                 |
 | **Push**            | Expo Push API                                      |
 | **i18n**            | i18next (ES + EN)                                  |
 | **DNS**             | Namecheap                                          |
@@ -260,12 +260,12 @@ sequenceDiagram
     participant M as App Móvil
     participant S as Supabase Auth
     participant SR as Server Express
-    participant BM as BillionMail
+    participant BM as Resend
 
     U->>M: Rellena email + password
     M->>S: signUp()
     S->>SR: Auth Hook (POST /auth-email)
-    SR->>BM: Send confirm email
+    SR->>BM: Send confirm email (Resend API)
     BM->>U: Email con link
     U->>S: Click confirm link
     S-->>M: Sesión activa
@@ -491,7 +491,7 @@ flowchart TB
 | **Autorización**     | Roles`normal` / `caregiver` / `admin` con middleware `isAdmin` |
 | **Tokens**            | JWT firmados, expiran en 1h, refresh automático               |
 | **Hashing**           | bcrypt (gestionado por Supabase Auth)                          |
-| **HTTPS**             | Forzado en Vercel + Let's Encrypt en BillionMail               |
+| **HTTPS**             | Forzado en Vercel + TLS gestionado por Resend                  |
 | **CORS**              | Whitelist configurada en server                                |
 | **Rate limiting**     | express-rate-limit en endpoints públicos                      |
 | **Email auth hook**   | JWT firmado con`SUPABASE_AUTH_HOOK_SECRET`                     |
@@ -527,7 +527,7 @@ flowchart LR
         V1[Vercel: web]
         V2[Vercel: admin]
         V3[Vercel: server]
-        H[Hetzner: BillionMail]
+        H[Resend: API Cloud]
         S[Supabase: managed]
         E[EAS Build → App Stores]
     end
@@ -537,7 +537,7 @@ flowchart LR
     G -->|auto deploy| V2
     G -->|auto deploy| V3
     Dev -->|manual| E
-    V3 -.SMTP.-> H
+    V3 -.API.-> H
     V1 & V2 & V3 -.SDK.-> S
 ```
 
@@ -551,7 +551,7 @@ flowchart LR
 | Server API    | Vercel         | api.apppawmate.com   |
 | App iOS       | App Store      | (pendiente)          |
 | App Android   | Google Play    | (pendiente)          |
-| Email server  | Hetzner VPS    | mail.apppawmate.com  |
+| Email         | Resend Cloud   | resend.com           |
 | Base de datos | Supabase Cloud | xxxx.supabase.co     |
 
 ---
@@ -575,11 +575,10 @@ SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
-SMTP_HOST=mail.apppawmate.com
-SMTP_PORT=587
-SMTP_USER=noreply@apppawmate.com
-SMTP_PASS=
-SMTP_FROM=noreply@apppawmate.com
+RESEND_API_KEY=re_xxxxxxxxxxxx
+EMAIL_FROM=PawMate <noreply@apppawmate.com>
+EMAIL_FROM_SUPPORT=PawMate Soporte <support@apppawmate.com>
+EMAIL_FROM_ADMIN=PawMate Admin <admin@apppawmate.com>
 SUPABASE_AUTH_HOOK_SECRET=
 ALLOWED_ORIGINS=https://apppawmate.com,https://admin.apppawmate.com
 ```

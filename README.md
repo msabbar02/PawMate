@@ -89,7 +89,7 @@ PawMate/
 | **Framework** | Express | 4.18.2 |
 | **Base de datos** | Supabase JS (PostgreSQL) | 2.x |
 | **Pagos** | Stripe | 20.4.0 |
-| **Email transaccional** | Nodemailer → BillionMail SMTP (self-hosted) | 6.x |
+| **Email transaccional** | Resend SDK | 4.x |
 | **Autenticación** | jsonwebtoken (JWT middleware) | 9.x |
 | **CORS & variables** | cors + dotenv | — |
 | **Dev** | Nodemon | 3.x |
@@ -103,7 +103,7 @@ PawMate/
 |----------|-----|
 | **Supabase** | PostgreSQL · Auth · Realtime · Storage (base de datos principal) |
 | **Stripe** | Procesamiento de pagos (PaymentIntent + reembolsos) |
-| **BillionMail** | Servidor SMTP self-hosted para emails transaccionales |
+| **Resend** | Servicio de email transaccional (API cloud) |
 | **Vercel** | Despliegue: landing web, admin y backend (serverless) |
 | **Expo Push** | Notificaciones push en tiempo real a dispositivos |
 | **Google Maps** | Mapas nativos y seguimiento GPS de paseos |
@@ -161,7 +161,7 @@ PawMate/
 - ✅ Middleware de autenticación con JWT (tokens de Supabase)
 - ✅ CORS configurado por entorno (producción / desarrollo local)
 - ✅ Procesamiento de pagos con Stripe (PaymentIntent + reembolsos)
-- ✅ Emails transaccionales HTML con Nodemailer → BillionMail SMTP (self-hosted)
+- ✅ Emails transaccionales HTML con Resend SDK
   - Confirmación de reserva, aceptación/rechazo por el cuidador, bienvenida
 - ✅ Health check endpoint (`GET /api/health`)
 - ✅ Handlers globales de error y 404
@@ -201,7 +201,7 @@ cd server
 npm install
 npm run dev
 ```
-> Requiere `.env` con `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `JWT_SECRET`
+> Requiere `.env` con `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`, `RESEND_API_KEY`, `JWT_SECRET`
 
 ---
 

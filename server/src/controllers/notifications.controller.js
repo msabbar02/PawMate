@@ -213,7 +213,7 @@ const sendReservationStatusEmail = async (req, res) => {
             results,
             Object.values(results).some(Boolean)
                 ? 'Notification emails sent'
-                : 'No emails sent (check BillionMail SMTP config or email addresses)'
+                : 'No emails sent (check RESEND_API_KEY or email addresses)'
         );
     } catch (error) {
         console.error('sendReservationStatusEmail error:', error);

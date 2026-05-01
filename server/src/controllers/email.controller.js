@@ -1,11 +1,36 @@
+const { Resend } = require('resend');
 const { sendSuccess, sendError } = require('../utils/response');
 
-/* --- Shared helpers --- */
+/* --- Shared FROM addresses --- */
+const FROM_DEFAULT = process.env.EMAIL_FROM         || 'PawMate <noreply@apppawmate.com>';
+const FROM_SUPPORT = process.env.EMAIL_FROM_SUPPORT  || 'PawMate Soporte <support@apppawmate.com>';
+const FROM_ADMIN   = process.env.EMAIL_FROM_ADMIN    || 'PawMate Admin <admin@apppawmate.com>';
 
-const FROM_DEFAULT  = process.env.SMTP_FROM         || 'noreply@apppawmate.com';
-const FROM_SUPPORT  = process.env.SMTP_FROM_SUPPORT  || 'support@apppawmate.com';
-const FROM_ADMIN    = process.env.SMTP_FROM_ADMIN    || 'admin@apppawmate.com';
+/* --- Resend send helper --- */
+async function sendEmail({ from, to, subject, html, text }) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        console.error('[Email] RESEND_API_KEY not set — email will not be sent');
+        throw new Error('RESEND_API_KEY not configured');
+    }
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({ from, to, subject, html, text });
+    if (error) {
+        console.error('[Email] Resend error:', error);
+        throw new Error(error.message || JSON.stringify(error));
+    }
+    console.log('[Email] Sent OK id=', data?.id, '→', to);
+    return data;
+}
 
+/* --- Backward-compat shim for notifications.controller.js --- */
+function createTransporter() {
+    return {
+        sendMail: (opts) => sendEmail(opts),
+    };
+}
+
+/* --- HTML helpers --- */
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -14,24 +39,6 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-}
-
-function createTransporter() {
-    const nodemailer = require('nodemailer');
-
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.error('SMTP_USER or SMTP_PASS not set - emails will fail');
-    }
-
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'localhost',
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: false,
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-        },
-    });
 }
 
 function emailLayout({ icon, title, subtitle, gradient, body }) {
@@ -49,7 +56,7 @@ function emailLayout({ icon, title, subtitle, gradient, body }) {
       ${body}
     </div>
     <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:24px;">
-      &copy; ${new Date().getFullYear()} PawMate &middot; pawmate.com
+      &copy; ${new Date().getFullYear()} PawMate &middot; apppawmate.com
     </p>
   </div>
 </body>
@@ -66,6 +73,7 @@ function expiryNote() {
     return `<p style="color:#94a3b8;font-size:12px;text-align:center;margin:16px 0 0;">Este enlace expira en 24 horas. Si no has solicitado esto, puedes ignorar este email.</p>`;
 }
 
+/* --- Route handler: POST /api/notifications/welcome-email --- */
 const sendWelcomeEmail = async (req, res) => {
     try {
         const { email, fullName } = req.body;
@@ -74,16 +82,18 @@ const sendWelcomeEmail = async (req, res) => {
         }
 
         const name = escapeHtml(fullName || email.split('@')[0]);
-
         let sent = false;
         try {
-            const transporter = createTransporter();
-            const html = emailLayout({
-                icon: '🐾',
-                title: '¡Bienvenido a PawMate!',
-                subtitle: 'Tu compañero perfecto para el cuidado de mascotas',
-                gradient: '#6366f1 0%, #8b5cf6 100%',
-                body: `
+            await sendEmail({
+                from: FROM_DEFAULT,
+                to: email,
+                subject: `¡Bienvenido a PawMate, ${name}! 🐾`,
+                html: emailLayout({
+                    icon: '🐾',
+                    title: '¡Bienvenido a PawMate!',
+                    subtitle: 'Tu compañero perfecto para el cuidado de mascotas',
+                    gradient: '#6366f1 0%, #8b5cf6 100%',
+                    body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${name},</h2>
       <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 20px;">
         ¡Nos alegra tenerte en la familia PawMate! Ahora puedes disfrutar de todas las funcionalidades para cuidar de tus mascotas:
@@ -108,34 +118,27 @@ const sendWelcomeEmail = async (req, res) => {
       <p style="color:#64748b;font-size:14px;margin:0;">
         ¿Necesitas ayuda? Escríbenos a <a href="mailto:support@apppawmate.com" style="color:#6366f1;">support@apppawmate.com</a>
       </p>`,
-            });
-
-            const text = `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\nAhora puedes encontrar cuidadores, agendar reservas y mucho más.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? support@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`;
-
-            await transporter.sendMail({
-                from: `"PawMate" <${FROM_DEFAULT}>`,
-                to: email,
-                subject: `¡Bienvenido a PawMate, ${name}! 🐾`,
-                text,
-                html,
+                }),
+                text: `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? support@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`,
             });
             sent = true;
         } catch (emailErr) {
-            console.error('Welcome email send error:', emailErr.message, emailErr.stack);
+            console.error('Welcome email send error:', emailErr.message);
         }
 
-        return sendSuccess(res, { sent }, sent ? 'Welcome email sent' : 'Could not send email (check SMTP config)');
+        return sendSuccess(res, { sent }, sent ? 'Welcome email sent' : 'Could not send email');
     } catch (error) {
         console.error('sendWelcomeEmail error:', error);
         return sendError(res, 'Error sending welcome email', 500);
     }
 };
 
+/* --- Supabase Auth Hook: POST /api/notifications/auth-email --- */
 const handleAuthEmail = async (req, res) => {
     try {
         const hookSecret = process.env.SUPABASE_AUTH_HOOK_SECRET;
         if (!hookSecret) {
-            console.error('SUPABASE_AUTH_HOOK_SECRET is not set — rejecting auth hook request');
+            console.error('SUPABASE_AUTH_HOOK_SECRET is not set');
             return res.status(500).json({ error: { http_code: 500, message: 'Auth hook not configured' } });
         }
         const authHeader = req.headers['authorization'] || '';
@@ -147,8 +150,7 @@ const handleAuthEmail = async (req, res) => {
             const secret = hookSecret.startsWith('v1,whsec_')
                 ? hookSecret.replace('v1,whsec_', '')
                 : hookSecret;
-            const token = authHeader.replace('Bearer ', '');
-            jwt.verify(token, Buffer.from(secret, 'base64'));
+            jwt.verify(authHeader.replace('Bearer ', ''), Buffer.from(secret, 'base64'));
         } catch (jwtErr) {
             console.error('Auth hook JWT verification failed:', jwtErr.message);
             return res.status(401).json({ error: { http_code: 401, message: 'Invalid hook signature' } });
@@ -171,14 +173,17 @@ const handleAuthEmail = async (req, res) => {
         };
 
         const confirmUrl = buildLink(token_hash, email_action_type);
-        const transporter = createTransporter();
 
         if (email_action_type === 'signup') {
-            const html = emailLayout({
-                icon: '🐾', title: '¡Bienvenido a PawMate!',
-                subtitle: 'Solo falta un paso para activar tu cuenta',
-                gradient: '#6366f1 0%, #8b5cf6 100%',
-                body: `
+            await sendEmail({
+                from: FROM_DEFAULT,
+                to: user.email,
+                subject: `¡Confirma tu cuenta en PawMate, ${userName}! 🐾`,
+                html: emailLayout({
+                    icon: '🐾', title: '¡Bienvenido a PawMate!',
+                    subtitle: 'Solo falta un paso para activar tu cuenta',
+                    gradient: '#6366f1 0%, #8b5cf6 100%',
+                    body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>
       <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">
         ¡Gracias por registrarte en PawMate! Confirma tu dirección de correo para activar tu cuenta.
@@ -187,87 +192,88 @@ const handleAuthEmail = async (req, res) => {
       <p style="color:#64748b;font-size:13px;line-height:1.6;margin:0 0 8px;">Si el botón no funciona, copia y pega este enlace:</p>
       <p style="word-break:break-all;color:#6366f1;font-size:12px;margin:0 0 16px;">${confirmUrl}</p>
       ${expiryNote()}`,
-            });
-            await transporter.sendMail({
-                from: `"PawMate" <${FROM_DEFAULT}>`, to: user.email,
-                subject: `¡Confirma tu cuenta en PawMate, ${userName}! 🐾`, html,
+                }),
                 text: `Hola ${userName},\n\nConfirma tu cuenta: ${confirmUrl}\n\nExpira en 24h.\n\n© ${new Date().getFullYear()} PawMate`,
             });
         }
 
         else if (email_action_type === 'magiclink') {
-            const html = emailLayout({
-                icon: '🔗', title: 'Tu enlace de acceso',
-                subtitle: 'Inicia sesión con un solo clic',
-                gradient: '#6366f1 0%, #8b5cf6 100%',
-                body: `
+            await sendEmail({
+                from: FROM_DEFAULT,
+                to: user.email,
+                subject: 'Tu enlace de acceso a PawMate 🔗',
+                html: emailLayout({
+                    icon: '🔗', title: 'Tu enlace de acceso',
+                    subtitle: 'Inicia sesión con un solo clic',
+                    gradient: '#6366f1 0%, #8b5cf6 100%',
+                    body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>
       <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">Haz clic en el botón para acceder a tu cuenta:</p>
       ${emailButton(confirmUrl, 'Iniciar sesión')}
       <p style="color:#64748b;font-size:13px;line-height:1.6;margin:0 0 8px;">Si el botón no funciona, copia y pega este enlace:</p>
       <p style="word-break:break-all;color:#6366f1;font-size:12px;margin:0 0 16px;">${confirmUrl}</p>
       ${expiryNote()}`,
-            });
-            await transporter.sendMail({
-                from: `"PawMate" <${FROM_DEFAULT}>`, to: user.email,
-                subject: 'Tu enlace de acceso a PawMate 🔗', html,
+                }),
                 text: `Hola ${userName},\n\nInicia sesión: ${confirmUrl}\n\nExpira en 24h.\n\n© ${new Date().getFullYear()} PawMate`,
             });
         }
 
         else if (email_action_type === 'email_change') {
-            const html = emailLayout({
-                icon: '🔒', title: 'Cambio de email',
-                subtitle: 'Confirma esta acción de seguridad',
-                gradient: '#ef4444 0%, #f97316 100%',
-                body: `
+            await sendEmail({
+                from: FROM_SUPPORT,
+                to: user.email,
+                subject: 'Confirma tu cambio de email · PawMate 🔒',
+                html: emailLayout({
+                    icon: '🔒', title: 'Cambio de email',
+                    subtitle: 'Confirma esta acción de seguridad',
+                    gradient: '#ef4444 0%, #f97316 100%',
+                    body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>
-      <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">
-        Has solicitado cambiar el correo electrónico de tu cuenta PawMate. Confirma este cambio:
-      </p>
+      <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">Has solicitado cambiar el correo de tu cuenta PawMate. Confirma este cambio:</p>
       ${emailButton(confirmUrl, 'Confirmar cambio de email', '#ef4444')}
       <p style="color:#64748b;font-size:13px;line-height:1.6;margin:0 0 8px;">Si el botón no funciona, copia y pega este enlace:</p>
       <p style="word-break:break-all;color:#ef4444;font-size:12px;margin:0 0 16px;">${confirmUrl}</p>
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin:16px 0;">
-        <p style="color:#991b1b;font-size:13px;margin:0;"><strong>⚠️ ¿No has sido tú?</strong> Ignora este email y cambia tu contraseña por precaución.</p>
+        <p style="color:#991b1b;font-size:13px;margin:0;"><strong>⚠️ ¿No has sido tú?</strong> Ignora este email y cambia tu contraseña.</p>
       </div>
       ${expiryNote()}`,
-            });
-            await transporter.sendMail({
-                from: `"PawMate Seguridad" <${FROM_SUPPORT}>`, to: user.email,
-                subject: 'Confirma tu cambio de email · PawMate 🔒', html,
+                }),
                 text: `Hola ${userName},\n\nConfirma el cambio: ${confirmUrl}\n\n© ${new Date().getFullYear()} PawMate`,
             });
 
             if (token_hash_new) {
                 const newConfirmUrl = buildLink(token_hash_new, email_action_type);
-                const htmlNew = emailLayout({
-                    icon: '🔒', title: 'Confirma tu nuevo email',
-                    subtitle: 'Verifica que esta dirección es tuya',
-                    gradient: '#ef4444 0%, #f97316 100%',
-                    body: `
+                await sendEmail({
+                    from: FROM_SUPPORT,
+                    to: user.new_email || user.email_change_send_to || user.email,
+                    subject: 'Confirma tu nuevo email · PawMate 🔒',
+                    html: emailLayout({
+                        icon: '🔒', title: 'Confirma tu nuevo email',
+                        subtitle: 'Verifica que esta dirección es tuya',
+                        gradient: '#ef4444 0%, #f97316 100%',
+                        body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>
       <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">Confirma esta dirección como tu nuevo correo en PawMate.</p>
       ${emailButton(newConfirmUrl, 'Confirmar nuevo email', '#ef4444')}
       <p style="color:#64748b;font-size:13px;line-height:1.6;margin:0 0 8px;">Si el botón no funciona, copia y pega este enlace:</p>
       <p style="word-break:break-all;color:#ef4444;font-size:12px;margin:0 0 16px;">${newConfirmUrl}</p>
       ${expiryNote()}`,
-                });
-                await transporter.sendMail({
-                    from: `"PawMate Seguridad" <${FROM_SUPPORT}>`,
-                    to: user.new_email || user.email_change_send_to || user.email,
-                    subject: 'Confirma tu nuevo email · PawMate 🔒', html: htmlNew,
+                    }),
                     text: `Hola ${userName},\n\nConfirma: ${newConfirmUrl}\n\n© ${new Date().getFullYear()} PawMate`,
                 });
             }
         }
 
         else if (email_action_type === 'recovery') {
-            const html = emailLayout({
-                icon: '🔑', title: 'Restablecer contraseña',
-                subtitle: 'Recupera el acceso a tu cuenta',
-                gradient: '#f59e0b 0%, #f97316 100%',
-                body: `
+            await sendEmail({
+                from: FROM_SUPPORT,
+                to: user.email,
+                subject: 'Restablecer tu contraseña · PawMate 🔑',
+                html: emailLayout({
+                    icon: '🔑', title: 'Restablecer contraseña',
+                    subtitle: 'Recupera el acceso a tu cuenta',
+                    gradient: '#f59e0b 0%, #f97316 100%',
+                    body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>
       <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">Haz clic para crear una nueva contraseña:</p>
       ${emailButton(confirmUrl, 'Restablecer contraseña', '#f59e0b')}
@@ -277,37 +283,35 @@ const handleAuthEmail = async (req, res) => {
         <p style="color:#92400e;font-size:13px;margin:0;"><strong>🔐 Consejo:</strong> Usa una contraseña única de al menos 8 caracteres.</p>
       </div>
       ${expiryNote()}`,
-            });
-            await transporter.sendMail({
-                from: `"PawMate Soporte" <${FROM_SUPPORT}>`, to: user.email,
-                subject: 'Restablecer tu contraseña · PawMate 🔑', html,
+                }),
                 text: `Hola ${userName},\n\nRestablece: ${confirmUrl}\n\nExpira en 24h.\n\n© ${new Date().getFullYear()} PawMate`,
             });
         }
 
         else {
-            const html = emailLayout({
-                icon: '🐾', title: 'PawMate', subtitle: '',
-                gradient: '#6366f1 0%, #8b5cf6 100%',
-                body: `
+            await sendEmail({
+                from: FROM_DEFAULT,
+                to: user.email,
+                subject: 'Acción requerida · PawMate',
+                html: emailLayout({
+                    icon: '🐾', title: 'PawMate', subtitle: '',
+                    gradient: '#6366f1 0%, #8b5cf6 100%',
+                    body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>
       <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 8px;">Haz clic en el enlace para continuar:</p>
       ${emailButton(confirmUrl, 'Continuar')}
       ${expiryNote()}`,
-            });
-            await transporter.sendMail({
-                from: `"PawMate" <${FROM_DEFAULT}>`, to: user.email,
-                subject: 'Acción requerida · PawMate', html,
+                }),
                 text: `Hola ${userName},\n\nContinúa aquí: ${confirmUrl}\n\n© ${new Date().getFullYear()} PawMate`,
             });
         }
 
-        console.log(`Auth email [${email_action_type}] sent to ${user.email}`);
+        console.log(`[Email] Auth hook [${email_action_type}] sent to ${user.email}`);
         return res.json({ success: true });
     } catch (err) {
-        console.error('Auth email hook error:', err.message, err.stack);
+        console.error('[Email] Auth hook error:', err.message, err.stack);
         return res.status(500).json({ error: { http_code: 500, message: err.message } });
     }
 };
 
-module.exports = { sendWelcomeEmail, handleAuthEmail, createTransporter, FROM_DEFAULT, FROM_SUPPORT, FROM_ADMIN };
+module.exports = { sendWelcomeEmail, handleAuthEmail, sendEmail, createTransporter, FROM_DEFAULT, FROM_SUPPORT, FROM_ADMIN };

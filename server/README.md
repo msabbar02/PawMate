@@ -6,8 +6,7 @@ API REST para la plataforma PawMate.
 
 - **Node.js** + **Express**
 - **Supabase** (Auth JWT + PostgreSQL con service key)
-- **BillionMail** (servidor SMTP self-hosted para emails transaccionales)
-- **Nodemailer** (cliente SMTP)
+- **Resend** (API de email transaccional cloud)
 - **Stripe** (pagos, reembolsos y webhooks)
 - **express-rate-limit** (protección contra abuso de API — 200 req/15 min)
 - **jsonwebtoken** (verificación del hook de Supabase Auth)
@@ -26,7 +25,7 @@ server/
 │   │   ├── email.controller.js     # Emails HTML de auth (signup, magic link, recovery, cambio email)
 │   │   ├── users.controller.js     # CRUD usuarios con filtrado de campos por rol y paginación
 │   │   ├── pets.controller.js      # CRUD de mascotas
-│   │   ├── notifications.controller.js # Emails HTML de reserva via BillionMail SMTP
+│   │   ├── notifications.controller.js # Emails HTML de reserva via Resend
 │   │   └── payment.controller.js   # Stripe PaymentIntent + reembolsos + webhook
 │   ├── middleware/
 │   │   ├── auth.middleware.js      # Verificar JWT de Supabase + check isAdmin
@@ -102,11 +101,11 @@ NODE_ENV=development
 SUPABASE_URL=https://tu-proyecto.supabase.co
 SUPABASE_SERVICE_KEY=tu-service-role-key
 
-# BillionMail SMTP (self-hosted)
-SMTP_HOST=mail.tudominio.com
-SMTP_PORT=587
-SMTP_USER=noreply@apppawmate.com
-SMTP_PASS=tu-smtp-password
+# Resend
+RESEND_API_KEY=re_xxxxxxxxxxxx
+EMAIL_FROM=PawMate <noreply@apppawmate.com>
+EMAIL_FROM_SUPPORT=PawMate Soporte <support@apppawmate.com>
+EMAIL_FROM_ADMIN=PawMate Admin <admin@apppawmate.com>
 SMTP_FROM=noreply@apppawmate.com
 SMTP_FROM_SUPPORT=support@apppawmate.com
 SMTP_FROM_ADMIN=admin@apppawmate.com
