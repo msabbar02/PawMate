@@ -132,7 +132,7 @@ export default function ChatScreen({ route, navigation }) {
                 onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
                 ListEmptyComponent={
                     <View style={styles.emptyChat}>
-                        <Text style={{ fontSize: 44 }}>💬</Text>
+                        <Text style={{ fontSize: 44 }}></Text>
                         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                             {t('chat.startConversationWith', { name: otherName })}
                         </Text>

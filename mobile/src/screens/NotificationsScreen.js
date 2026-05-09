@@ -402,7 +402,7 @@ export default function NotificationsScreen({ navigation }) {
                     )}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
-                            <Text style={{ fontSize: 56 }}>🔔</Text>
+                            <Text style={{ fontSize: 56 }}></Text>
                              <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('notifications.noNotifications')}</Text>
                              <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>{t('notifications.noNotificationsDesc')}</Text>
                         </View>

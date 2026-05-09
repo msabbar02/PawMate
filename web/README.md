@@ -1,8 +1,8 @@
-# 🌐 PawMate Landing Page
+# PawMate Landing Page
 
 Landing page de la plataforma PawMate — diseño premium, moderno y responsive.
 
-## 🚀 Tecnologías
+## Tecnologías
 
 - **React 19** + **Vite 8**
 - **Framer Motion** (animaciones fluidas)
@@ -11,7 +11,7 @@ Landing page de la plataforma PawMate — diseño premium, moderno y responsive.
 - CSS puro con variables y diseño responsive
 - Desplegado en **Vercel**
 
-## 📂 Estructura
+## Estructura
 
 ```
 pawmate-web/
@@ -29,7 +29,7 @@ pawmate-web/
 └── package.json
 ```
 
-## 🎯 Secciones
+## Secciones
 
 - **Navbar** — Flotante con efecto cristal (glassmorphism), menú hamburguesa en móvil
 - **Hero** — Texto con animación de palabras rotativas, métricas, imagen con tarjetas flotantes
@@ -42,7 +42,7 @@ pawmate-web/
 - **Footer** — Grid de 4 columnas con links y redes sociales
 - **Dark/Light Mode** — Toggle con persistencia en localStorage
 
-## 🎨 Paleta de Colores
+## Paleta de Colores
 
 | Variable | Color | Uso |
 |----------|-------|-----|
@@ -55,20 +55,20 @@ pawmate-web/
 | `--fog` | `#f0f7f4` | Fondos claros |
 | `--cloud` | `#ffffff` | Fondo base |
 
-## 🔧 Instalación
+## Instalación
 
 ```bash
 cd pawmate-web
 npm install
 ```
 
-## ▶️ Ejecutar
+## Ejecutar
 
 ```bash
 npm run dev
 ```
 
-## 📦 Build
+## Build
 
 ```bash
 npm run build
@@ -76,4 +76,4 @@ npm run build
 
 ---
 
-**Estado**: ✅ Funcional
+**Estado**:  Funcional

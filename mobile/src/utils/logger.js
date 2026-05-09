@@ -34,19 +34,21 @@ export const logActivity = async (userId, title, description = '', type = 'syste
  * @param {Object} details - Detalles adicionales (opcional).
  */
 export const logSystemAction = async (userId, userEmail, actionType, entity, details = {}) => {
-    if (!userId || !userEmail) return; // never log without a real user
     try {
-        await supabase.from('system_logs').insert([
+        const { error } = await supabase.from('system_logs').insert([
             {
-                userId,
-                userEmail,
-                actionType,
-                entity,
+                userId: userId || 'Sistema',
+                userEmail: userEmail || 'Sistema',
+                actionType: actionType,
+                entity: entity,
                 details: typeof details === 'string' ? details : JSON.stringify(details),
-                created_at: new Date().toISOString(),
             }
         ]);
-    } catch {
-        // Silently fail — system_logs table may not exist yet
+
+        if (error) {
+            console.warn("⚠️ Advertencia: No se pudo registrar el log en system_logs.", error.message);
+        }
+    } catch (err) {
+        console.error("Error ejecutando logSystemAction:", err);
     }
 };

@@ -17,16 +17,18 @@ export default function CaregiverSetupScreen({ navigation }) {
     const { t } = useTranslation();
 
     const SERVICES = [
-        { value: 'walking', label: t('services.walking'), icon: 'walk-outline', emoji: '🚶' },
-        { value: 'hotel', label: t('services.hotel'), icon: 'home-outline', emoji: '🏨' },
+        { value: 'walking', label: t('services.walking'), icon: 'walk-outline', emoji: '' },
+        { value: 'hotel', label: t('services.hotel'), icon: 'home-outline', emoji: '' },
     ];
 
     const SPECIES = [
-        { value: 'perro', label: '🐶 ' + t('species.dogs') },
-        { value: 'gato', label: '🐱 ' + t('species.cats') },
+        { value: 'perro', label: ' ' + t('species.dogs') },
+        { value: 'gato', label: ' ' + t('species.cats') },
     ];
 
-    const DAYS = [t('days.monday'), t('days.tuesday'), t('days.wednesday'), t('days.thursday'), t('days.friday'), t('days.saturday'), t('days.sunday')];
+    const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const DAYS = DAY_KEYS;
+    const getDayLabel = (key) => t(`days.${key}`);
 
     const [saving, setSaving] = useState(false);
     const [bio, setBio] = useState(userData?.bio || '');
@@ -306,7 +308,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                         return (
                             <View key={day} style={[styles.scheduleRow, { borderBottomColor: theme.border }]}>
                                 <View style={styles.dayHeader}>
-                                    <Text style={[styles.dayText, { color: theme.text }]}>{day}</Text>
+                                    <Text style={[styles.dayText, { color: theme.text }]}>{getDayLabel(day)}</Text>
                                     <Switch
                                         value={dayData.available !== false}
                                         onValueChange={() => toggleDay(day)}

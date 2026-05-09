@@ -12,11 +12,11 @@ export function LanguageProvider({ children }) {
 
     const switchLanguage = useCallback(async (newLang) => {
         setLang(newLang);
-        await AsyncStorage.setItem('pawmate_lang', newLang);
+        await AsyncStorage.setItem('@pawmate_lang', newLang);
     }, []);
 
     React.useEffect(() => {
-        AsyncStorage.getItem('pawmate_lang').then(saved => {
+        AsyncStorage.getItem('@pawmate_lang').then(saved => {
             if (saved && translations[saved]) setLang(saved);
         });
     }, []);

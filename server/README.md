@@ -1,8 +1,8 @@
-# 🔧 PawMate Backend Server
+# PawMate Backend Server
 
 API REST para la plataforma PawMate.
 
-## 🚀 Tecnologías
+## Tecnologías
 
 - **Node.js** + **Express**
 - **Supabase** (Auth JWT + PostgreSQL con service key)
@@ -12,7 +12,7 @@ API REST para la plataforma PawMate.
 - **jsonwebtoken** (verificación del hook de Supabase Auth)
 - **CORS** + **dotenv**
 
-## 📂 Estructura
+## Estructura
 
 ```
 server/
@@ -43,7 +43,7 @@ server/
 └── .env                            # Variables de entorno (no comiteado)
 ```
 
-## 🎯 Endpoints
+## Endpoints
 
 ### Health Check
 - `GET /api/health` — Estado del servidor
@@ -75,7 +75,7 @@ server/
 - `POST /api/payments/refund` *(auth)* — Reembolsar pago + actualizar `paymentStatus: 'refunded'` en DB
 - `POST /api/payments/webhook` *(Stripe, sin auth)* — Webhook para `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
 
-## 🔒 Seguridad
+## Seguridad
 
 - **Rate limiting**: 200 req / 15 min por IP en todas las rutas `/api/*`
 - **Campos sensibles**: `idFrontUrl`, `idBackUrl`, `selfieUrl`, `certDocUrl`, `fcmToken`, `expoPushToken` nunca se exponen a otros usuarios
@@ -83,14 +83,14 @@ server/
 - **Doble reembolso**: previene reembolsos duplicados verificando `paymentStatus !== 'refunded'`
 - **Stripe webhook**: verifica firma con `STRIPE_WEBHOOK_SECRET`; raw body parser en `/api/payments/webhook`
 
-## 🔧 Instalación
+## Instalación
 
 ```bash
 cd server
 npm install
 ```
 
-## ⚙️ Configuración
+## Configuración
 
 Crear archivo `.env`:
 ```env
@@ -118,7 +118,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 SUPABASE_AUTH_HOOK_SECRET=v1,whsec_...
 ```
 
-## ▶️ Ejecutar
+## Ejecutar
 
 ```bash
 # Desarrollo (con nodemon)
@@ -130,4 +130,4 @@ npm start
 
 ---
 
-**Estado**: ✅ Funcional
+**Estado**:  Funcional

@@ -93,7 +93,7 @@ export default function ReservationsPage() {
     });
 
     const getServiceIcon = (type) => {
-        return type === 'walking' ? `🚶 ${t('reservations.walkService')}` : type === 'daycare' ? `☀️ ${t('reservations.daycareService')}` : `🏨 ${t('reservations.hotelService')}`;
+        return type === 'walking' ? `🚶 ${t('reservations.walkService')}` : `🏨 ${t('reservations.hotelService')}`;
     };
 
     const statusLabel = (s) => {

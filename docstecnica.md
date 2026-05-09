@@ -1,11 +1,11 @@
-# 📘 PawMate — Documentación Técnica
+# PawMate — Documentación Técnica
 
 > Plataforma móvil + web para conectar dueños de mascotas con cuidadores verificados.
 > Versión: 1.0 · Última revisión: 2026-04
 
 ---
 
-## 📑 Índice
+## Índice
 
 1. [Visión general](#1-visión-general)
 2. [Arquitectura del sistema](#2-arquitectura-del-sistema)
@@ -60,21 +60,21 @@ mindmap
 
 ```mermaid
 flowchart TB
-    subgraph Clients["🖥️ Clientes"]
-        Mobile[📱 App Móvil<br/>React Native + Expo]
-        Web[🌐 Web Landing<br/>React + Vite]
-        Admin[👨‍💼 Panel Admin<br/>React + Vite]
+    subgraph Clients[" Clientes"]
+        Mobile[App Móvil<br/>React Native + Expo]
+        Web[Web Landing<br/>React + Vite]
+        Admin[Panel Admin<br/>React + Vite]
     end
 
-    subgraph Backend["⚙️ Backend"]
-        Server[🚀 API Express<br/>Node.js · Vercel]
+    subgraph Backend[" Backend"]
+        Server[API Express<br/>Node.js · Vercel]
     end
 
-    subgraph Cloud["☁️ Servicios Cloud"]
-        Supabase[(🗄️ Supabase<br/>Auth + PostgreSQL<br/>Storage + Realtime)]
-        Stripe[💳 Stripe]
-        Resend[📧 Resend<br/>API Cloud]
-        Expo[🔔 Expo Push]
+    subgraph Cloud[" Servicios Cloud"]
+        Supabase[( Supabase<br/>Auth + PostgreSQL<br/>Storage + Realtime)]
+        Stripe[Stripe]
+        Resend[Resend<br/>API Cloud]
+        Expo[Expo Push]
     end
 
     Mobile -.SDK.-> Supabase
@@ -319,10 +319,10 @@ flowchart LR
 flowchart TD
     A[Usuario crea recordatorio] --> B[Auto-detectar categoría<br/>por palabras clave]
     B --> C{Categoría detectada}
-    C -->|vacuna| D[💉]
-    C -->|vet/médico| E[🩺]
-    C -->|antiparásito| F[🐛]
-    C -->|otro| G[📌]
+    C -->|vacuna| D[]
+    C -->|vet/médico| E[]
+    C -->|antiparásito| F[]
+    C -->|otro| G[]
     D & E & F --> H[Guardar en pets.reminders]
     H --> I[Programar push notification]
     I --> J{¿Es categoría salud?}
@@ -358,11 +358,11 @@ flowchart TD
     Auth -->|No| Login[LoginScreen]
     Auth -->|No| Signup[SignupScreen]
     Auth -->|Sí| Tabs[Bottom Tabs]
-    Tabs --> Home[🏠 Home<br/>Mapa + Radar]
-    Tabs --> Pets[🐾 Mis Mascotas]
-    Tabs --> Books[📋 Reservas]
-    Tabs --> Care[🧑‍⚕️ Cuidadores]
-    Tabs --> Set[⚙️ Ajustes]
+    Tabs --> Home[Home<br/>Mapa + Radar]
+    Tabs --> Pets[Mis Mascotas]
+    Tabs --> Books[Reservas]
+    Tabs --> Care[Cuidadores]
+    Tabs --> Set[Ajustes]
     Tabs --> Stack[Stack adicional]
     Stack --> Chat[ChatScreen]
     Stack --> Profile[ProfileScreen]
@@ -461,21 +461,21 @@ Landing page de marketing con secciones animadas.
 
 ```mermaid
 flowchart TB
-    subgraph Layer1["🔒 Capa 1: Cliente"]
+    subgraph Layer1[" Capa 1: Cliente"]
         A[Validación formularios]
         B[HTTPS obligatorio]
     end
-    subgraph Layer2["🔐 Capa 2: Auth"]
+    subgraph Layer2[" Capa 2: Auth"]
         C[Supabase Auth JWT + PKCE]
         D[Token expira 1h<br/>Refresh token]
     end
-    subgraph Layer3["🛡️ Capa 3: Server"]
+    subgraph Layer3[" Capa 3: Server"]
         E[Rate limiting]
         F[verifyToken middleware]
         G[isAdmin middleware]
         H[CORS whitelist]
     end
-    subgraph Layer4["🗄️ Capa 4: Base de datos"]
+    subgraph Layer4[" Capa 4: Base de datos"]
         I[Row Level Security RLS]
         J[Service key solo en server]
     end
@@ -513,17 +513,17 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    subgraph Dev["💻 Desarrollo local"]
+    subgraph Dev[" Desarrollo local"]
         D1[Mobile: Expo Go]
         D2[Web: localhost:5173]
         D3[Server: localhost:3000]
     end
 
-    subgraph CI["🔄 GitHub"]
+    subgraph CI[" GitHub"]
         G[git push]
     end
 
-    subgraph Prod["🚀 Producción"]
+    subgraph Prod[" Producción"]
         V1[Vercel: web]
         V2[Vercel: admin]
         V3[Vercel: server]
@@ -596,7 +596,7 @@ VITE_SUPABASE_ANON_KEY=
 
 > Lista priorizada de mejoras pendientes.
 
-### 🔴 Críticos
+### Críticos
 
 
 | # | Problema                                  | Solución propuesta                         |
@@ -605,7 +605,7 @@ VITE_SUPABASE_ANON_KEY=
 | 2 | `updateUser` permite cambiar `role`       | Whitelist de campos editables               |
 | 3 | API keys hardcodeadas (Weather)            | Mover a variables de entorno                |
 
-### 🟠 Altos
+### Altos
 
 
 | # | Problema                                 | Solución                                      |
@@ -615,7 +615,7 @@ VITE_SUPABASE_ANON_KEY=
 | 6 | Sin índices en`ownerId`, `status`       | `CREATE INDEX` en schema                       |
 | 7 | Vercel bloquea SMTP outbound (plan free) | Migrar server a Render/Railway o usar plan Pro |
 
-### 🟡 Medios
+### Medios
 
 
 | #  | Problema                                                          | Solución                               |
@@ -624,7 +624,7 @@ VITE_SUPABASE_ANON_KEY=
 | 9  | N+1 queries en Admin PetsPage                                     | Join con`select(..., owner:users(...))` |
 | 10 | Columnas duplicadas (`birthdate`/`birthDate`, `image`/`photoURL`) | Unificar a una sola                     |
 
-### 🟢 Bajos
+### Bajos
 
 - `Math.random()` como key en LogsPage
 

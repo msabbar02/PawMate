@@ -284,7 +284,7 @@ export default function ProfileScreen({ navigation }) {
                             <Image source={{ uri: photoUri }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: COLORS.primaryBg }]}>
-                                <Text style={{ fontSize: 48 }}>🐾</Text>
+                                <Text style={{ fontSize: 48 }}></Text>
                             </View>
                         )}
                         <View style={[styles.cameraBadge, { backgroundColor: COLORS.primary, borderColor: theme.cardBackground }]}>
@@ -338,9 +338,9 @@ export default function ProfileScreen({ navigation }) {
                 {/* ── CAREGIVER BADGE (only for caregivers) ── */}
                 {userData?.role === 'caregiver' && (() => {
                     const TIERS = [
-                        { min: 0,  label: t('profile.badgeBronze'), emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
-                        { min: 5,  label: t('profile.badgeSilver'), emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
-                        { min: 20, label: t('profile.badgeGold'),   emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                        { min: 0,  label: t('profile.badgeBronze'), emoji: '', color: '#CD7F32', bg: '#FDF2E9' },
+                        { min: 5,  label: t('profile.badgeSilver'), emoji: '', color: '#9CA3AF', bg: '#F3F4F6' },
+                        { min: 20, label: t('profile.badgeGold'),   emoji: '', color: '#F5A623', bg: '#FEF3C7' },
                     ];
                     const completed = userData?.completedServices || 0;
                     let badge = TIERS[0];
@@ -528,7 +528,7 @@ export default function ProfileScreen({ navigation }) {
                             onPress={() => navigation.navigate('Verify')}
                         >
                             <View style={[styles.roleBtnIcon, { backgroundColor: COLORS.primary }]}>
-                                <Text style={{ fontSize: 22 }}>🐾</Text>
+                                <Text style={{ fontSize: 22 }}></Text>
                             </View>
                             <View style={{ flex: 1, marginLeft: 14 }}>
                                 <Text style={[styles.roleBtnTitle, { color: COLORS.primary }]}>{t('profile.becomeOwner')}</Text>
@@ -542,7 +542,7 @@ export default function ProfileScreen({ navigation }) {
                             onPress={() => navigation.navigate('Verify')}
                         >
                             <View style={[styles.roleBtnIcon, { backgroundColor: COLORS.secondary }]}>
-                                <Text style={{ fontSize: 22 }}>🛡️</Text>
+                                <Text style={{ fontSize: 22 }}></Text>
                             </View>
                             <View style={{ flex: 1, marginLeft: 14 }}>
                                 <Text style={[styles.roleBtnTitle, { color: COLORS.secondary }]}>{t('profile.becomeCaregiver')}</Text>

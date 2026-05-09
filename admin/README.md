@@ -1,8 +1,8 @@
-# 👨‍💼 PawMate Admin Panel
+# PawMate Admin Panel
 
 Panel de administración completo para gestionar la plataforma PawMate.
 
-## 🚀 Tecnologías
+## Tecnologías
 
 - **React 18** + **Vite 5**
 - **Supabase** (Auth + PostgreSQL)
@@ -11,7 +11,7 @@ Panel de administración completo para gestionar la plataforma PawMate.
 - CSS personalizado con variables y diseño glassmorphism
 - Desplegado en **Vercel**
 
-## 📂 Estructura
+## Estructura
 
 ```
 admin/
@@ -43,28 +43,28 @@ admin/
 └── vercel.json                     # Config de despliegue en Vercel
 ```
 
-## 🎯 Funcionalidades
+## Funcionalidades
 
-- 📊 Dashboard con estadísticas en tiempo real (usuarios, mascotas, reservas)
-- 👥 Gestión de usuarios con filtros, búsqueda y vista detallada premium
-- 🐾 Gestión de mascotas
-- 📅 Gestión de reservas
-- 💬 Mensajes
-- 📝 Moderación de comunidad
-- 📈 Reportes y logs
-- 👤 Perfil de admin editable (nombre, foto, teléfono, ubicación, bio)
-- 🔑 Gestión de administradores (crear nuevos admins, revocar permisos)
-- 🌓 Modo claro / oscuro con persistencia en localStorage
-- 🔒 Acceso restringido a usuarios con `role: 'admin'` en tabla `users`
+- Dashboard con estadísticas en tiempo real (usuarios, mascotas, reservas)
+- Gestión de usuarios con filtros, búsqueda y vista detallada premium
+- Gestión de mascotas
+- Gestión de reservas
+- Mensajes
+- Moderación de comunidad
+- Reportes y logs
+- Perfil de admin editable (nombre, foto, teléfono, ubicación, bio)
+- Gestión de administradores (crear nuevos admins, revocar permisos)
+- Modo claro / oscuro con persistencia en localStorage
+- Acceso restringido a usuarios con `role: 'admin'` en tabla `users`
 
-## 🔧 Instalación
+## Instalación
 
 ```bash
 cd admin
 npm install
 ```
 
-## ⚙️ Configuración
+## Configuración
 
 Crear archivo `.env`:
 ```env
@@ -72,20 +72,20 @@ VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu-anon-key
 ```
 
-## ▶️ Ejecutar
+## Ejecutar
 
 ```bash
 npm run dev
 ```
 
-## 🔐 Acceso
+## Acceso
 
 Solo usuarios con `role: 'admin'` en la tabla `users` de Supabase pueden acceder.
 
-## 🚀 Despliegue
+## Despliegue
 
 Desplegado automáticamente en **Vercel**. Asegurar que las variables de entorno están configuradas en el dashboard de Vercel.
 
 ---
 
-**Estado**: ✅ Funcional
+**Estado**:  Funcional

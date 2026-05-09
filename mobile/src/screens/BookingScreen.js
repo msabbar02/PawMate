@@ -30,8 +30,8 @@ const STATUS = {
 };
 
 const SERVICE_TYPES = [
-    { value: 'walking', labelKey: 'services.walking', emoji: '🚶', icon: 'walk-outline' },
-    { value: 'hotel',   labelKey: 'services.hotel',   emoji: '🏨', icon: 'home-outline' },
+    { value: 'walking', labelKey: 'services.walking', emoji: '', icon: 'walk-outline' },
+    { value: 'hotel',   labelKey: 'services.hotel',   emoji: '', icon: 'home-outline' },
 ];
 
 const MAX_WALK  = 5;
@@ -513,7 +513,7 @@ export default function BookingScreen() {
                 await createNotification(reservation.ownerId, {
                     type: newVal ? 'walk_started' : 'walk_ended',
                     bookingId: reservation.id,
-                    title: newVal ? '🚶 Paseo iniciado' : '🏠 Paseo finalizado',
+                    title: newVal ? ' Paseo iniciado' : ' Paseo finalizado',
                     body: newVal
                         ? `${userData?.fullName || 'El cuidador'} ha iniciado el paseo con ${petNames}. ¡Puedes seguir su ubicación!`
                         : `${userData?.fullName || 'El cuidador'} ha finalizado el paseo con ${petNames}.`,
@@ -631,7 +631,7 @@ export default function BookingScreen() {
             // Notify the receiver about the new message
             await createNotification(receiverId, {
                 type: 'new_message',
-                title: '💬 Nuevo mensaje',
+                title: ' Nuevo mensaje',
                 body: `${userData?.fullName || 'Alguien'}: ${text.substring(0, 80)}`,
                 icon: 'chatbubble-outline',
                 iconBg: '#DBEAFE',
@@ -820,7 +820,7 @@ export default function BookingScreen() {
                 <Text style={[s.headerTitle, { color: theme.text }]}>{t('bookings.title')}</Text>
                 <View style={[s.roleChip, { backgroundColor: theme.primaryBg }]}>
                     <Text style={[s.roleChipText, { color: theme.primary }]}>
-                        {userData?.role === 'caregiver' ? '🛡️ ' + t('roles.caregiver') : '🐾 ' + t('roles.owner')}
+                        {userData?.role === 'caregiver' ? ' ' + t('roles.caregiver') : ' ' + t('roles.owner')}
                     </Text>
                 </View>
             </View>
@@ -853,7 +853,7 @@ export default function BookingScreen() {
                     showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={s.emptyState}>
-                            <Text style={{ fontSize: 56 }}>📅</Text>
+                            <Text style={{ fontSize: 56 }}></Text>
                             <Text style={[s.emptyTitle, { color: theme.text }]}>{t('bookings.noBookings')}</Text>
                             <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>
                                 {userData?.role === 'caregiver'
@@ -875,7 +875,7 @@ export default function BookingScreen() {
                     showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={s.emptyState}>
-                            <Text style={{ fontSize: 56 }}>💬</Text>
+                            <Text style={{ fontSize: 56 }}></Text>
                             <Text style={[s.emptyTitle, { color: theme.text }]}>{t('bookings.noMessages')}</Text>
                             <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>{t('bookings.noMessagesDesc')}</Text>
                         </View>
@@ -1299,7 +1299,7 @@ export default function BookingScreen() {
                         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                         ListEmptyComponent={
                             <View style={{ alignItems: 'center', marginTop: 60 }}>
-                                <Text style={{ fontSize: 44 }}>💬</Text>
+                                <Text style={{ fontSize: 44 }}></Text>
                                 <Text style={[s.emptyDesc, { color: theme.textSecondary }]}>{t('bookings.startConversation')}</Text>
                             </View>
                         }

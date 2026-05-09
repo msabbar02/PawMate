@@ -20,8 +20,8 @@ export default function CreateBookingScreen({ route, navigation }) {
     const { t } = useTranslation();
 
     const SERVICE_TYPES = [
-        { value: 'walking', label: '🚶 ' + t('services.walking'), icon: 'walk-outline' },
-        { value: 'hotel', label: '🏨 ' + t('services.hotel'), icon: 'home-outline' },
+        { value: 'walking', label: ' ' + t('services.walking'), icon: 'walk-outline' },
+        { value: 'hotel', label: ' ' + t('services.hotel'), icon: 'home-outline' },
     ];
 
     const [serviceType, setServiceType] = useState(null);
@@ -73,7 +73,7 @@ export default function CreateBookingScreen({ route, navigation }) {
             return walkHours * caregiver.price;
         }
         const diffMs = endDate.getTime() - startDate.getTime();
-        if (serviceType === 'hotel' || serviceType === 'daycare') {
+        if (serviceType === 'hotel') {
             const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
             return days * caregiver.price * 8;
         }
@@ -133,7 +133,7 @@ export default function CreateBookingScreen({ route, navigation }) {
             await createNotification(caregiver.id, {
                 type: 'booking_request',
                 bookingId: insertedRes?.id,
-                title: '📅 Nueva solicitud de reserva',
+                title: ' Nueva solicitud de reserva',
                 body: `${userData?.fullName || t('roles.owner')} quiere reservar ${SERVICE_TYPES.find(s => s.value === serviceType)?.label || serviceType}`,
                 icon: 'calendar-outline',
                 iconBg: '#FEF3C7',
@@ -216,7 +216,7 @@ export default function CreateBookingScreen({ route, navigation }) {
                             {caregiver.acceptedSpecies.map(sp => (
                                 <View key={sp} style={{ backgroundColor: '#E0F2FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
                                     <Text style={{ fontSize: 11, fontWeight: '700', color: '#0891b2' }}>
-                                        {sp === 'perro' ? '🐶 ' + t('species.dogs') : sp === 'gato' ? '🐱 ' + t('species.cats') : sp === 'ave' ? '🐦 ' + t('species.birds') : sp === 'reptil' ? '🦎 ' + t('species.reptiles') : '🐾 ' + sp}
+                                        {sp === 'perro' ? ' ' + t('species.dogs') : sp === 'gato' ? ' ' + t('species.cats') : sp === 'ave' ? ' ' + t('species.birds') : sp === 'reptil' ? ' ' + t('species.reptiles') : ' ' + sp}
                                     </Text>
                                 </View>
                             ))}
@@ -417,7 +417,7 @@ export default function CreateBookingScreen({ route, navigation }) {
                                         ]}
                                         onPress={() => togglePet(pet.id)}
                                     >
-                                        <Text style={{ fontSize: 14 }}>{pet.species === 'perro' || pet.species === 'dog' ? '🐶' : pet.species === 'gato' || pet.species === 'cat' ? '🐱' : '🐾'}</Text>
+                                        <Text style={{ fontSize: 14 }}>{pet.species === 'perro' || pet.species === 'dog' ? '' : pet.species === 'gato' || pet.species === 'cat' ? '' : ''}</Text>
                                         <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{pet.name}</Text>
                                         {active && <Icon name="checkmark-circle" size={16} color="#FFF" />}
                                     </TouchableOpacity>

@@ -96,12 +96,12 @@ const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
                 {/* Badge flotante inferior */}
                 {isMatch && (
                     <View style={[styles.badge, { backgroundColor: '#F59E0B' }]}>
-                        <Text style={styles.badgeText}>Match ✨</Text>
+                        <Text style={styles.badgeText}>Match </Text>
                     </View>
                 )}
                 {!isCaregiver && (
                     <View style={[styles.badge, { backgroundColor: '#3B82F6' }]}>
-                        <Text style={styles.badgeText}>Grupo 🐾</Text>
+                        <Text style={styles.badgeText}>Grupo </Text>
                     </View>
                 )}
             </View>

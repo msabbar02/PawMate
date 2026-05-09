@@ -38,7 +38,7 @@ function getNextBadge(completedCount) {
     return null;
 }
 
-const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel', daycare: '☀️ Guardería', grooming: '✂️ Peluquería', training: '🏋️ Entreno' };
+const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel' };
 
 export default function CaregiverDashboardScreen({ navigation }) {
     const { user, userData, refreshUserData, updateUserOptimistic } = useContext(AuthContext);
@@ -139,34 +139,24 @@ export default function CaregiverDashboardScreen({ navigation }) {
 
     const handleToggleOnline = async () => {
         const newVal = !userData?.isOnline;
-        console.log('[ToggleOnline:Dashboard] click. uid=', user?.id, 'current=', userData?.isOnline, 'new=', newVal);
-        // Optimistic UI update first
-        updateUserOptimistic({ isOnline: newVal });
-        const update = { isOnline: newVal };
-        if (newVal) {
-            try {
+        try {
+            // Optimistic UI update — change locally immediately
+            updateUserOptimistic({ isOnline: newVal });
+            const update = { isOnline: newVal };
+            if (newVal) {
                 const { status } = await Location.requestForegroundPermissionsAsync();
-                console.log('[ToggleOnline:Dashboard] location permission=', status);
                 if (status === 'granted') {
                     const loc = await Location.getCurrentPositionAsync({});
                     update.latitude = loc.coords.latitude;
                     update.longitude = loc.coords.longitude;
                 }
-            } catch (locErr) {
-                console.warn('[ToggleOnline:Dashboard] location error:', locErr?.message);
             }
-        }
-        console.log('[ToggleOnline:Dashboard] sending update=', update);
-        const { data, error } = await supabase.from('users').update(update).eq('id', user.id).select();
-        console.log('[ToggleOnline:Dashboard] result data=', data, 'error=', error);
-        if (error) {
+            const { error } = await supabase.from('users').update(update).eq('id', user.id);
+            if (error) throw error;
+        } catch (e) {
+            // Revert on error
             updateUserOptimistic({ isOnline: !newVal });
-            Alert.alert('Error toggle online', `${error.message}\nCode: ${error.code}\nDetails: ${error.details || '-'}`);
-            return;
-        }
-        if (!data || data.length === 0) {
-            updateUserOptimistic({ isOnline: !newVal });
-            Alert.alert('Error toggle online', 'La query no actualizó ninguna fila. Posible problema de RLS o id incorrecto.');
+            Alert.alert('Error', 'No se pudo cambiar el estado online.');
         }
     };
 
@@ -324,7 +314,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
 
                     <TouchableOpacity
                         style={[s.actionBtn, { backgroundColor: theme.cardBackground }]}
-                        onPress={() => navigation.navigate('MainTabs', { screen: 'Reservas' })}
+                        onPress={() => navigation.navigate('Reservas')}
                     >
                         <View style={[s.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
                             <Ionicons name="calendar-outline" size={22} color="#F5A623" />
@@ -354,7 +344,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                             <TouchableOpacity
                                 key={res.id}
                                 style={[s.activeResCard, { borderColor: theme.border }]}
-                                onPress={() => navigation.navigate('MainTabs', { screen: 'Reservas' })}
+                                onPress={() => navigation.navigate('Reservas')}
                             >
                                 <View style={{ flex: 1 }}>
                                     <Text style={[s.activeResName, { color: theme.text }]}>{res.ownerName}</Text>

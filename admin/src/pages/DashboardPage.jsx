@@ -11,7 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import {
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
-    PieChart, Pie, Cell, Legend, Bar,
+    PieChart, Pie, Cell, Bar,
     ComposedChart,
 } from 'recharts';
 import './DashboardPage.css';
@@ -597,7 +597,7 @@ export default function DashboardPage() {
                     sparkline={sparkSeries(filteredVerifUsers)}
                     onClick={() => navigate('/users')} />
                 <StatCard icon={faDog} color="#10b981" bg="rgba(16,185,129,0.18)"
-                    title={t('dashboard.totalPets')} total={filteredPets.length}
+                    title={t('dashboard.pets')} total={filteredPets.length}
                     inWindowCount={petsInWindow.length} prevWindowCount={prevPets} windowKey={windowKey}
                     sparkline={sparkSeries(filteredPets)}
                     onClick={() => navigate('/pets')} />

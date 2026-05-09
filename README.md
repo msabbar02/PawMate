@@ -1,4 +1,4 @@
-# 🐾 PawMate
+# PawMate
 
 **La plataforma integral de gestión de mascotas — App Móvil · Landing Web · Admin · Backend**
 
@@ -6,27 +6,27 @@
 
 ---
 
-## 📋 Descripción
+## Descripción
 
 PawMate es un ecosistema digital completo para el cuidado y gestión de mascotas en España. Conecta a dueños de animales con cuidadores verificados, ofrece seguimiento GPS en tiempo real, historial médico completo, chat integrado, pagos con Stripe y una comunidad activa de amantes de los animales.
 
 ---
 
-## 🏗️ Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 PawMate/
-├── mobile/          📱 App móvil (React Native 0.81 + Expo 54)
-├── pawmate-web/     🌐 Landing Page (Vite 8 + React 19 + Three.js)
-├── admin/           👨‍💼 Panel de administración (Vite 5 + React 18)
-└── server/          🔧 Backend API REST (Node.js + Express)
+├── mobile/           App móvil (React Native 0.81 + Expo 54)
+├── pawmate-web/      Landing Page (Vite 8 + React 19 + Three.js)
+├── admin/            Panel de administración (Vite 5 + React 18)
+└── server/           Backend API REST (Node.js + Express)
 ```
 
 ---
 
-## 🚀 Tech Stack Completo
+## Tech Stack Completo
 
-### 📱 App Móvil — `mobile/`
+### App Móvil — `mobile/`
 
 | Categoría | Tecnología | Versión |
 |-----------|-----------|---------|
@@ -50,7 +50,7 @@ PawMate/
 
 ---
 
-### 🌐 Landing Page — `pawmate-web/`
+### Landing Page — `pawmate-web/`
 
 | Categoría | Tecnología | Versión |
 |-----------|-----------|---------|
@@ -67,7 +67,7 @@ PawMate/
 
 ---
 
-### 👨‍💼 Panel de Administración — `admin/`
+### Panel de Administración — `admin/`
 
 | Categoría | Tecnología | Versión |
 |-----------|-----------|---------|
@@ -81,7 +81,7 @@ PawMate/
 
 ---
 
-### 🔧 Backend API — `server/`
+### Backend API — `server/`
 
 | Categoría | Tecnología | Versión |
 |-----------|-----------|---------|
@@ -97,7 +97,7 @@ PawMate/
 
 ---
 
-### ☁️ Infraestructura & Servicios
+### Infraestructura & Servicios
 
 | Servicio | Uso |
 |----------|-----|
@@ -110,66 +110,66 @@ PawMate/
 
 ---
 
-## 🎯 Funcionalidades Principales
+## Funcionalidades Principales
 
-### 📱 App Móvil
-- ✅ Autenticación con Supabase Auth (Email/Password, Google OAuth)
-- ✅ Perfiles completos de mascotas (fotos, historial médico, chip NFC)
-- ✅ Seguimiento GPS en tiempo real de paseos con mapa, distancia, duración y velocidad
-- ✅ Modo oscuro personalizado en Google Maps
-- ✅ Paw-Port QR Biométrico — código QR de emergencia imprimible y descargable
-- ✅ Recordatorios de vacunas y citas veterinarias
-- ✅ Chat en tiempo real entre dueños y cuidadores (Supabase Realtime)
-- ✅ Sistema de cuidadores verificados con reservas y pagos (Stripe)
-- ✅ Flujo de verificación de identidad en 3 pasos (DNI frontal + dorsal + selfie + certificados)
-- ✅ Notificaciones push en tiempo real (Expo Notifications)
-- ✅ Widget del clima en tiempo real
-- ✅ Radar de mascotas cercanas
-- ✅ Dark mode / Light mode con tema naranja-navy
-- ✅ Localización completa ES / EN (i18next)
-- ✅ Banner de perfil incompleto con indicador de progreso
+### App Móvil
+- Autenticación con Supabase Auth (Email/Password, Google OAuth)
+- Perfiles completos de mascotas (fotos, historial médico, chip NFC)
+- Seguimiento GPS en tiempo real de paseos con mapa, distancia, duración y velocidad
+- Modo oscuro personalizado en Google Maps
+- Paw-Port QR Biométrico — código QR de emergencia imprimible y descargable
+- Recordatorios de vacunas y citas veterinarias
+- Chat en tiempo real entre dueños y cuidadores (Supabase Realtime)
+- Sistema de cuidadores verificados con reservas y pagos (Stripe)
+- Flujo de verificación de identidad en 3 pasos (DNI frontal + dorsal + selfie + certificados)
+- Notificaciones push en tiempo real (Expo Notifications)
+- Widget del clima en tiempo real
+- Radar de mascotas cercanas
+- Dark mode / Light mode con tema naranja-navy
+- Localización completa ES / EN (i18next)
+- Banner de perfil incompleto con indicador de progreso
 
-### 🌐 Landing Page (`pawmate-web/`)
-- ✅ Hero con elementos 3D flotantes animados (Three.js + @react-three/fiber)
-- ✅ Cursor personalizado en forma de huella
-- ✅ Navbar flotante de cristal con efecto blur
-- ✅ Trust band con marquee infinito
-- ✅ Feature cards con animaciones Framer Motion y scroll reveal
-- ✅ Showcase de experiencia premium con estadísticas animadas
-- ✅ Sección de testimonios
-- ✅ CTA con botones de descarga (App Store / Google Play)
-- ✅ Páginas de confirmación y reseteo de contraseña (Supabase Auth)
-- ✅ Responsive mobile-first · i18n ES/EN
+### Landing Page (`pawmate-web/`)
+- Hero con elementos 3D flotantes animados (Three.js + @react-three/fiber)
+- Cursor personalizado en forma de huella
+- Navbar flotante de cristal con efecto blur
+- Trust band con marquee infinito
+- Feature cards con animaciones Framer Motion y scroll reveal
+- Showcase de experiencia premium con estadísticas animadas
+- Sección de testimonios
+- CTA con botones de descarga (App Store / Google Play)
+- Páginas de confirmación y reseteo de contraseña (Supabase Auth)
+- Responsive mobile-first · i18n ES/EN
 
-### 👨‍💼 Panel de Administración (`admin/`)
-- ✅ Login seguro con verificación de rol admin (Supabase Auth)
-- ✅ Dashboard con métricas y estadísticas en tiempo real
-- ✅ Gestión completa de usuarios (CRUD, filtros, estado)
-- ✅ Gestión de mascotas
-- ✅ Gestión y moderación de reservas
-- ✅ Moderación de comunidad
-- ✅ Bandeja de mensajes y conversaciones
-- ✅ Sistema de reportes y logs de actividad
-- ✅ Flujo de verificaciones de identidad (aprobar / rechazar con rol)
-- ✅ Gestión de administradores (crear / eliminar)
-- ✅ Perfil de administrador editable (avatar, datos personales)
-- ✅ Dark mode / Light mode · i18n ES/EN
-- ✅ Desplegado en Vercel
+### Panel de Administración (`admin/`)
+- Login seguro con verificación de rol admin (Supabase Auth)
+- Dashboard con métricas y estadísticas en tiempo real
+- Gestión completa de usuarios (CRUD, filtros, estado)
+- Gestión de mascotas
+- Gestión y moderación de reservas
+- Moderación de comunidad
+- Bandeja de mensajes y conversaciones
+- Sistema de reportes y logs de actividad
+- Flujo de verificaciones de identidad (aprobar / rechazar con rol)
+- Gestión de administradores (crear / eliminar)
+- Perfil de administrador editable (avatar, datos personales)
+- Dark mode / Light mode · i18n ES/EN
+- Desplegado en Vercel
 
-### 🔧 Backend API (`server/`)
-- ✅ API REST modular con Express (auth, users, pets, notifications, payments)
-- ✅ Middleware de autenticación con JWT (tokens de Supabase)
-- ✅ CORS configurado por entorno (producción / desarrollo local)
-- ✅ Procesamiento de pagos con Stripe (PaymentIntent + reembolsos)
-- ✅ Emails transaccionales HTML con Resend SDK
+### Backend API (`server/`)
+- API REST modular con Express (auth, users, pets, notifications, payments)
+- Middleware de autenticación con JWT (tokens de Supabase)
+- CORS configurado por entorno (producción / desarrollo local)
+- Procesamiento de pagos con Stripe (PaymentIntent + reembolsos)
+- Emails transaccionales HTML con Resend SDK
   - Confirmación de reserva, aceptación/rechazo por el cuidador, bienvenida
-- ✅ Health check endpoint (`GET /api/health`)
-- ✅ Handlers globales de error y 404
-- ✅ Serverless-ready para Vercel
+- Health check endpoint (`GET /api/health`)
+- Handlers globales de error y 404
+- Serverless-ready para Vercel
 
 ---
 
-## ▶️ Ejecutar en Local
+## Ejecutar en Local
 
 ### Landing Web
 ```bash
@@ -205,16 +205,16 @@ npm run dev
 
 ---
 
-## 👨‍💻 Desarrollador
+## Desarrollador
 
 **Mohamed Sabbar**
-- 📧 msabbar02@yahoo.com
-- 📱 +34 624 170 100
-- 🎓 DAM — Desarrollo de Aplicaciones Multiplataforma
-- 🔗 [GitHub](https://github.com/msabbar02/PawMate)
+- msabbar02@yahoo.com
+- +34 624 170 100
+- DAM — Desarrollo de Aplicaciones Multiplataforma
+- [GitHub](https://github.com/msabbar02/PawMate)
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Proyecto educativo · Uso académico · © 2026 PawMate

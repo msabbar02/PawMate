@@ -22,7 +22,7 @@ export default function CommunityPage() {
     const fetchPosts = async () => {
         setLoading(true);
         try {
-            const { data: postsData } = await supabase.from('posts').select('*').order('createdAt', { ascending: false });
+            const { data: postsData } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
             if (postsData) setPosts(postsData);
         } catch (error) {
             console.error("Error fetching posts:", error);

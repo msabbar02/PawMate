@@ -49,7 +49,7 @@ export default function LogsPage() {
     const [autoTick, setAutoTick] = useState(0);
 
     useEffect(() => {
-        const id = setInterval(() => setAutoTick(t => t + 1), 30000);
+        const id = setInterval(() => setAutoTick(prev => prev + 1), 30000);
         return () => clearInterval(id);
     }, []);
 

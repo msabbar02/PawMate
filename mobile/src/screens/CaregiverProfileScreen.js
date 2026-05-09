@@ -17,7 +17,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
     const { user, userData } = useContext(AuthContext);
     const { t } = useTranslation();
 
-    const SERVICE_LABELS = { walking: '🚶 ' + t('services.walking'), hotel: '🏨 ' + t('services.hotel') };
+    const SERVICE_LABELS = { walking: ' ' + t('services.walking'), hotel: ' ' + t('services.hotel') };
     const TABS = [t('caregiverProfile.generalTab'), t('caregiverProfile.availabilityTab'), t('caregiverProfile.reviewsTab')];
     const DAYS = [t('days.monday'), t('days.tuesday'), t('days.wednesday'), t('days.thursday'), t('days.friday'), t('days.saturday'), t('days.sunday')];
 
@@ -156,7 +156,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                         {caregiver.acceptedSpecies.map(s => (
                             <View key={s} style={[styles.chip, { backgroundColor: '#E0F2FE' }]}>
                                 <Text style={[styles.chipText, { color: '#0891b2' }]}>
-                                    {s === 'perro' ? '🐶 ' + t('species.dogs') : s === 'gato' ? '🐱 ' + t('species.cats') : '🐾 ' + s}
+                                    {s === 'perro' ? ' ' + t('species.dogs') : s === 'gato' ? ' ' + t('species.cats') : ' ' + s}
                                 </Text>
                             </View>
                         ))}

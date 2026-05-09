@@ -134,7 +134,7 @@ export default function VerifyOwnerScreen({ navigation }) {
                 onPress={() => setTargetRole('owner')}
             >
                 <View style={styles.roleCardIcon}>
-                    <Text style={{ fontSize: 36 }}>🐾</Text>
+                    <Text style={{ fontSize: 36 }}></Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -158,7 +158,7 @@ export default function VerifyOwnerScreen({ navigation }) {
                 onPress={() => setTargetRole('caregiver')}
             >
                 <View style={[styles.roleCardIcon, { backgroundColor: COLORS.secondaryLight }]}>
-                    <Text style={{ fontSize: 36 }}>🛡️</Text>
+                    <Text style={{ fontSize: 36 }}></Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -321,7 +321,7 @@ export default function VerifyOwnerScreen({ navigation }) {
     // ─────────────────────────────────────────────────
     const renderStep3 = () => (
         <View style={[styles.stepContainer, { alignItems: 'center', justifyContent: 'center', flex: 1 }]}>
-            <Text style={{ fontSize: 80, marginBottom: 20 }}>🎉</Text>
+            <Text style={{ fontSize: 80, marginBottom: 20 }}></Text>
             <Text style={styles.successTitle}>{t('verify.requestSent')}</Text>
             <Text style={styles.successDesc}>
                 {t('verify.requestSentMsg')}
@@ -358,7 +358,7 @@ export default function VerifyOwnerScreen({ navigation }) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 30 }]}>
                 <StatusBar style="dark" />
-                <Text style={{ fontSize: 60 }}>✅</Text>
+                <Text style={{ fontSize: 60 }}></Text>
                 <Text style={[styles.successTitle, { marginTop: 20 }]}>
                     {userData.role === 'caregiver' ? t('verify.alreadyCaregiver') : t('verify.alreadyOwner')}
                 </Text>

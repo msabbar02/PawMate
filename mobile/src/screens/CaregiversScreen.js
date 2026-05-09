@@ -15,7 +15,7 @@ export default function CaregiversScreen({ navigation }) {
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { user, userData } = useContext(AuthContext);
     const { t } = useTranslation();
-    const SERVICE_LABELS = { walking: '🚶 ' + t('services.walking'), hotel: '🏨 ' + t('services.hotel') };
+    const SERVICE_LABELS = { walking: ' ' + t('services.walking'), hotel: ' ' + t('services.hotel') };
     
     const [caregivers, setCaregivers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -164,7 +164,7 @@ export default function CaregiversScreen({ navigation }) {
                         {species.map(sp => (
                             <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE' }]}>
                                 <Text style={{ fontSize: 11, color: '#0891b2', fontWeight: '700' }}>
-                                    {sp === 'perro' ? '🐶 ' + t('species.dogs') : sp === 'gato' ? '🐱 ' + t('species.cats') : '🐾 ' + sp}
+                                    {sp === 'perro' ? ' ' + t('species.dogs') : sp === 'gato' ? ' ' + t('species.cats') : ' ' + sp}
                                 </Text>
                             </View>
                         ))}

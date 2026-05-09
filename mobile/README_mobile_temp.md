@@ -1,8 +1,8 @@
-# 📱 PawMate Mobile App
+# PawMate Mobile App
 
 Aplicación móvil para Android e iOS desarrollada con React Native y Expo.
 
-## 🚀 Tecnologías
+## Tecnologías
 
 - **React Native** + **Expo**
 - **React Navigation** (navegación por pestañas y stack)
@@ -12,7 +12,7 @@ Aplicación móvil para Android e iOS desarrollada con React Native y Expo.
 - AsyncStorage (almacenamiento local)
 - Expo Location (GPS tracking)
 
-## 📂 Estructura
+## Estructura
 
 ```
 mobile/
@@ -61,31 +61,31 @@ mobile/
 └── App.js                          # Punto de entrada
 ```
 
-## 🎯 Funcionalidades
+## Funcionalidades
 
-- 🔐 Autenticación con Supabase (Email/Password, Google)
-- 🐾 Gestión completa de mascotas (fotos, médico, chip, vacunas)
-- 📍 Seguimiento GPS de paseos en tiempo real
-- 🆔 Paw-Port QR biométrico de emergencia
+- Autenticación con Supabase (Email/Password, Google)
+- Gestión completa de mascotas (fotos, médico, chip, vacunas)
+- Seguimiento GPS de paseos en tiempo real
+- Paw-Port QR biométrico de emergencia
 - ⏰ Recordatorios de vacunas y citas veterinarias
-- 👥 Comunidad social con feed de fotos
-- 🏥 Historial médico completo
-- 🧑‍🍳 Cuidadores verificados con reservas y pagos (Stripe)
-- 💬 Chat entre dueños y cuidadores
-- 🌡️ Widget del clima en tiempo real
-- 📡 Radar de mascotas cercanas
-- 🌓 Dark mode / Light mode
-- 🔔 Notificaciones push (Expo)
-- 🆘 Botón SOS de emergencias
+- Comunidad social con feed de fotos
+- Historial médico completo
+- Cuidadores verificados con reservas y pagos (Stripe)
+- Chat entre dueños y cuidadores
+- Widget del clima en tiempo real
+- Radar de mascotas cercanas
+- Dark mode / Light mode
+- Notificaciones push (Expo)
+- Botón SOS de emergencias
 
-## 🔧 Instalación
+## Instalación
 
 ```bash
 cd mobile
 npm install
 ```
 
-## ▶️ Ejecutar
+## Ejecutar
 
 ```bash
 # Desarrollo con Expo
@@ -100,4 +100,4 @@ npx expo run:ios
 
 ---
 
-**Estado**: ✅ Funcional · **Última actualización**: Abril 2026
+**Estado**:  Funcional · **Última actualización**: Abril 2026
