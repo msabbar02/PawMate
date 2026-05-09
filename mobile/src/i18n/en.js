@@ -1,4 +1,4 @@
-export default {
+﻿export default {
     // ── Common ──
     common: {
         save: 'Save',

@@ -1,4 +1,4 @@
-const { Resend } = require('resend');
+﻿const { Resend } = require('resend');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /* --- Shared FROM addresses --- */
@@ -87,9 +87,9 @@ const sendWelcomeEmail = async (req, res) => {
             await sendEmail({
                 from: FROM_DEFAULT,
                 to: email,
-                subject: `¡Bienvenido a PawMate, ${name}! 🐾`,
+                subject: `¡Bienvenido a PawMate, ${name}! `,
                 html: emailLayout({
-                    icon: '🐾',
+                    icon: '',
                     title: '¡Bienvenido a PawMate!',
                     subtitle: 'Tu compañero perfecto para el cuidado de mascotas',
                     gradient: '#6366f1 0%, #8b5cf6 100%',
@@ -100,15 +100,15 @@ const sendWelcomeEmail = async (req, res) => {
       </p>
       <div style="background:#f8fafc;border-radius:16px;padding:20px;margin-bottom:24px;">
         <div style="display:flex;margin-bottom:12px;align-items:center;">
-          <span style="font-size:24px;margin-right:12px;">🔍</span>
+          <span style="font-size:24px;margin-right:12px;"></span>
           <div><strong style="color:#1e293b;">Radar de Cuidadores</strong><p style="color:#64748b;margin:4px 0 0;font-size:13px;">Encuentra cuidadores cercanos verificados</p></div>
         </div>
         <div style="display:flex;margin-bottom:12px;align-items:center;">
-          <span style="font-size:24px;margin-right:12px;">📅</span>
+          <span style="font-size:24px;margin-right:12px;"></span>
           <div><strong style="color:#1e293b;">Reservas</strong><p style="color:#64748b;margin:4px 0 0;font-size:13px;">Agenda paseos y servicios de hotel</p></div>
         </div>
         <div style="display:flex;align-items:center;">
-          <span style="font-size:24px;margin-right:12px;">🚨</span>
+          <span style="font-size:24px;margin-right:12px;"></span>
           <div><strong style="color:#1e293b;">Botón SOS</strong><p style="color:#64748b;margin:4px 0 0;font-size:13px;">Emergencias durante paseos activos</p></div>
         </div>
       </div>
@@ -178,9 +178,9 @@ const handleAuthEmail = async (req, res) => {
             await sendEmail({
                 from: FROM_DEFAULT,
                 to: user.email,
-                subject: `¡Confirma tu cuenta en PawMate, ${userName}! 🐾`,
+                subject: `¡Confirma tu cuenta en PawMate, ${userName}! `,
                 html: emailLayout({
-                    icon: '🐾', title: '¡Bienvenido a PawMate!',
+                    icon: '', title: '¡Bienvenido a PawMate!',
                     subtitle: 'Solo falta un paso para activar tu cuenta',
                     gradient: '#6366f1 0%, #8b5cf6 100%',
                     body: `
@@ -201,9 +201,9 @@ const handleAuthEmail = async (req, res) => {
             await sendEmail({
                 from: FROM_DEFAULT,
                 to: user.email,
-                subject: 'Tu enlace de acceso a PawMate 🔗',
+                subject: 'Tu enlace de acceso a PawMate ',
                 html: emailLayout({
-                    icon: '🔗', title: 'Tu enlace de acceso',
+                    icon: '', title: 'Tu enlace de acceso',
                     subtitle: 'Inicia sesión con un solo clic',
                     gradient: '#6366f1 0%, #8b5cf6 100%',
                     body: `
@@ -222,9 +222,9 @@ const handleAuthEmail = async (req, res) => {
             await sendEmail({
                 from: FROM_SUPPORT,
                 to: user.email,
-                subject: 'Confirma tu cambio de email · PawMate 🔒',
+                subject: 'Confirma tu cambio de email · PawMate ',
                 html: emailLayout({
-                    icon: '🔒', title: 'Cambio de email',
+                    icon: '', title: 'Cambio de email',
                     subtitle: 'Confirma esta acción de seguridad',
                     gradient: '#ef4444 0%, #f97316 100%',
                     body: `
@@ -234,7 +234,7 @@ const handleAuthEmail = async (req, res) => {
       <p style="color:#64748b;font-size:13px;line-height:1.6;margin:0 0 8px;">Si el botón no funciona, copia y pega este enlace:</p>
       <p style="word-break:break-all;color:#ef4444;font-size:12px;margin:0 0 16px;">${confirmUrl}</p>
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin:16px 0;">
-        <p style="color:#991b1b;font-size:13px;margin:0;"><strong>⚠️ ¿No has sido tú?</strong> Ignora este email y cambia tu contraseña.</p>
+        <p style="color:#991b1b;font-size:13px;margin:0;"><strong>¿No has sido tú?</strong> Ignora este email y cambia tu contraseña.</p>
       </div>
       ${expiryNote()}`,
                 }),
@@ -246,9 +246,9 @@ const handleAuthEmail = async (req, res) => {
                 await sendEmail({
                     from: FROM_SUPPORT,
                     to: user.new_email || user.email_change_send_to || user.email,
-                    subject: 'Confirma tu nuevo email · PawMate 🔒',
+                    subject: 'Confirma tu nuevo email · PawMate ',
                     html: emailLayout({
-                        icon: '🔒', title: 'Confirma tu nuevo email',
+                        icon: '', title: 'Confirma tu nuevo email',
                         subtitle: 'Verifica que esta dirección es tuya',
                         gradient: '#ef4444 0%, #f97316 100%',
                         body: `
@@ -268,9 +268,9 @@ const handleAuthEmail = async (req, res) => {
             await sendEmail({
                 from: FROM_SUPPORT,
                 to: user.email,
-                subject: 'Restablecer tu contraseña · PawMate 🔑',
+                subject: 'Restablecer tu contraseña · PawMate ',
                 html: emailLayout({
-                    icon: '🔑', title: 'Restablecer contraseña',
+                    icon: '', title: 'Restablecer contraseña',
                     subtitle: 'Recupera el acceso a tu cuenta',
                     gradient: '#f59e0b 0%, #f97316 100%',
                     body: `
@@ -280,7 +280,7 @@ const handleAuthEmail = async (req, res) => {
       <p style="color:#64748b;font-size:13px;line-height:1.6;margin:0 0 8px;">Si el botón no funciona, copia y pega este enlace:</p>
       <p style="word-break:break-all;color:#f59e0b;font-size:12px;margin:0 0 16px;">${confirmUrl}</p>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;margin:16px 0;">
-        <p style="color:#92400e;font-size:13px;margin:0;"><strong>🔐 Consejo:</strong> Usa una contraseña única de al menos 8 caracteres.</p>
+        <p style="color:#92400e;font-size:13px;margin:0;"><strong>Consejo:</strong> Usa una contraseña única de al menos 8 caracteres.</p>
       </div>
       ${expiryNote()}`,
                 }),
@@ -294,7 +294,7 @@ const handleAuthEmail = async (req, res) => {
                 to: user.email,
                 subject: 'Acción requerida · PawMate',
                 html: emailLayout({
-                    icon: '🐾', title: 'PawMate', subtitle: '',
+                    icon: '', title: 'PawMate', subtitle: '',
                     gradient: '#6366f1 0%, #8b5cf6 100%',
                     body: `
       <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${userName},</h2>

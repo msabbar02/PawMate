@@ -13,6 +13,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/Icon';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
@@ -26,11 +27,11 @@ import { logActivity, logSystemAction } from '../utils/logger';
 const { width } = Dimensions.get('window');
 
 const SPECIES_OPTIONS = [
-    { value: 'dog', label: 'Perro', emoji: '🐕' },
-    { value: 'cat', label: 'Gato', emoji: '🐈' },
-    { value: 'bird', label: 'Ave', emoji: '🐦' },
-    { value: 'rabbit', label: 'Conejo', emoji: '🐇' },
-    { value: 'other', label: 'Otro', emoji: '🐾' },
+    { value: 'dog', label: 'Perro', icon: 'dog' },
+    { value: 'cat', label: 'Gato', icon: 'cat' },
+    { value: 'bird', label: 'Ave', icon: 'dove' },
+    { value: 'rabbit', label: 'Conejo', icon: 'paw' },
+    { value: 'other', label: 'Otro', icon: 'paw' },
 ];
 
 Notifications.setNotificationHandler({
@@ -44,9 +45,9 @@ Notifications.setNotificationHandler({
 // ─────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────
-const getSpeciesEmoji = (species) => {
+const getSpeciesIcon = (species) => {
     const sp = SPECIES_OPTIONS.find(s => s.value === species);
-    return sp ? sp.emoji : '🐾';
+    return sp ? sp.icon : 'paw';
 };
 
 const getSpeciesLabel = (species) => {
@@ -127,6 +128,7 @@ export default function PawMatePetsCenter() {
     const [isEditing, setIsEditing] = useState(false);
     const [isPassportVisible, setIsPassportVisible] = useState(false);
     const [isReminderModalVisible, setIsReminderModalVisible] = useState(false);
+    const [isHealthModalVisible, setIsHealthModalVisible] = useState(false);
 
     // ── Form State (Extended) ────────────────────────
     const [formParams, setFormParams] = useState({ ...EMPTY_FORM });
@@ -138,6 +140,13 @@ export default function PawMatePetsCenter() {
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
+
+    // ── Health Record State ──────────────────────────
+    const [editingHealthRecord, setEditingHealthRecord] = useState(null);
+    const [healthRecordForm, setHealthRecordForm] = useState({
+        type: 'vacuna', name: '', date: new Date(), notes: '',
+    });
+    const [showHealthDatePicker, setShowHealthDatePicker] = useState(false);
 
     // ── Walk Tracking ────────────────────────────────
     const [isWalking, setIsWalking] = useState(false);
@@ -292,7 +301,7 @@ export default function PawMatePetsCenter() {
                             <h1>Paw-Port Biométrico</h1>
                             <p>Documento de Identificación y Emergencia</p>
                         </div>
-                        <div class="header-logo">🐾</div>
+                        <div class="header-logo"></div>
                     </div>
                     <div class="content">
                         <div class="avatar-section">
@@ -316,7 +325,7 @@ export default function PawMatePetsCenter() {
                             </div>
                             
                             <div class="medical-section">
-                                <h3 class="medical-title">🏥 Información Médica y Emergencias</h3>
+                                <h3 class="medical-title">Información Médica y Emergencias</h3>
                                 <div class="medical-item">
                                     <div class="medical-label">Alergias</div>
                                     <p class="medical-val">${selectedPet.allergies || 'Ninguna documentada'}</p>
@@ -429,7 +438,7 @@ export default function PawMatePetsCenter() {
             await logActivity(user?.id, 'Paseo Completado', `${totalKm} km en la saca con ${selectedPet?.name}`, 'walk', 'walk');
             await logSystemAction(user?.id, userData?.email || 'Desconocido', 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: selectedPet?.name });
 
-            Alert.alert('¡Paseo completado! 🐾', `${totalKm} km · ${calories} kcal quemadas`);
+            Alert.alert('¡Paseo completado! ', `${totalKm} km · ${calories} kcal quemadas`);
         } catch (e) {
             Alert.alert('Error', 'No se pudo guardar el paseo');
         }
@@ -444,12 +453,12 @@ export default function PawMatePetsCenter() {
             ? new Date(walk.endTime).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
             : '';
         const message =
-            `🐾 ¡${selectedPet?.name} completó un paseo con PawMate!\n\n` +
-            `📍 Distancia: ${walk.totalKm} km\n` +
-            `⏱️ Duración: ${mins} min\n` +
-            `🔥 Calorías: ${walk.calories || 0} kcal\n` +
-            `📅 ${date}\n\n` +
-            `¡Descarga PawMate y lleva el control de la salud de tus mascotas! 🐶`;
+            `¡${selectedPet?.name} completó un paseo con PawMate!\n\n` +
+            `Distancia: ${walk.totalKm} km\n` +
+            `⏱Duración: ${mins} min\n` +
+            `Calorías: ${walk.calories || 0} kcal\n` +
+            `${date}\n\n` +
+            `¡Descarga PawMate y lleva el control de la salud de tus mascotas! `;
         try {
             await Share.share({ message, title: `Paseo de ${selectedPet?.name}` });
         } catch {
@@ -463,7 +472,7 @@ export default function PawMatePetsCenter() {
     const scheduleReminder = async (title, body, triggerDate) => {
         try {
             await Notifications.scheduleNotificationAsync({
-                content: { title: `🐾 ${title}`, body: body || 'Abre PawMate', sound: true },
+                content: { title: `${title}`, body: body || 'Abre PawMate', sound: true },
                 trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
             });
             Alert.alert('Alarma lista', `Te avisaremos: "${title}"`);
@@ -543,7 +552,7 @@ export default function PawMatePetsCenter() {
                 logActivity(user?.id, 'Mascota Actualizada', `Perfil de ${dataToSave.name} editado con éxito`, 'pet', 'create-outline').catch(() => {});
                 logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_UPDATED', 'Pets', { petName: dataToSave.name }).catch(() => {});
             } else {
-                logActivity(user?.id, 'Nueva Mascota', `Damos la bienvenida a ${dataToSave.name} 🐾`, 'pet', 'paw').catch(() => {});
+                logActivity(user?.id, 'Nueva Mascota', `Damos la bienvenida a ${dataToSave.name} `, 'pet', 'paw').catch(() => {});
                 logSystemAction(user?.id, userData?.email || 'Desconocido', 'PET_CREATED', 'Pets', { petName: dataToSave.name }).catch(() => {});
             }
         } catch (e) {
@@ -699,6 +708,59 @@ export default function PawMatePetsCenter() {
         } catch { Alert.alert('Error', 'No se pudo eliminar'); }
     };
 
+    // ─────────────────────────────────────────────────
+    // HEALTH RECORD CRUD
+    // ─────────────────────────────────────────────────
+    const HEALTH_TYPES = [
+        { key: 'vacuna', label: 'Vacuna' },
+        { key: 'visita_vet', label: 'Visita veterinaria' },
+        { key: 'medicamento', label: 'Medicamento' },
+        { key: 'desparasitacion', label: 'Desparasitación' },
+        { key: 'otro', label: 'Otro' },
+    ];
+
+    const openHealthForm = (record = null) => {
+        if (record) {
+            setEditingHealthRecord(record);
+            setHealthRecordForm({
+                type: record.type || 'vacuna',
+                name: record.name || '',
+                date: record.date ? new Date(record.date) : new Date(),
+                notes: record.notes || '',
+            });
+        } else {
+            setEditingHealthRecord(null);
+            setHealthRecordForm({ type: 'vacuna', name: '', date: new Date(), notes: '' });
+        }
+        setIsHealthModalVisible(true);
+    };
+
+    const saveHealthRecord = async () => {
+        if (!healthRecordForm.name.trim()) return Alert.alert('Error', 'Escribe un nombre');
+        const data = {
+            type: healthRecordForm.type,
+            name: healthRecordForm.name.trim(),
+            date: healthRecordForm.date.toISOString(),
+            notes: healthRecordForm.notes.trim(),
+        };
+        const current = selectedPet.vaccines || [];
+        const updated = editingHealthRecord
+            ? current.map(r => r.id === editingHealthRecord.id ? { ...r, ...data } : r)
+            : [...current, { id: Date.now().toString(), ...data }];
+        try {
+            await supabase.from('pets').update({ vaccines: updated }).eq('id', selectedPet.id);
+            setIsHealthModalVisible(false);
+        } catch { Alert.alert('Error', 'No se pudo guardar el registro'); }
+    };
+
+    const deleteHealthRecord = async (id) => {
+        const filtered = (selectedPet.vaccines || []).filter(r => r.id !== id);
+        try {
+            await supabase.from('pets').update({ vaccines: filtered }).eq('id', selectedPet.id);
+            setIsHealthModalVisible(false);
+        } catch { Alert.alert('Error', 'No se pudo eliminar'); }
+    };
+
     // ═══════════════════════════════════════════════════
     // RENDER: LIST VIEW
     // ═══════════════════════════════════════════════════
@@ -714,7 +776,7 @@ export default function PawMatePetsCenter() {
 
             {pets.length === 0 ? (
                 <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={{ fontSize: 64, textAlign: 'center' }}>🐾</Text>
+                    <Text style={{ fontSize: 64, textAlign: 'center' }}></Text>
                     <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin Mascotas</Text>
                     <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
                         Añade tu primera mascota para gestionar su perfil, paseos y salud.
@@ -739,21 +801,23 @@ export default function PawMatePetsCenter() {
                             <View style={[styles.petAvatarWrap, { backgroundColor: theme.primaryBg }]}>
                                 {pet.image
                                     ? <Image source={{ uri: pet.image }} style={styles.petAvatarImg} />
-                                    : <Text style={{ fontSize: 34 }}>{getSpeciesEmoji(pet.species)}</Text>
+                                    : <Icon name={getSpeciesIcon(pet.species)} size={34} color={COLORS.primary} />
                                 }
                             </View>
 
                             {/* Info */}
                             <View style={{ flex: 1, marginLeft: 14 }}>
                                 <Text style={[styles.petCardName, { color: theme.text }]}>{pet.name}</Text>
-                                <Text style={[styles.petCardSub, { color: theme.textSecondary }]}>
-                                    {getSpeciesEmoji(pet.species)} {getSpeciesLabel(pet.species)}
-                                    {pet.breed ? ` · ${pet.breed}` : ''}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Icon name={getSpeciesIcon(pet.species)} size={12} color={theme.textSecondary} />
+                                    <Text style={[styles.petCardSub, { color: theme.textSecondary }]}>
+                                        {getSpeciesLabel(pet.species)}{pet.breed ? ` · ${pet.breed}` : ''}
+                                    </Text>
+                                </View>
                                 {pet.activity?.km > 0 && (
                                     <View style={styles.petBadge}>
                                         <Text style={styles.petBadgeText}>
-                                            🏃 {parseFloat(pet.activity.km).toFixed(1)} km
+                                            {parseFloat(pet.activity.km).toFixed(1)} km
                                         </Text>
                                     </View>
                                 )}
@@ -802,45 +866,45 @@ export default function PawMatePetsCenter() {
                 <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
                     <Text style={[styles.infoCardTitle, { color: theme.text }]}>Información General</Text>
                     <View style={styles.infoGrid}>
-                        <InfoItem label="Especie" value={`${getSpeciesEmoji(selectedPet?.species)} ${getSpeciesLabel(selectedPet?.species)}`} />
+                        <InfoItem label="Especie" value={getSpeciesLabel(selectedPet?.species)} />
                         <InfoItem label="Raza" value={selectedPet?.breed || '—'} />
-                        <InfoItem label="Sexo" value={selectedPet?.gender === 'female' ? '♀ Hembra' : '♂ Macho'} />
+                        <InfoItem label="Sexo" value={selectedPet?.gender === 'female' ? 'Hembra' : 'Macho'} />
                         <InfoItem label="Peso" value={selectedPet?.weight ? `${selectedPet.weight} kg` : '—'} />
                         {age && <InfoItem label="Edad" value={age} />}
                         {selectedPet?.birthdate && (
                             <InfoItem label="Nacimiento" value={new Date(selectedPet.birthdate).toLocaleDateString('es-ES')} />
                         )}
                         {selectedPet?.color && <InfoItem label="Color" value={selectedPet.color} />}
-                        <InfoItem label="Esterilizado" value={selectedPet?.sterilized ? '✅ Sí' : '❌ No'} />
+                        <InfoItem label="Esterilizado" value={selectedPet?.sterilized ? 'Sí' : 'No'} />
                     </View>
                 </View>
 
                 {/* Medical Data */}
                 <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>🏥 Datos Médicos</Text>
+                    <Text style={[styles.infoCardTitle, { color: theme.text }]}>Datos Médicos</Text>
                     <InfoItemFull
                         label="Nº Microchip"
                         value={selectedPet?.chipId || 'Sin microchip registrado'}
                         mono
                     />
                     {selectedPet?.allergies && (
-                        <InfoItemFull label="⚠️ Alergias" value={selectedPet.allergies} danger />
+                        <InfoItemFull label="Alergias" value={selectedPet.allergies} danger />
                     )}
                     {selectedPet?.medications && (
-                        <InfoItemFull label="💊 Medicamentos" value={selectedPet.medications} />
+                        <InfoItemFull label="Medicamentos" value={selectedPet.medications} />
                     )}
                     {selectedPet?.medicalConditions && (
-                        <InfoItemFull label="📋 Condiciones" value={selectedPet.medicalConditions} />
+                        <InfoItemFull label="Condiciones" value={selectedPet.medicalConditions} />
                     )}
                     {selectedPet?.insurance && (
-                        <InfoItemFull label="🛡️ Seguro / Póliza" value={selectedPet.insurance} />
+                        <InfoItemFull label="Seguro / Póliza" value={selectedPet.insurance} />
                     )}
                 </View>
 
                 {/* Vet Contact */}
                 {(selectedPet?.vetName || selectedPet?.vetPhone) && (
                     <View style={[styles.infoCard, { backgroundColor: theme.cardBackground }]}>
-                        <Text style={[styles.infoCardTitle, { color: theme.text }]}>🩺 Veterinario</Text>
+                        <Text style={[styles.infoCardTitle, { color: theme.text }]}>Veterinario</Text>
                         {selectedPet?.vetName && (
                             <View style={styles.vetRow}>
                                 <Ionicons name="person-outline" size={17} color={COLORS.secondary} />
@@ -905,7 +969,7 @@ export default function PawMatePetsCenter() {
                     isWalking ? (
                         <View style={[styles.walkBanner, { backgroundColor: COLORS.danger }]}>
                             <View>
-                                <Text style={styles.walkBannerTitle}>🏃 Paseo en Curso</Text>
+                                <Text style={styles.walkBannerTitle}>Paseo en Curso</Text>
                                 <Text style={styles.walkBannerRunning}>
                                     {walkDistance.toFixed(2)} km  ·  {formatDuration(walkTimer)}
                                 </Text>
@@ -948,7 +1012,7 @@ export default function PawMatePetsCenter() {
                 {/* Walks List */}
                 {walks.length === 0 ? (
                     <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, marginTop: 0 }]}>
-                        <Text style={{ fontSize: 52, textAlign: 'center' }}>🗺️</Text>
+                        <Text style={{ fontSize: 52, textAlign: 'center' }}></Text>
                         <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin Paseos</Text>
                         <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
                             Los paseos con GPS aparecerán aquí con mapa, distancia y calorías.
@@ -1053,7 +1117,7 @@ export default function PawMatePetsCenter() {
 
                 {!isDog && (
                     <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, marginTop: 0 }]}>
-                        <Text style={{ fontSize: 48, textAlign: 'center' }}>🐾</Text>
+                        <Text style={{ fontSize: 48, textAlign: 'center' }}></Text>
                         <Text style={[styles.emptyTitle, { color: theme.text }]}>Solo para perros</Text>
                         <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
                             El seguimiento GPS de paseos está disponible para perros.
@@ -1069,8 +1133,9 @@ export default function PawMatePetsCenter() {
     // ═══════════════════════════════════════════════════
     const renderHealthTab = () => (
         <View>
+            {/* ── SECTION: RECORDATORIOS ── */}
             <View style={[styles.listHeaderRow, { paddingHorizontal: 2 }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>📅 Recordatorios</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Recordatorios</Text>
                 <TouchableOpacity
                     style={[styles.addBtn, { width: 34, height: 34, borderRadius: 17 }]}
                     onPress={() => openReminderForm()}
@@ -1082,7 +1147,7 @@ export default function PawMatePetsCenter() {
             <View style={[styles.agendaCard, { backgroundColor: theme.cardBackground }]}>
                 {(!selectedPet?.reminders || selectedPet.reminders.length === 0) ? (
                     <View style={{ padding: 30, alignItems: 'center' }}>
-                        <Text style={{ fontSize: 44 }}>🔔</Text>
+                        <Text style={{ fontSize: 44 }}></Text>
                         <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Sin recordatorios activos.</Text>
                         <TouchableOpacity onPress={() => openReminderForm()} style={{ marginTop: 10 }}>
                             <Text style={{ color: theme.primary, fontWeight: '700' }}>+ Añadir recordatorio</Text>
@@ -1111,6 +1176,62 @@ export default function PawMatePetsCenter() {
                             </View>
                         </TouchableOpacity>
                     ))
+                )}
+            </View>
+
+            {/* ── SECTION: HISTORIAL DE SALUD ── */}
+            <View style={[styles.listHeaderRow, { paddingHorizontal: 2, marginTop: 24 }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Historial de Salud</Text>
+                <TouchableOpacity
+                    style={[styles.addBtn, { width: 34, height: 34, borderRadius: 17 }]}
+                    onPress={() => openHealthForm()}
+                >
+                    <Ionicons name="add" size={16} color="#FFF" />
+                </TouchableOpacity>
+            </View>
+
+            <View style={[styles.agendaCard, { backgroundColor: theme.cardBackground }]}>
+                {(!selectedPet?.vaccines || selectedPet.vaccines.length === 0) ? (
+                    <View style={{ padding: 30, alignItems: 'center' }}>
+                        <Icon name="heart-pulse" size={44} color={theme.textSecondary} />
+                        <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>Sin registros de salud.</Text>
+                        <TouchableOpacity onPress={() => openHealthForm()} style={{ marginTop: 10 }}>
+                            <Text style={{ color: theme.primary, fontWeight: '700' }}>+ Añadir registro</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    [...selectedPet.vaccines]
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .map((rec, i, arr) => {
+                            const typeIconNames = {
+                                vacuna: 'syringe', visita_vet: 'stethoscope', medicamento: 'pills',
+                                desparasitacion: 'bug', otro: 'notes-medical',
+                            };
+                            return (
+                                <TouchableOpacity
+                                    key={rec.id}
+                                    style={[styles.agendaItem, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                                    onPress={() => openHealthForm(rec)}
+                                >
+                                    <View style={styles.agendaIconBox}>
+                                        <Icon name={typeIconNames[rec.type] || 'notes-medical'} size={16} color={COLORS.primary} />
+                                    </View>
+                                    <View style={styles.agendaTextWrap}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text style={styles.agendaTitle}>{rec.name}</Text>
+                                            <Text style={styles.agendaDate}>
+                                                {rec.date
+                                                    ? new Date(rec.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })
+                                                    : ''}
+                                            </Text>
+                                        </View>
+                                        {rec.notes ? (
+                                            <Text style={styles.agendaDesc}>{rec.notes}</Text>
+                                        ) : null}
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
                 )}
             </View>
         </View>
@@ -1146,7 +1267,7 @@ export default function PawMatePetsCenter() {
                         <View style={styles.heroAvatarInner}>
                             {selectedPet.image
                                 ? <Image source={{ uri: selectedPet.image }} style={styles.heroAvatarImg} />
-                                : <Text style={{ fontSize: 60 }}>{getSpeciesEmoji(selectedPet.species)}</Text>
+                                : <Icon name={getSpeciesIcon(selectedPet.species)} size={60} color={COLORS.primary} />
                             }
                         </View>
                     </View>
@@ -1156,11 +1277,11 @@ export default function PawMatePetsCenter() {
 
                     {/* Badges */}
                     <View style={styles.heroBadgesRow}>
-                        <Badge label={`${getSpeciesEmoji(selectedPet.species)} ${getSpeciesLabel(selectedPet.species)}`} color="amber" />
+                        <Badge label={getSpeciesLabel(selectedPet.species)} color="amber" />
                         {selectedPet.breed && <Badge label={selectedPet.breed} color="blue" />}
                         {age && <Badge label={age} color="green" />}
                         {selectedPet.gender && (
-                            <Badge label={selectedPet.gender === 'female' ? '♀ Hembra' : '♂ Macho'} color="purple" />
+                            <Badge label={selectedPet.gender === 'female' ? 'Hembra' : 'Macho'} color="purple" />
                         )}
                     </View>
 
@@ -1179,9 +1300,9 @@ export default function PawMatePetsCenter() {
                 {/* ── TAB BAR ────────────────────────────── */}
                 <View style={[styles.tabBar, { backgroundColor: theme.cardBackground }]}>
                     {[
-                        { key: 'profile', label: '🐾 Perfil' },
-                        { key: 'walks', label: '🗺️ Paseos' },
-                        { key: 'health', label: '🏥 Salud' },
+                        { key: 'profile', label: 'Perfil' },
+                        { key: 'walks', label: 'Paseos' },
+                        { key: 'health', label: 'Salud' },
                     ].map(tab => (
                         <TouchableOpacity
                             key={tab.key}
@@ -1257,7 +1378,7 @@ export default function PawMatePetsCenter() {
                             <Ionicons name="chevron-back" size={24} color="#FFF" />
                         </TouchableOpacity>
                         <View style={wizStyles.headerCenter}>
-                            <Text style={wizStyles.brandText}>🐾 PawMate</Text>
+                            <Text style={wizStyles.brandText}>PawMate</Text>
                             <Text style={wizStyles.stepCounter}>{wizardStep + 1}/{TOTAL_STEPS}</Text>
                         </View>
                         <TouchableOpacity onPress={() => { setIsFormVisible(false); resetForm(); }}>
@@ -1282,7 +1403,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 0: PHOTO ── */}
                             {WIZARD_STEPS[wizardStep] === 'photo' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepEmoji}>📸</Text>
+                                    <Text style={wizStyles.stepEmoji}></Text>
                                     <Text style={wizStyles.stepTitle}>
                                         {isEditing ? 'Actualiza las fotos' : 'Añade fotos'}
                                     </Text>
@@ -1311,7 +1432,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 1: NAME ── */}
                             {WIZARD_STEPS[wizardStep] === 'name' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepEmoji}>✏️</Text>
+                                    <Text style={wizStyles.stepEmoji}></Text>
                                     <Text style={wizStyles.stepTitle}>¿Cómo se llama?</Text>
                                     <Text style={wizStyles.stepDesc}>Escribe el nombre de tu mascota</Text>
                                     <TextInput
@@ -1344,7 +1465,7 @@ export default function PawMatePetsCenter() {
                                                     wizStyles.speciesIconWrap,
                                                     formParams.species === sp.value && { borderColor: '#F5A623', borderWidth: 3 }
                                                 ]}>
-                                                    <Text style={{ fontSize: 40 }}>{sp.emoji}</Text>
+                                                    <Icon name={sp.icon} size={40} color={formParams.species === sp.value ? '#F5A623' : COLORS.primary} />
                                                 </View>
                                                 <Text style={[
                                                     wizStyles.speciesLabel,
@@ -1359,7 +1480,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 3: BREED ── */}
                             {WIZARD_STEPS[wizardStep] === 'breed' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepEmoji}>{getSpeciesEmoji(formParams.species)}</Text>
+                                    <Icon name={getSpeciesIcon(formParams.species)} size={60} color={COLORS.primary} />
                                     <Text style={wizStyles.stepTitle}>¿Cuál es su raza?</Text>
                                     <Text style={wizStyles.stepDesc}>Escribe la raza de tu {getSpeciesLabel(formParams.species).toLowerCase()}</Text>
                                     <TextInput
@@ -1409,7 +1530,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 5: DETAILS ── */}
                             {WIZARD_STEPS[wizardStep] === 'details' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepEmoji}>📋</Text>
+                                    <Text style={wizStyles.stepEmoji}></Text>
                                     <Text style={wizStyles.stepTitle}>Detalles adicionales</Text>
                                     <Text style={wizStyles.stepDesc}>Estos datos son opcionales</Text>
 
@@ -1448,7 +1569,7 @@ export default function PawMatePetsCenter() {
                                             onPress={() => setFormParams(p => ({ ...p, sterilized: !p.sterilized }))}
                                         >
                                             <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
-                                                {formParams.sterilized ? '✅ Sí' : '❌ No'}
+                                                {formParams.sterilized ? 'Sí' : 'No'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -1458,7 +1579,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 6: MEDICAL ── */}
                             {WIZARD_STEPS[wizardStep] === 'medical' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepEmoji}>🏥</Text>
+                                    <Text style={wizStyles.stepEmoji}></Text>
                                     <Text style={wizStyles.stepTitle}>Datos médicos</Text>
                                     <Text style={wizStyles.stepDesc}>Información importante de salud (opcional)</Text>
 
@@ -1471,7 +1592,7 @@ export default function PawMatePetsCenter() {
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>⚠️ Alergias</Text>
+                                    <Text style={wizStyles.fieldLabel}>Alergias</Text>
                                     <TextInput
                                         style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
                                         multiline
@@ -1481,7 +1602,7 @@ export default function PawMatePetsCenter() {
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>💊 Medicamentos actuales</Text>
+                                    <Text style={wizStyles.fieldLabel}>Medicamentos actuales</Text>
                                     <TextInput
                                         style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
                                         multiline
@@ -1491,7 +1612,7 @@ export default function PawMatePetsCenter() {
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>📋 Condiciones médicas</Text>
+                                    <Text style={wizStyles.fieldLabel}>Condiciones médicas</Text>
                                     <TextInput
                                         style={[wizStyles.wizardInput, { height: 70, textAlignVertical: 'top', paddingTop: 14 }]}
                                         multiline
@@ -1501,7 +1622,7 @@ export default function PawMatePetsCenter() {
                                         placeholderTextColor="rgba(255,255,255,0.3)"
                                     />
 
-                                    <Text style={wizStyles.fieldLabel}>🛡️ Nº Seguro / Póliza</Text>
+                                    <Text style={wizStyles.fieldLabel}>Nº Seguro / Póliza</Text>
                                     <TextInput
                                         style={wizStyles.wizardInput}
                                         value={formParams.insurance}
@@ -1515,7 +1636,7 @@ export default function PawMatePetsCenter() {
                             {/* ── STEP 7: VET ── */}
                             {WIZARD_STEPS[wizardStep] === 'vet' && (
                                 <View style={wizStyles.stepContainer}>
-                                    <Text style={wizStyles.stepEmoji}>🩺</Text>
+                                    <Text style={wizStyles.stepEmoji}></Text>
                                     <Text style={wizStyles.stepTitle}>Veterinario</Text>
                                     <Text style={wizStyles.stepDesc}>Datos de contacto del veterinario (opcional)</Text>
 
@@ -1568,7 +1689,7 @@ export default function PawMatePetsCenter() {
                             ) : (
                                 <TouchableOpacity style={wizStyles.saveBtn} onPress={handleSavePet}>
                                     <Text style={wizStyles.saveBtnText}>
-                                        {isEditing ? '✅ Guardar Cambios' : '🐾 Registrar Mascota'}
+                                        {isEditing ? 'Guardar Cambios' : 'Registrar Mascota'}
                                     </Text>
                                 </TouchableOpacity>
                             )}
@@ -1609,19 +1730,19 @@ export default function PawMatePetsCenter() {
                         <View style={styles.qrInfoGrid}>
                             {selectedPet?.allergies && (
                                 <View style={styles.qrInfoRow}>
-                                    <Text style={styles.qrInfoKey}>⚠️ Alergias</Text>
+                                    <Text style={styles.qrInfoKey}>Alergias</Text>
                                     <Text style={styles.qrInfoVal}>{selectedPet.allergies}</Text>
                                 </View>
                             )}
                             {selectedPet?.vetPhone && (
                                 <View style={styles.qrInfoRow}>
-                                    <Text style={styles.qrInfoKey}>🩺 Vet</Text>
+                                    <Text style={styles.qrInfoKey}>Vet</Text>
                                     <Text style={styles.qrInfoVal}>{selectedPet.vetPhone}</Text>
                                 </View>
                             )}
                             {selectedPet?.medications && (
                                 <View style={styles.qrInfoRow}>
-                                    <Text style={styles.qrInfoKey}>💊 Medicación</Text>
+                                    <Text style={styles.qrInfoKey}>Medicación</Text>
                                     <Text style={styles.qrInfoVal}>{selectedPet.medications}</Text>
                                 </View>
                             )}
@@ -1750,6 +1871,110 @@ export default function PawMatePetsCenter() {
                             >
                                 <Text style={[styles.submitText, { color: COLORS.danger }]}>
                                     Eliminar Recordatorio
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        <View style={{ height: 60 }} />
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* ── MODAL: HISTORIAL DE SALUD ─────────── */}
+            <Modal visible={isHealthModalVisible} animationType="slide" presentationStyle="pageSheet">
+                <KeyboardAvoidingView
+                    style={{ flex: 1, backgroundColor: theme.background }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <View style={[styles.formHeader, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
+                        <Text style={[styles.formTitle, { color: theme.text }]}>
+                            {editingHealthRecord ? 'Editar Registro' : 'Nuevo Registro de Salud'}
+                        </Text>
+                        <TouchableOpacity onPress={() => setIsHealthModalVisible(false)}>
+                            <Ionicons name="close" size={24} color={theme.text} />
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView style={[styles.formBody, { backgroundColor: theme.background }]}>
+                        <FormLabel text="Tipo de registro" />
+                        <View style={{ borderWidth: 1.5, borderColor: theme.border, borderRadius: 14, overflow: 'hidden', backgroundColor: theme.cardBackground, marginBottom: 16 }}>
+                            <Picker
+                                selectedValue={healthRecordForm.type}
+                                onValueChange={v => setHealthRecordForm(r => ({ ...r, type: v }))}
+                                style={{ color: theme.text }}
+                                itemStyle={{ color: theme.text, fontSize: 16 }}
+                            >
+                                <Picker.Item label="Vacuna" value="vacuna" />
+                                <Picker.Item label="Visita veterinaria" value="visita_vet" />
+                                <Picker.Item label="Medicamento" value="medicamento" />
+                                <Picker.Item label="Desparasitación" value="desparasitacion" />
+                                <Picker.Item label="Otro" value="otro" />
+                            </Picker>
+                        </View>
+
+                        <FormLabel text="Nombre / descripción breve" />
+                        <TextInput
+                            style={[styles.input, { backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
+                            value={healthRecordForm.name}
+                            onChangeText={v => setHealthRecordForm(r => ({ ...r, name: v }))}
+                            placeholder="Ej. Vacuna Rabia, Revisión anual..."
+                            placeholderTextColor={theme.textSecondary}
+                        />
+
+                        <FormLabel text="Fecha" />
+                        {Platform.OS === 'ios' ? (
+                            <DateTimePicker
+                                value={healthRecordForm.date}
+                                mode="date"
+                                display="spinner"
+                                textColor={COLORS.text}
+                                themeVariant="light"
+                                onChange={(_, date) => { if (date) setHealthRecordForm(r => ({ ...r, date })); }}
+                                style={{ height: 120, marginLeft: -10 }}
+                            />
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.input, { justifyContent: 'center' }]}
+                                onPress={() => setShowHealthDatePicker(true)}
+                            >
+                                <Text style={{ color: theme.text, fontWeight: '600' }}>
+                                    {healthRecordForm.date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        {showHealthDatePicker && Platform.OS === 'android' && (
+                            <DateTimePicker
+                                value={healthRecordForm.date}
+                                mode="date"
+                                display="default"
+                                onChange={(_, date) => {
+                                    setShowHealthDatePicker(false);
+                                    if (date) setHealthRecordForm(r => ({ ...r, date }));
+                                }}
+                            />
+                        )}
+
+                        <FormLabel text="Notas (opcional)" />
+                        <TextInput
+                            style={[styles.input, { height: 80, textAlignVertical: 'top', paddingTop: 12, backgroundColor: theme.cardBackground, borderColor: theme.border, color: theme.text }]}
+                            multiline
+                            value={healthRecordForm.notes}
+                            onChangeText={v => setHealthRecordForm(r => ({ ...r, notes: v }))}
+                            placeholder="Dosis, próxima cita, observaciones..."
+                            placeholderTextColor={theme.textSecondary}
+                        />
+
+                        <TouchableOpacity style={styles.submitBtn} onPress={saveHealthRecord}>
+                            <Text style={styles.submitText}>
+                                {editingHealthRecord ? 'Guardar Cambios' : 'Añadir Registro'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {editingHealthRecord && (
+                            <TouchableOpacity
+                                style={[styles.submitBtn, { backgroundColor: '#ffebee', marginTop: 12 }]}
+                                onPress={() => deleteHealthRecord(editingHealthRecord.id)}
+                            >
+                                <Text style={[styles.submitText, { color: COLORS.danger }]}>
+                                    Eliminar Registro
                                 </Text>
                             </TouchableOpacity>
                         )}

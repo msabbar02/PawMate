@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
@@ -21,9 +21,9 @@ try {
         message: { success: false, message: 'Too many requests, please try again later.' },
         skip: (req) => req.path === '/api/health', // health check is unlimited
     });
-    console.log('✅ Rate limiting enabled');
+    console.log('Rate limiting enabled');
 } catch {
-    console.warn('⚠️  express-rate-limit not installed — rate limiting disabled');
+    console.warn(' express-rate-limit not installed — rate limiting disabled');
 }
 
 // ── CORS ───────────────────────────────────────────────────────────────────
@@ -67,8 +67,8 @@ app.use(errorHandler);
 // Start server (only in non-serverless environments)
 if (process.env.VERCEL !== '1') {
     app.listen(PORT, () => {
-        console.log(`🚀 PawMate API server running on port ${PORT}`);
-        console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+        console.log(`PawMate API server running on port ${PORT}`);
+        console.log(`Health check: http://localhost:${PORT}/api/health`);
     });
 }
 

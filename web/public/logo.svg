@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 300" fill="none">
+  <!-- House / badge shape -->
+  <path d="M130 14 L222 68 L222 188 Q222 210 200 210 L60 210 Q38 210 38 188 L38 68 Z" fill="#F5A623"/>
+
+  <!-- DOG silhouette (white, left, facing right) -->
+  <!-- Head -->
+  <circle cx="100" cy="125" r="38" fill="white"/>
+  <!-- Floppy ear -->
+  <ellipse cx="72" cy="98" rx="16" ry="28" fill="white" transform="rotate(18 72 98)"/>
+  <!-- Muzzle -->
+  <ellipse cx="132" cy="138" rx="22" ry="15" fill="white"/>
+  <!-- Eye (orange cutout) -->
+  <circle cx="104" cy="112" r="7" fill="#F5A623"/>
+  <!-- Nose (orange cutout) -->
+  <ellipse cx="150" cy="133" rx="7" ry="6" fill="#F5A623"/>
+
+  <!-- CAT silhouette (white, right, facing left) -->
+  <!-- Head -->
+  <ellipse cx="172" cy="148" rx="32" ry="34" fill="white"/>
+  <!-- Ear left -->
+  <polygon points="148,130 142,103 166,124" fill="white"/>
+  <!-- Ear right -->
+  <polygon points="196,130 202,103 178,124" fill="white"/>
+  <!-- Eye (orange cutout) -->
+  <ellipse cx="163" cy="142" rx="5" ry="7" fill="#F5A623"/>
+  <!-- Nose bridge area (to naturally separate from dog) -->
+  <ellipse cx="150" cy="155" rx="10" ry="8" fill="white"/>
+
+  <!-- PawMate wordmark -->
+  <text
+    x="130" y="272"
+    text-anchor="middle"
+    font-family="'Arial Black', 'Arial Bold', Arial, sans-serif"
+    font-weight="900"
+    font-size="44"
+    letter-spacing="-1"
+    fill="#F5A623"
+  >PawMate</text>
+
+  <!-- Diamond mark (bottom right, brand detail) -->
+  <polygon points="248,292 256,300 248,308 240,300" fill="#F5A623" opacity="0.5"/>
+</svg>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -172,7 +172,7 @@ export default function UserDetailPage() {
                             <div className="detail-row"><span className="label">Radio servicio</span><span className="value">{user.serviceRadius ? `${user.serviceRadius} km` : '-'}</span></div>
                             <div className="detail-row"><span className="label">Max paseos simultáneos</span><span className="value">{user.maxConcurrentWalks || '-'}</span></div>
                             <div className="detail-row"><span className="label">Max hotel simultáneos</span><span className="value">{user.maxConcurrentHotel || '-'}</span></div>
-                            <div className="detail-row"><span className="label">Rating</span><span className="value">{user.rating ? `${user.rating} ⭐ (${user.reviewCount || 0})` : '-'}</span></div>
+                            <div className="detail-row"><span className="label">Rating</span><span className="value">{user.rating ? `${user.rating} (${user.reviewCount || 0})` : '-'}</span></div>
                             <div className="detail-row"><span className="label">Total paseos</span><span className="value">{user.totalWalks || 0}</span></div>
                             <div className="detail-row"><span className="label">Distancia total</span><span className="value">{user.totalDistance ? `${user.totalDistance} km` : '-'}</span></div>
                         </div>

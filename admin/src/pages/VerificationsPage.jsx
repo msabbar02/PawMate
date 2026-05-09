@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShieldHalved, faClock, faXmark, faEye, faUserCheck, faRotateLeft, faFileImage } from '@fortawesome/free-solid-svg-icons';
@@ -204,7 +204,7 @@ export default function VerificationsPage() {
                                     <span className="email">{req.email}</span>
                                 </div>
                                 <span className={`role-badge ${req.pendingRole || 'owner'}`}>
-                                    {req.pendingRole === 'caregiver' ? `🛡️ ${t('verifications.roleCaregiver')}` : `🐾 ${t('verifications.roleOwner')}`}
+                                    {req.pendingRole === 'caregiver' ? `${t('verifications.roleCaregiver')}` : `${t('verifications.roleOwner')}`}
                                 </span>
                             </div>
 
@@ -236,7 +236,7 @@ export default function VerificationsPage() {
                             {/* Meta chips */}
                             <div className="card-meta">
                                 <span className={`status-badge ${req.verificationStatus}`}>
-                                    {req.verificationStatus === 'pending' ? `⏳ ${t('verifications.statusPending')}` : req.verificationStatus === 'approved' ? `✅ ${t('verifications.statusApproved')}` : `❌ ${t('verifications.statusRejected')}`}
+                                    {req.verificationStatus === 'pending' ? `⏳ ${t('verifications.statusPending')}` : req.verificationStatus === 'approved' ? `${t('verifications.statusApproved')}` : `${t('verifications.statusRejected')}`}
                                 </span>
                                 <span className="meta-chip">
                                     <FontAwesomeIcon icon={faClock} style={{ fontSize: 12 }} /> {formatDate(req.verificationRequestedAt)}

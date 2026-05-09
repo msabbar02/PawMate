@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -204,8 +204,7 @@ function Navbar() {
     >
       <div className="navbar-inner">
         <div className="nav-logo" onClick={() => scrollTo('hero')}>
-          <span className="logo-icon">🐾</span>
-          <span className="logo-text">PawMate</span>
+          <img src="/logo.svg" alt="PawMate" style={{ height: 38, width: 'auto', objectFit: 'contain' }} />
         </div>
         <ul className="nav-links">
           {links.map(([label, id]) => (
@@ -520,7 +519,7 @@ function Footer() {
       <div className="container">
         <div className="footer-content">
           <div className="footer-brand">
-            <div className="nav-logo"><span className="logo-icon">🐾</span><span className="logo-text">PawMate</span></div>
+            <div className="nav-logo"><span className="logo-icon"></span><span className="logo-text">PawMate</span></div>
             <p>{t('footer.desc')}</p>
           </div>
         </div>

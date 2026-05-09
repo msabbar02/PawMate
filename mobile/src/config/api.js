@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+﻿import { supabase } from './supabase';
 
 // Base URL del backend PawMate. En producción usa tu URL real.
 // En Android emulador usa http://10.0.2.2:3000 en lugar de localhost.

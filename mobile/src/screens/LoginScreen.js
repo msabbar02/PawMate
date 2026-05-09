@@ -12,6 +12,8 @@ import {
     Dimensions,
     ScrollView,
     Alert,
+    Linking,
+    Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from '../components/Icon';
@@ -161,23 +163,8 @@ export default function LoginScreen({ navigation }) {
         }
     };
 
-    const handleResetPassword = async () => {
-        if (!formData.email.trim()) {
-            setErrors({ email: t('login.forgotPasswordPrompt') });
-            return;
-        }
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-                redirectTo: 'https://apppawmate.com/reset-password',
-            });
-            if (error) throw error;
-            Alert.alert(t('login.linkSent'), t('login.checkEmail'));
-        } catch (error) {
-            Alert.alert(t('common.error'), error.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleResetPassword = () => {
+        Linking.openURL('https://apppawmate.com/reset-password');
     };
 
     const handleGoogleLogin = async () => {
@@ -243,22 +230,7 @@ export default function LoginScreen({ navigation }) {
         }
     };
 
-    const handleMagicLink = async () => {
-        if (!formData.email.trim()) {
-            setErrors({ email: t('login.magicLinkPrompt') });
-            return;
-        }
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
-            if (error) throw error;
-            Alert.alert(t('login.magicLinkSent'), t('login.magicLinkCheck'));
-        } catch (error) {
-            Alert.alert(t('common.error'), error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+
 
     return (
         <KeyboardAvoidingView
@@ -280,7 +252,7 @@ export default function LoginScreen({ navigation }) {
 
                         <View style={styles.header}>
                             <View style={styles.logoContainer}>
-                                <Icon name="paw" size={40} color={COLORS.background} />
+                                <Image source={require('../../assets/logo-small.png')} style={{ width: 56, height: 56, borderRadius: 12 }} resizeMode="contain" />
                             </View>
                             <Text style={styles.title}>{t('login.title')}</Text>
                             <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
@@ -371,18 +343,6 @@ export default function LoginScreen({ navigation }) {
                                 )}
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={[styles.submitButton, { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.primary, marginTop: 12 }]}
-                                onPress={handleMagicLink}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color={COLORS.primary} />
-                                ) : (
-                                    <Text style={[styles.submitButtonText, { color: COLORS.primary }]}>{t('login.sendMagicLink')}</Text>
-                                )}
-                            </TouchableOpacity>
-
                             <View style={styles.switchFlow}>
                                 <Text style={styles.switchText}>{t('login.noAccount')} </Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
@@ -424,7 +384,7 @@ const styles = StyleSheet.create({
     decorativeCircle2: { position: 'absolute', bottom: -140, left: -80, width: 350, height: 350, borderRadius: 175, backgroundColor: COLORS.primaryLight, opacity: 0.06 },
     glassCard: { width: '100%', maxWidth: 420, backgroundColor: COLORS.background, borderRadius: 28, padding: 28, shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 12 }, shadowRadius: 24, elevation: 12 },
     header: { alignItems: 'center', marginBottom: 32 },
-    logoContainer: { width: 76, height: 76, backgroundColor: COLORS.primary, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: COLORS.primary, shadowOpacity: 0.35, shadowOffset: { width: 0, height: 6 }, shadowRadius: 14, elevation: 10 },
+    logoContainer: { width: 76, height: 76, backgroundColor: 'transparent', borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
     title: { fontSize: 28, fontWeight: '800', color: COLORS.secondary, letterSpacing: -0.5 },
     subtitle: { fontSize: 14, color: COLORS.textLight, marginTop: 6, fontWeight: '500' },
     formContainer: { width: '100%' },

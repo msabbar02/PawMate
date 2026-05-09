@@ -1,4 +1,4 @@
-const stripe = process.env.STRIPE_SECRET_KEY
+﻿const stripe = process.env.STRIPE_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_SECRET_KEY)
     : null;
 
@@ -152,7 +152,7 @@ const handleStripeWebhook = async (req, res) => {
                         })
                         .eq('id', reservationId)
                         .in('paymentStatus', ['processing', 'pending']); // only update if not already paid
-                    console.log(`✅ Payment confirmed for reservation ${reservationId}`);
+                    console.log(`Payment confirmed for reservation ${reservationId}`);
                 }
                 break;
             }
@@ -164,7 +164,7 @@ const handleStripeWebhook = async (req, res) => {
                     await supabase.from('reservations')
                         .update({ paymentStatus: 'failed' })
                         .eq('id', reservationId);
-                    console.warn(`❌ Payment failed for reservation ${reservationId}`);
+                    console.warn(`Payment failed for reservation ${reservationId}`);
                 }
                 break;
             }

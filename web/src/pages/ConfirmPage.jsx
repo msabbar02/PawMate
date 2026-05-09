@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleCheck, faArrowRight, faMobileScreenButton } from '@fortawesome/free-solid-svg-icons';
@@ -24,7 +24,7 @@ export default function ConfirmPage() {
           <FontAwesomeIcon icon={faCircleCheck} style={{ fontSize: 64 }} className="confirm-check-icon" />
         </div>
 
-        <div className="confirm-paw">🐾</div>
+        <div className="confirm-paw"></div>
 
         <h1 className="confirm-title">{t('confirm.title')}</h1>
         <p className="confirm-desc" dangerouslySetInnerHTML={{ __html: t('confirm.desc1') + '<br/>' + t('confirm.desc2') }} />

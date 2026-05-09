@@ -16,11 +16,11 @@ import { COLORS } from '../constants/colors';
 
 // ── Badge tiers ──────────────────────────────────────────────
 const BADGE_TIERS = [
-    { min: 0,  label: 'Bronce',   emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
-    { min: 5,  label: 'Plata',    emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
-    { min: 20, label: 'Oro',      emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
-    { min: 50, label: 'Platino',  emoji: '💎', color: '#0ea5e9', bg: '#E0F2FE' },
-    { min: 100,label: 'Leyenda',  emoji: '👑', color: '#8B5CF6', bg: '#EDE9FE' },
+    { min: 0,  label: 'Bronce',   emoji: '', color: '#CD7F32', bg: '#FDF2E9' },
+    { min: 5,  label: 'Plata',    emoji: '', color: '#9CA3AF', bg: '#F3F4F6' },
+    { min: 20, label: 'Oro',      emoji: '', color: '#F5A623', bg: '#FEF3C7' },
+    { min: 50, label: 'Platino',  emoji: '', color: '#0ea5e9', bg: '#E0F2FE' },
+    { min: 100,label: 'Leyenda',  emoji: '', color: '#8B5CF6', bg: '#EDE9FE' },
 ];
 
 function getBadge(completedCount) {
@@ -38,7 +38,7 @@ function getNextBadge(completedCount) {
     return null;
 }
 
-const SERVICE_LABELS = { walking: '🚶 Paseo', hotel: '🏨 Hotel' };
+const SERVICE_LABELS = { walking: 'Paseo', hotel: 'Hotel' };
 
 export default function CaregiverDashboardScreen({ navigation }) {
     const { user, userData, refreshUserData, updateUserOptimistic } = useContext(AuthContext);
@@ -117,7 +117,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
             await supabase.from('users').update({ galleryPhotos: updatedPhotos }).eq('id', user.id);
             setPhotos(updatedPhotos);
             if (refreshUserData) refreshUserData();
-            Alert.alert('✅ Foto guardada', 'La foto se ha añadido a tu galería correctamente.');
+            Alert.alert('Foto guardada', 'La foto se ha añadido a tu galería correctamente.');
         } catch (e) {
             Alert.alert('Error', 'No se pudo subir la foto.');
         } finally {
@@ -163,7 +163,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
     // Emergency: send location to all active booking owners
     const handleEmergency = async () => {
         Alert.alert(
-            '🚨 Emergencia',
+            'Emergencia',
             'Se enviará tu ubicación exacta a todos los dueños con reserva activa. ¿Continuar?',
             [
                 { text: 'Cancelar', style: 'cancel' },
@@ -183,7 +183,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                 if (res.ownerId) {
                                     await createNotification(res.ownerId, {
                                         type: 'emergency_location',
-                                        title: '🚨 Alerta del cuidador',
+                                        title: 'Alerta del cuidador',
                                         body: `${userData?.fullName || 'El cuidador'} ha enviado una alerta de emergencia. Toca para ver su ubicación.`,
                                         icon: 'warning-outline',
                                         iconBg: '#FEE2E2',
@@ -193,7 +193,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                                     });
                                 }
                             }
-                            Alert.alert('✅ Enviado', 'Los dueños han recibido tu ubicación.');
+                            Alert.alert('Enviado', 'Los dueños han recibido tu ubicación.');
                         } catch (e) {
                             Alert.alert('Error', 'No se pudo enviar la ubicación.');
                         }
@@ -295,7 +295,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
                         </>
                     ) : (
                         <Text style={[s.progressText, { color: badge.color, fontWeight: '800', marginTop: 8 }]}>
-                            🏆 ¡Has alcanzado el nivel máximo!
+                            ¡Has alcanzado el nivel máximo!
                         </Text>
                     )}
                 </View>

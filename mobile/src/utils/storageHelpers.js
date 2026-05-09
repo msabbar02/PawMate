@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+﻿import { supabase } from '../config/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 

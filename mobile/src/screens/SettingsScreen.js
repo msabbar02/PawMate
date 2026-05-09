@@ -113,9 +113,9 @@ export default function SettingsScreen({ navigation }) {
 
 
     const ROLE_CONFIG = {
-        normal:    { label: 'Usuario',             emoji: '👤', color: '#6B7280' },
-        owner:     { label: 'Dueño Verificado',    emoji: '🐾', color: theme.primary },
-        caregiver: { label: 'Cuidador Verificado', emoji: '🛡️', color: '#0891b2' },
+        normal:    { label: 'Usuario',             emoji: '', color: '#6B7280' },
+        owner:     { label: 'Dueño Verificado',    emoji: '', color: theme.primary },
+        caregiver: { label: 'Cuidador Verificado', emoji: '', color: '#0891b2' },
     };
     const role = ROLE_CONFIG[userData?.role] || ROLE_CONFIG.normal;
 
@@ -217,7 +217,7 @@ export default function SettingsScreen({ navigation }) {
             if (updateError) throw updateError;
             setShowPasswordModal(false);
             setOldPass(''); setNewPass(''); setConfirmPass('');
-            Alert.alert('✅ Contraseña actualizada');
+            Alert.alert('Contraseña actualizada');
         } catch (e) {
             Alert.alert('Error', e.message === 'wrong-password'
                 ? 'La contraseña actual es incorrecta.'
@@ -269,7 +269,7 @@ export default function SettingsScreen({ navigation }) {
             setReportText('');
             setReportReason('');
             setReportImages([]);
-            Alert.alert('✅ Reporte enviado', 'Gracias por tu feedback. Lo revisaremos pronto.');
+            Alert.alert('Reporte enviado', 'Gracias por tu feedback. Lo revisaremos pronto.');
         } catch (e) {
             console.error('Report error:', e);
             Alert.alert('Error', 'No se pudo enviar el reporte. Inténtalo de nuevo.');
@@ -368,7 +368,7 @@ export default function SettingsScreen({ navigation }) {
     };
 
     const handleDeleteAccount = () => {
-        Alert.alert('⚠️ Eliminar cuenta', 'Esta acción es IRREVERSIBLE.', [
+        Alert.alert('Eliminar cuenta', 'Esta acción es IRREVERSIBLE.', [
             { text: 'Cancelar', style: 'cancel' },
             {
                 text: 'Eliminar', style: 'destructive',
@@ -465,9 +465,9 @@ export default function SettingsScreen({ navigation }) {
                     {/* Badge for caregivers */}
                     {userData?.role === 'caregiver' && (() => {
                         const TIERS = [
-                            { min: 0,  label: 'Bronce', emoji: '🥉', color: '#CD7F32', bg: '#FDF2E9' },
-                            { min: 5,  label: 'Plata',  emoji: '🥈', color: '#9CA3AF', bg: '#F3F4F6' },
-                            { min: 20, label: 'Oro',    emoji: '🥇', color: '#F5A623', bg: '#FEF3C7' },
+                            { min: 0,  label: 'Bronce', emoji: '', color: '#CD7F32', bg: '#FDF2E9' },
+                            { min: 5,  label: 'Plata',  emoji: '', color: '#9CA3AF', bg: '#F3F4F6' },
+                            { min: 20, label: 'Oro',    emoji: '', color: '#F5A623', bg: '#FEF3C7' },
                         ];
                         const done = userData?.completedServices || 0;
                         let b = TIERS[0];
@@ -852,12 +852,12 @@ export default function SettingsScreen({ navigation }) {
                         </View>
                         {confirmPass.length > 0 && confirmPass !== newPass && (
                             <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 6, fontWeight: '600' }}>
-                                ⚠️ Las contraseñas no coinciden
+                                Las contraseñas no coinciden
                             </Text>
                         )}
                         {confirmPass.length > 0 && confirmPass === newPass && newPass.length >= 6 && (
                             <Text style={{ color: '#22C55E', fontSize: 12, marginTop: 6, fontWeight: '600' }}>
-                                ✅ Las contraseñas coinciden
+                                Las contraseñas coinciden
                             </Text>
                         )}
 

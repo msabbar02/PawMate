@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase');
+﻿const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 const { createTransporter, FROM_DEFAULT, FROM_SUPPORT } = require('./email.controller');
 
@@ -88,8 +88,8 @@ const sendReservationStatusEmail = async (req, res) => {
             ? data.petNames.map(escapeHtml).join(', ')
             : 'tu mascota';
         const serviceLabel  = data.serviceType === 'hotel'
-            ? '🏨 Hotel para mascotas'
-            : '🚶 Paseo';
+            ? 'Hotel para mascotas'
+            : 'Paseo';
         const startDate     = data.startDate || '';
         const endDate       = data.endDate   || '';
         const totalPrice    = data.totalPrice != null ? `${Number(data.totalPrice).toFixed(2)} €` : null;
@@ -103,7 +103,7 @@ const sendReservationStatusEmail = async (req, res) => {
 
                 if (isAccepted) {
                     const html = emailLayout({
-                        icon: '✅',
+                        icon: '',
                         title: '¡Tu reserva ha sido aceptada!',
                         subtitle: `${caregiverName} está listo para cuidar a ${petName}`,
                         gradient: '#16A34A 0%, #15803d 100%',
@@ -115,11 +115,11 @@ const sendReservationStatusEmail = async (req, res) => {
   <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;padding:20px;margin-bottom:24px;">
     <p style="margin:0 0 10px;font-size:14px;color:#166534;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Detalles de la reserva</p>
     <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">🐾 Mascota(s)</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${petName}</td></tr>
-      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">🛎️ Servicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${serviceLabel}</td></tr>
-      ${startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">📅 Inicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${startDate}</td></tr>` : ''}
-      ${endDate && endDate !== startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">📅 Fin</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${endDate}</td></tr>` : ''}
-      ${totalPrice ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">💰 Precio total</td><td style="padding:6px 0;color:#16A34A;font-weight:700;font-size:15px;text-align:right;">${totalPrice}</td></tr>` : ''}
+      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Mascota(s)</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${petName}</td></tr>
+      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Servicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${serviceLabel}</td></tr>
+      ${startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">Inicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${startDate}</td></tr>` : ''}
+      ${endDate && endDate !== startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">Fin</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${endDate}</td></tr>` : ''}
+      ${totalPrice ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">Precio total</td><td style="padding:6px 0;color:#16A34A;font-weight:700;font-size:15px;text-align:right;">${totalPrice}</td></tr>` : ''}
     </table>
   </div>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 24px;">
@@ -130,13 +130,13 @@ const sendReservationStatusEmail = async (req, res) => {
                     await transporter.sendMail({
                         from: `"PawMate" <${FROM_DEFAULT}>`,
                         to: ownerEmail,
-                        subject: `✅ ${caregiverName} ha aceptado tu reserva · PawMate`,
+                        subject: `${caregiverName} ha aceptado tu reserva · PawMate`,
                         html,
                         text: `Hola ${ownerName},\n\n${caregiverName} ha aceptado tu reserva para ${petName} (${serviceLabel}).\n\nDetalles: ${startDate}${endDate && endDate !== startDate ? ' → ' + endDate : ''}${totalPrice ? ' · ' + totalPrice : ''}.\n\nGracias por usar PawMate.`,
                     });
                 } else {
                     const html = emailLayout({
-                        icon: '😔',
+                        icon: '',
                         title: 'Reserva no disponible',
                         subtitle: `${caregiverName} no puede atenderte en esta ocasión`,
                         gradient: '#64748b 0%, #475569 100%',
@@ -171,7 +171,7 @@ const sendReservationStatusEmail = async (req, res) => {
             try {
                 const transporter = createTransporter();
                 const html = emailLayout({
-                    icon: '📅',
+                    icon: '',
                     title: 'Nueva solicitud de reserva',
                     subtitle: `${ownerName} quiere reservar tus servicios`,
                     gradient: '#F5A623 0%, #FF6B35 100%',
@@ -183,11 +183,11 @@ const sendReservationStatusEmail = async (req, res) => {
   <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:16px;padding:20px;margin-bottom:24px;">
     <p style="margin:0 0 10px;font-size:14px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Detalles</p>
     <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">🐾 Mascota(s)</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${petName}</td></tr>
-      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">🛎️ Servicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${serviceLabel}</td></tr>
-      ${startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">📅 Inicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${startDate}</td></tr>` : ''}
-      ${endDate && endDate !== startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">📅 Fin</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${endDate}</td></tr>` : ''}
-      ${totalPrice ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">💰 Precio total</td><td style="padding:6px 0;color:#F5A623;font-weight:700;font-size:15px;text-align:right;">${totalPrice}</td></tr>` : ''}
+      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Mascota(s)</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${petName}</td></tr>
+      <tr><td style="padding:6px 0;color:#475569;font-size:14px;">Servicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${serviceLabel}</td></tr>
+      ${startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">Inicio</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${startDate}</td></tr>` : ''}
+      ${endDate && endDate !== startDate ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">Fin</td><td style="padding:6px 0;color:#1e293b;font-weight:600;font-size:14px;text-align:right;">${endDate}</td></tr>` : ''}
+      ${totalPrice ? `<tr><td style="padding:6px 0;color:#475569;font-size:14px;">Precio total</td><td style="padding:6px 0;color:#F5A623;font-weight:700;font-size:15px;text-align:right;">${totalPrice}</td></tr>` : ''}
     </table>
   </div>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 24px;">
@@ -198,7 +198,7 @@ const sendReservationStatusEmail = async (req, res) => {
                 await transporter.sendMail({
                     from: `"PawMate" <${FROM_DEFAULT}>`,
                     to: caregiverEmail,
-                    subject: `📅 Nueva reserva de ${ownerName} · PawMate`,
+                    subject: `Nueva reserva de ${ownerName} · PawMate`,
                     html,
                     text: `Hola ${caregiverName},\n\n${ownerName} ha solicitado una reserva para ${petName} (${serviceLabel}).\n\nAbre la app para responder.\n\nGracias por ser parte de PawMate.`,
                 });

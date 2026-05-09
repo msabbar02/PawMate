@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Alert, AppState, Platform } from 'react-native';
 import { supabase } from '../config/supabase';
 import { registerForPushNotifications } from '../utils/pushNotifications';

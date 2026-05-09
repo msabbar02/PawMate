@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+﻿import React, { useState, useContext, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext';
@@ -77,7 +77,7 @@ export default function AdminLayout() {
 
             <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <h2>{t('sidebar.brand')}</h2>
+                    <img src="/logo.svg" alt="PawMate" style={{ height: 40, width: 'auto', objectFit: 'contain' }} />
                     <button className="mobile-close-btn" onClick={closeSidebar}>
                         <FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} />
                     </button>
@@ -103,7 +103,7 @@ export default function AdminLayout() {
                         <span>{theme === 'dark' ? t('sidebar.lightMode') : t('sidebar.darkMode')}</span>
                     </button>
                     <button onClick={toggleLang} className="theme-toggle-btn">
-                        {i18n.language === 'es' ? '🇬🇧 English' : '🇪🇸 Español'}
+                        {i18n.language === 'es' ? 'English' : 'Español'}
                     </button>
                     <button onClick={handleLogout} className="logout-btn">
                         <FontAwesomeIcon icon={faRightFromBracket} style={{ fontSize: 20 }} />

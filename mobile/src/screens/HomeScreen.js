@@ -298,7 +298,7 @@ export default function HomeScreen({ navigation }) {
             logActivity(user?.id, 'Paseo Completado', `${totalKm} km con ${walkingPet?.name}`, 'walk', 'walk').catch(() => {});
             logSystemAction(user?.id, userData?.email || 'Desconocido', 'WALK_COMPLETED', 'Reservations/Walks', { totalKm, calories, petName: walkingPet?.name }).catch(() => {});
 
-            Alert.alert(t('home.walkCompletedTitle') + ' 🐾', `${totalKm} km · ${calories} kcal · ${walkingPet?.name}`);
+            Alert.alert(t('home.walkCompletedTitle') + ' ', `${totalKm} km · ${calories} kcal · ${walkingPet?.name}`);
         } catch (e) {
             Alert.alert(t('common.error'), t('home.walkSaveError'));
         }
@@ -340,7 +340,7 @@ export default function HomeScreen({ navigation }) {
                                     <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 3, borderColor: '#f97316', overflow: 'hidden', backgroundColor: '#FFF' }}>
                                         <Image source={{ uri: u.avatar || u.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
                                     </View>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>🐾 Manada</Text>
+                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>Manada</Text>
                                 </View>
                             </Marker>
                         ))}
@@ -441,7 +441,7 @@ export default function HomeScreen({ navigation }) {
                     {!isCaregiver && isWalking && (
                         <View style={{ flex: 1, backgroundColor: '#EF4444', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 4 }}>
                             <View>
-                                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>🏃 {walkingPet?.name}</Text>
+                                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>{walkingPet?.name}</Text>
                                 <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' }}>
                                     {walkDistance.toFixed(2)} km · {formatDuration(walkTimer)}
                                 </Text>
@@ -459,7 +459,7 @@ export default function HomeScreen({ navigation }) {
                             style={{ flex: 1, backgroundColor: isGroupWalking ? '#f97316' : '#fff7ed', paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#f97316', elevation: isGroupWalking ? 4 : 0 }}
                             onPress={handleToggleGroupWalk}
                         >
-                            <Text style={{ fontSize: 16, marginRight: 6 }}>🐾</Text>
+                            <Text style={{ fontSize: 16, marginRight: 6 }}></Text>
                             <Text style={{ color: isGroupWalking ? '#FFF' : '#f97316', fontSize: 13, fontWeight: '800' }}>{isGroupWalking ? t('home.packMode') : t('home.packModeLabel')}</Text>
                         </TouchableOpacity>
                     )}
@@ -469,7 +469,7 @@ export default function HomeScreen({ navigation }) {
                             onPress={handleToggleOnline}
                         >
                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: userData?.isOnline ? '#FFF' : '#22c55e', marginRight: 8 }} />
-                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 14, fontWeight: '800' }}>{userData?.isOnline ? t('home.online') + '✓' : t('home.goOnline')}</Text>
+                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 14, fontWeight: '800' }}>{userData?.isOnline ? t('home.online') + '' : t('home.goOnline')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -491,7 +491,7 @@ export default function HomeScreen({ navigation }) {
                                         <Ionicons name="star" size={14} color="#f59e0b" />
                                         <Text style={{ fontSize: 13, color: theme.textSecondary, marginLeft: 4 }}>{selectedCaregiver?.rating ? Number(selectedCaregiver.rating).toFixed(1) : 'Nuevo'}</Text>
                                         <View style={{ marginLeft: 10, backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                                            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>🟢 Online</Text>
+                                            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '700' }}>Online</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -510,7 +510,7 @@ export default function HomeScreen({ navigation }) {
                 <Modal visible={showDogPicker} animationType="fade" transparent>
                     <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setShowDogPicker(false)}>
                         <View style={{ backgroundColor: theme.cardBackground, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 28, maxHeight: '60%' }}>
-                            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.text, marginBottom: 6 }}>🐕 {t('home.chooseDog')}</Text>
+                            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.text, marginBottom: 6 }}>{t('home.chooseDog')}</Text>
                             <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 16 }}>{t('home.chooseDogSub')}</Text>
                             <FlatList
                                 data={myDogs}
@@ -525,7 +525,7 @@ export default function HomeScreen({ navigation }) {
                                             <Image source={{ uri: item.image }} style={{ width: 50, height: 50, borderRadius: 25 }} />
                                         ) : (
                                             <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 24 }}>🐕</Text>
+                                                <Text style={{ fontSize: 24 }}></Text>
                                             </View>
                                         )}
                                         <View style={{ flex: 1, marginLeft: 14 }}>

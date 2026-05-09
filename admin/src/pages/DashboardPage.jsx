@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
@@ -585,7 +585,7 @@ export default function DashboardPage() {
                             </button>
                         </div>
                     )}
-                    {refreshing && <span className="dash-refreshing" title={t('dashboard.refreshing')}>⟳</span>}
+                    {refreshing && <span className="dash-refreshing" title={t('dashboard.refreshing')}></span>}
                 </div>
             </div>
 

@@ -19,6 +19,8 @@ import {
   faTriangleExclamation, faCircleExclamation, faBolt, faFlag,
   faSun, faMoon, faCloudSun, faCloudMoon, faCloud, faCloudRain, faCloudBolt, faSnowflake,
   faTag, faCompass, faQrcode, faRightFromBracket,
+  faDog, faCat, faDove, faBug,
+  faSyringe, faStethoscope, faPills, faHeartPulse, faNotesMedical,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -243,6 +245,21 @@ const iconMap = {
 
   // Send
   'send': faPaperPlane,
+
+  // Animals / Species
+  'dog': faDog,
+  'cat': faCat,
+  'dove': faDove,
+
+  // Bug / parasite
+  'bug': faBug,
+
+  // Medical
+  'syringe': faSyringe,
+  'stethoscope': faStethoscope,
+  'pills': faPills,
+  'heart-pulse': faHeartPulse,
+  'notes-medical': faNotesMedical,
 };
 
 /**

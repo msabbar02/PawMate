@@ -17,7 +17,10 @@ export default function CaregiverProfileScreen({ route, navigation }) {
     const { user, userData } = useContext(AuthContext);
     const { t } = useTranslation();
 
-    const SERVICE_LABELS = { walking: ' ' + t('services.walking'), hotel: ' ' + t('services.hotel') };
+    const SERVICE_META = {
+        walking: { icon: 'walk-outline', label: t('services.walking') },
+        hotel: { icon: 'home-outline', label: t('services.hotel') },
+    };
     const TABS = [t('caregiverProfile.generalTab'), t('caregiverProfile.availabilityTab'), t('caregiverProfile.reviewsTab')];
     const DAYS = [t('days.monday'), t('days.tuesday'), t('days.wednesday'), t('days.thursday'), t('days.friday'), t('days.saturday'), t('days.sunday')];
 
@@ -125,8 +128,9 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.servicesTitle')}</Text>
                     <View style={styles.serviceChips}>
                         {caregiver.serviceTypes.map(s => (
-                            <View key={s} style={[styles.chip, { backgroundColor: COLORS.primaryBg }]}>
-                                <Text style={[styles.chipText, { color: COLORS.primary }]}>{SERVICE_LABELS[s] || s}</Text>
+                            <View key={s} style={[styles.chip, { backgroundColor: COLORS.primaryBg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                                <Icon name={(SERVICE_META[s] || {}).icon || 'paw'} size={13} color={COLORS.primary} />
+                                <Text style={[styles.chipText, { color: COLORS.primary }]}>{(SERVICE_META[s] || {}).label || s}</Text>
                             </View>
                         ))}
                     </View>
@@ -154,9 +158,10 @@ export default function CaregiverProfileScreen({ route, navigation }) {
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.acceptedPets')}</Text>
                     <View style={styles.serviceChips}>
                         {caregiver.acceptedSpecies.map(s => (
-                            <View key={s} style={[styles.chip, { backgroundColor: '#E0F2FE' }]}>
+                            <View key={s} style={[styles.chip, { backgroundColor: '#E0F2FE', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                                <Icon name={s === 'perro' ? 'dog' : s === 'gato' ? 'cat' : 'paw'} size={13} color="#0891b2" />
                                 <Text style={[styles.chipText, { color: '#0891b2' }]}>
-                                    {s === 'perro' ? ' ' + t('species.dogs') : s === 'gato' ? ' ' + t('species.cats') : ' ' + s}
+                                    {s === 'perro' ? t('species.dogs') : s === 'gato' ? t('species.cats') : s}
                                 </Text>
                             </View>
                         ))}

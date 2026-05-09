@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
@@ -93,7 +93,7 @@ export default function ReservationsPage() {
     });
 
     const getServiceIcon = (type) => {
-        return type === 'walking' ? `🚶 ${t('reservations.walkService')}` : `🏨 ${t('reservations.hotelService')}`;
+        return type === 'walking' ? `${t('reservations.walkService')}` : `${t('reservations.hotelService')}`;
     };
 
     const statusLabel = (s) => {
@@ -167,7 +167,7 @@ export default function ReservationsPage() {
                                                 <div className="contact-info">
                                                     <span><strong>{t('reservations.ownerPrefix')}</strong> {res.ownerName || t('reservations.userFallback')}</span>
                                                     <span><strong>{t('reservations.caregiverPrefix')}</strong> {res.caregiverName || t('reservations.userFallback')}</span>
-                                                    {res.petNames && <span className="text-muted">🐾 {res.petNames.join(', ')}</span>}
+                                                    {res.petNames && <span className="text-muted">{res.petNames.join(', ')}</span>}
                                                 </div>
                                             </td>
                                             <td>
@@ -319,7 +319,7 @@ export default function ReservationsPage() {
                                 <div className="premium-detail-card">
                                     <span className="premium-detail-label">{t('reservations.paymentReleased')}</span>
                                     <span className="premium-detail-value" style={{ color: selectedRes.paymentReleased ? '#22c55e' : '#f59e0b' }}>
-                                        {selectedRes.paymentReleased ? `✅ ${t('reservations.paymentReleasedYes')}` : `⏳ ${t('reservations.paymentReleasedPending')}`}
+                                        {selectedRes.paymentReleased ? `${t('reservations.paymentReleasedYes')}` : `⏳ ${t('reservations.paymentReleasedPending')}`}
                                     </span>
                                 </div>
                             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faTrash, faXmark, faImage, faEye } from '@fortawesome/free-solid-svg-icons';
@@ -120,8 +120,8 @@ export default function CommunityPage() {
                                             </td>
                                             <td>
                                                 <div className="contact-info">
-                                                    <span style={{ color: '#ef4444', fontWeight: 600 }}>♥ {post.likesCount || 0}</span>
-                                                    <span style={{ color: 'var(--primary-color)' }}>🗨 {post.commentsCount || 0}</span>
+                                                    <span style={{ color: '#ef4444', fontWeight: 600 }}>{post.likesCount || 0}</span>
+                                                    <span style={{ color: 'var(--primary-color)' }}>{post.commentsCount || 0}</span>
                                                 </div>
                                             </td>
                                             <td>
@@ -189,10 +189,10 @@ export default function CommunityPage() {
 
                             <div style={{ display: 'flex', gap: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '20px', marginBottom: '10px' }}>
                                 <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-                                    <span style={{ fontSize: '18px' }}>♥</span> {selectedPost.likesCount || 0} {t('community.likes')}
+                                    <span style={{ fontSize: '18px' }}></span> {selectedPost.likesCount || 0} {t('community.likes')}
                                 </div>
                                 <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-                                    <span style={{ fontSize: '18px' }}>🗨</span> {selectedPost.commentsCount || 0} {t('community.comments')}
+                                    <span style={{ fontSize: '18px' }}></span> {selectedPost.commentsCount || 0} {t('community.comments')}
                                 </div>
                             </div>
                         </div>

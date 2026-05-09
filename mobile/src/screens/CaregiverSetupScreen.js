@@ -22,8 +22,8 @@ export default function CaregiverSetupScreen({ navigation }) {
     ];
 
     const SPECIES = [
-        { value: 'perro', label: ' ' + t('species.dogs') },
-        { value: 'gato', label: ' ' + t('species.cats') },
+        { value: 'perro', label: t('species.dogs'), icon: 'dog' },
+        { value: 'gato', label: t('species.cats'), icon: 'cat' },
     ];
 
     const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -265,7 +265,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                                     style={[styles.chip, active ? { backgroundColor: COLORS.primary } : { backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1.5 }]}
                                     onPress={() => toggleService(s.value)}
                                 >
-                                    <Text style={{ fontSize: 16 }}>{s.emoji}</Text>
+                                    <Icon name={s.icon} size={16} color={active ? '#FFF' : theme.text} />
                                     <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{s.label}</Text>
                                     {active && <Icon name="checkmark-circle" size={16} color="#FFF" />}
                                 </TouchableOpacity>
@@ -289,6 +289,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                                     style={[styles.chip, active ? { backgroundColor: COLORS.primary } : { backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1.5 }]}
                                     onPress={() => toggleSpecies(s.value)}
                                 >
+                                    <Icon name={s.icon} size={14} color={active ? '#FFF' : theme.text} />
                                     <Text style={[styles.chipLabel, { color: active ? '#FFF' : theme.text }]}>{s.label}</Text>
                                     {active && <Icon name="checkmark-circle" size={16} color="#FFF" />}
                                 </TouchableOpacity>

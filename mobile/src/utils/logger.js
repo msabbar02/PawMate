@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+﻿import { supabase } from '../config/supabase';
 
 /**
  * Logs a user activity into the recent_activity table.
@@ -46,7 +46,7 @@ export const logSystemAction = async (userId, userEmail, actionType, entity, det
         ]);
 
         if (error) {
-            console.warn("⚠️ Advertencia: No se pudo registrar el log en system_logs.", error.message);
+            console.warn("Advertencia: No se pudo registrar el log en system_logs.", error.message);
         }
     } catch (err) {
         console.error("Error ejecutando logSystemAction:", err);

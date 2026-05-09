@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
@@ -214,7 +214,7 @@ export default function ReportsPage() {
                         <div className="modal-body view-modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
                             <div className="premium-profile-header" style={{ marginBottom: '16px' }}>
                                 <div className="premium-avatar-placeholder" style={{background: tab === 'reports' ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'}}>
-                                    {tab === 'reports' ? <FontAwesomeIcon icon={faFlag} style={{ fontSize: 36, color: 'white' }} /> : <span style={{fontSize: '36px'}}>★</span>}
+                                    {tab === 'reports' ? <FontAwesomeIcon icon={faFlag} style={{ fontSize: 36, color: 'white' }} /> : <span style={{fontSize: '36px'}}></span>}
                                 </div>
                                 <div className="premium-profile-info">
                                     <h3 className="premium-profile-name">{tab === 'reports' ? `${t('reports.reportFrom')} ${selectedItem.reporterName || t('reports.anonymous')}` : `${t('reports.reviewFrom')} ${selectedItem.reviewerName}`}</h3>

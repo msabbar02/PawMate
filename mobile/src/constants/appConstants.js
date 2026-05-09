@@ -1,4 +1,4 @@
-// Shared app constants — single source of truth
+﻿// Shared app constants — single source of truth
 // Only dogs and cats, only walking and hotel
 
 export const SPECIES_OPTIONS = [

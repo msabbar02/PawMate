@@ -12,6 +12,7 @@ import {
     Dimensions,
     ScrollView,
     Alert,
+    Image,
 } from 'react-native';
 import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
@@ -163,9 +164,7 @@ export default function SignupScreen({ navigation }) {
                     // Usuario creado pero email de confirmación falló
                     // Si hay sesión activa, el AuthContext redirigirá automáticamente
                     if (!data?.session) {
-                        setErrors({
-                            form: t('signup.accountCreated'),
-                        });
+                        navigation.replace('Confirm');
                     }
                     return;
                 }
@@ -182,11 +181,9 @@ export default function SignupScreen({ navigation }) {
 
             // Si no se requiere confirmación de email, el usuario queda logueado
             // y AuthContext lo redirige automáticamente.
-            // Si se requiere confirmación, mostramos aviso.
+            // Si se requiere confirmación, navegamos a la pantalla de confirmación.
             if (data?.user && !data?.session) {
-                setErrors({
-                    form: t('signup.accountCreated'),
-                });
+                navigation.replace('Confirm');
             }
         } catch (error) {
             console.error('Supabase Signup Error:', error.message);
@@ -264,7 +261,7 @@ export default function SignupScreen({ navigation }) {
 
                         <View style={styles.header}>
                             <View style={styles.logoContainer}>
-                                <Icon name="paw" size={40} color={COLORS.background} />
+                                <Image source={require('../../assets/logo-small.png')} style={{ width: 56, height: 56, borderRadius: 12 }} resizeMode="contain" />
                             </View>
                             <Text style={styles.title}>{t('signup.title')}</Text>
                             <Text style={styles.subtitle}>{t('signup.subtitle')}</Text>
@@ -402,7 +399,7 @@ const styles = StyleSheet.create({
     decorativeCircle2: { position: 'absolute', bottom: -140, left: -80, width: 350, height: 350, borderRadius: 175, backgroundColor: COLORS.primaryLight, opacity: 0.06 },
     glassCard: { width: '100%', maxWidth: 420, backgroundColor: COLORS.background, borderRadius: 28, padding: 28, shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 12 }, shadowRadius: 24, elevation: 12, marginTop: 40, marginBottom: 40 },
     header: { alignItems: 'center', marginBottom: 32 },
-    logoContainer: { width: 76, height: 76, backgroundColor: COLORS.primary, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: COLORS.primary, shadowOpacity: 0.35, shadowOffset: { width: 0, height: 6 }, shadowRadius: 14, elevation: 10 },
+    logoContainer: { width: 76, height: 76, backgroundColor: 'transparent', borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
     title: { fontSize: 28, fontWeight: '800', color: COLORS.secondary, letterSpacing: -0.5 },
     subtitle: { fontSize: 14, color: COLORS.textLight, marginTop: 6, fontWeight: '500' },
     formContainer: { width: '100%' },

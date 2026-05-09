@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faEye, faEyeSlash, faCircleCheck, faCircleExclamation, faArrowRight, faMobileScreenButton } from '@fortawesome/free-solid-svg-icons';
@@ -105,7 +105,7 @@ export default function ResetPasswordPage() {
           <div className="confirm-icon-wrap">
             <FontAwesomeIcon icon={faCircleCheck} style={{ fontSize: 64 }} className="confirm-check-icon" />
           </div>
-          <div className="confirm-paw">🔐</div>
+          <div className="confirm-paw"></div>
           <h1 className="confirm-title">{t('reset.titleSuccess')}</h1>
           <p className="confirm-desc" dangerouslySetInnerHTML={{ __html: t('reset.descSuccess1') + '<br/>' + t('reset.descSuccess2') }} />
           <div className="confirm-steps">
@@ -171,7 +171,7 @@ export default function ResetPasswordPage() {
         <div className="confirm-icon-wrap" style={{ background: 'rgba(245, 166, 35, 0.1)' }}>
           <FontAwesomeIcon icon={faLock} style={{ fontSize: 48, color: '#F5A623' }} />
         </div>
-        <div className="confirm-paw">🐾</div>
+        <div className="confirm-paw"></div>
         <h1 className="confirm-title">{t('reset.title')}</h1>
         <p className="confirm-desc">
           {t('reset.desc')}

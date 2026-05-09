@@ -11,6 +11,7 @@ import { AuthContext } from '../context/AuthContext';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import ConfirmScreen from '../screens/ConfirmScreen';
 import MyPetsScreen from '../screens/MyPetsScreen';
 import BookingScreen from '../screens/BookingScreen';
 import CaregiversScreen from '../screens/CaregiversScreen';
@@ -286,6 +287,7 @@ export default function AppNavigator() {
                     <>
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Signup" component={SignupScreen} />
+                        <Stack.Screen name="Confirm" component={ConfirmScreen} />
                     </>
                 )}
             </Stack.Navigator>

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
     StyleSheet, View, Text, FlatList, Image, TouchableOpacity,
-    ActivityIndicator, TextInput, Platform, RefreshControl,
+    ActivityIndicator, TextInput, Platform, RefreshControl, ScrollView,
 } from 'react-native';
 import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
@@ -15,12 +15,18 @@ export default function CaregiversScreen({ navigation }) {
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { user, userData } = useContext(AuthContext);
     const { t } = useTranslation();
-    const SERVICE_LABELS = { walking: ' ' + t('services.walking'), hotel: ' ' + t('services.hotel') };
+    const SERVICE_META = {
+        walking: { icon: 'walk-outline', label: t('services.walking') },
+        hotel: { icon: 'home-outline', label: t('services.hotel') },
+    };
     
     const [caregivers, setCaregivers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterService, setFilterService] = useState('all'); // 'all' | 'walking' | 'hotel'
+    const [filterSpecies, setFilterSpecies] = useState('all'); // 'all' | 'perro' | 'gato'
+    const [filterVerified, setFilterVerified] = useState(false);
 
     const fetchCaregivers = useCallback(async () => {
         try {
@@ -44,11 +50,16 @@ export default function CaregiversScreen({ navigation }) {
 
     const onRefresh = () => { setRefreshing(true); fetchCaregivers(); };
 
-    const filteredCaregivers = caregivers.filter(cg =>
-        (cg.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-        (cg.firstName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-        (cg.city?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-    );
+    const filteredCaregivers = caregivers.filter(cg => {
+        const matchesSearch =
+            (cg.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+            (cg.firstName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+            (cg.city?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+        const matchesService = filterService === 'all' || (cg.serviceTypes || []).includes(filterService);
+        const matchesSpecies = filterSpecies === 'all' || (cg.acceptedSpecies || []).includes(filterSpecies);
+        const matchesVerified = !filterVerified || cg.verificationStatus === 'verified';
+        return matchesSearch && matchesService && matchesSpecies && matchesVerified;
+    });
 
     const handleMessage = async (caregiver) => {
         try {
@@ -149,9 +160,10 @@ export default function CaregiversScreen({ navigation }) {
                 {services.length > 0 && (
                     <View style={styles.servicesRow}>
                         {services.slice(0, 3).map(svc => (
-                            <View key={svc} style={[styles.serviceChip, { backgroundColor: COLORS.primaryBg }]}>
+                            <View key={svc} style={[styles.serviceChip, { backgroundColor: COLORS.primaryBg, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                                <Icon name={(SERVICE_META[svc] || {}).icon || 'paw'} size={11} color={COLORS.primary} />
                                 <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: '700' }}>
-                                    {SERVICE_LABELS[svc] || svc}
+                                    {(SERVICE_META[svc] || {}).label || svc}
                                 </Text>
                             </View>
                         ))}
@@ -162,9 +174,10 @@ export default function CaregiversScreen({ navigation }) {
                 {species.length > 0 && (
                     <View style={[styles.servicesRow, { paddingTop: 0 }]}>
                         {species.map(sp => (
-                            <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE' }]}>
+                            <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                                <Icon name={sp === 'perro' ? 'dog' : sp === 'gato' ? 'cat' : 'paw'} size={11} color="#0891b2" />
                                 <Text style={{ fontSize: 11, color: '#0891b2', fontWeight: '700' }}>
-                                    {sp === 'perro' ? ' ' + t('species.dogs') : sp === 'gato' ? ' ' + t('species.cats') : ' ' + sp}
+                                    {sp === 'perro' ? t('species.dogs') : sp === 'gato' ? t('species.cats') : sp}
                                 </Text>
                             </View>
                         ))}
@@ -208,6 +221,57 @@ export default function CaregiversScreen({ navigation }) {
                         returnKeyType="search"
                     />
                 </View>
+
+                {/* ── FILTER CHIPS ── */}
+                <View style={styles.filtersRow}>
+                    {/* Service filter */}
+                    {[
+                        { key: 'all', label: 'Todos' },
+                        { key: 'walking', label: ' ' + t('services.walking') },
+                        { key: 'hotel', label: ' ' + t('services.hotel') },
+                    ].map(f => (
+                        <TouchableOpacity
+                            key={f.key}
+                            style={[styles.filterChip, filterService === f.key && styles.filterChipActive]}
+                            onPress={() => setFilterService(f.key)}
+                        >
+                            <Text style={[styles.filterChipText, filterService === f.key && styles.filterChipTextActive]}>
+                                {f.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+
+                    <View style={styles.filterDivider} />
+
+                    {/* Species filter */}
+                    {[
+                        { key: 'all', label: 'Todos', icon: 'paw' },
+                        { key: 'perro', label: t('species.dogs'), icon: 'dog' },
+                        { key: 'gato', label: t('species.cats'), icon: 'cat' },
+                    ].map(f => (
+                        <TouchableOpacity
+                            key={f.key}
+                            style={[styles.filterChip, filterSpecies === f.key && styles.filterChipActive]}
+                            onPress={() => setFilterSpecies(f.key)}
+                        >
+                            <Icon name={f.icon} size={12} color={filterSpecies === f.key ? '#fff' : '#F5A623'} style={{ marginRight: 3 }} />
+                            <Text style={[styles.filterChipText, filterSpecies === f.key && styles.filterChipTextActive]}>
+                                {f.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+
+                    <View style={styles.filterDivider} />
+
+                    {/* Verified filter */}
+                    <TouchableOpacity
+                        style={[styles.filterChip, filterVerified && styles.filterChipActive]}
+                        onPress={() => setFilterVerified(v => !v)}
+                    >
+                        <Icon name="shield-checkmark" size={12} color={filterVerified ? '#fff' : '#F5A623'} style={{ marginRight: 3 }} />
+                        <Text style={[styles.filterChipText, filterVerified && styles.filterChipTextActive]}>Verificados</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {loading ? (
@@ -236,11 +300,17 @@ export default function CaregiversScreen({ navigation }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20, paddingBottom: 18, borderBottomWidth: 1 },
+    header: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1 },
     headerTitle: { fontSize: 26, fontWeight: '800', marginBottom: 4, letterSpacing: -0.5 },
     headerSub: { fontSize: 14, marginBottom: 16 },
     searchBox: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 14, borderWidth: 1.5 },
     searchInput: { flex: 1, height: '100%', paddingHorizontal: 12, fontSize: 15, fontWeight: '500' },
+    filtersRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingBottom: 4 },
+    filterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', borderWidth: 1, borderColor: 'transparent' },
+    filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+    filterChipText: { fontSize: 12, fontWeight: '700', color: COLORS.textLight },
+    filterChipTextActive: { color: '#fff' },
+    filterDivider: { width: 1, height: 20, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2 },
     centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     listContent: { padding: 20, paddingBottom: 100 },
     card: { borderRadius: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 4 },

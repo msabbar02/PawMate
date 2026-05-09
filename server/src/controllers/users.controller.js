@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase');
+﻿const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
 // Fields safe to expose about any user (public profile)
