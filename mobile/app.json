@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PawMate",
-    "slug": "pawmate",
+    "slug": "mobile",
     "scheme": "pawmate",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,9 +32,14 @@
           "action": "VIEW",
           "autoVerify": false,
           "data": [
-            { "scheme": "pawmate" }
+            {
+              "scheme": "pawmate"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },

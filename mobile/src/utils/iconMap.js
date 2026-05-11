@@ -19,7 +19,7 @@ import {
   faTriangleExclamation, faCircleExclamation, faBolt, faFlag,
   faSun, faMoon, faCloudSun, faCloudMoon, faCloud, faCloudRain, faCloudBolt, faSnowflake,
   faTag, faCompass, faQrcode, faRightFromBracket,
-  faDog, faCat, faDove, faBug,
+  faDog, faCat, faDove, faBug, faCarrot,
   faSyringe, faStethoscope, faPills, faHeartPulse, faNotesMedical,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -250,6 +250,8 @@ const iconMap = {
   'dog': faDog,
   'cat': faCat,
   'dove': faDove,
+  'rabbit': faCarrot, // FA Free has no rabbit icon; carrot represents rabbit context
+  'carrot': faCarrot,
 
   // Bug / parasite
   'bug': faBug,

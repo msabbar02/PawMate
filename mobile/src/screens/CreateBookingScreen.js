@@ -96,6 +96,11 @@ export default function CreateBookingScreen({ route, navigation }) {
             const petNames = myPets.filter(p => selectedPets.includes(p.id)).map(p => p.name);
             const totalPrice = calculatePrice();
 
+            // For walks: end = start + walkHours
+            const effectiveEndDate = serviceType === 'walking'
+                ? new Date(startDate.getTime() + walkHours * 60 * 60 * 1000)
+                : endDate;
+
             const { data: insertedRes, error } = await supabase.from('reservations').insert({
                 ownerId: user.id,
                 caregiverId: caregiver.id,
@@ -105,16 +110,17 @@ export default function CreateBookingScreen({ route, navigation }) {
                 caregiverAvatar: caregiver.photoURL || caregiver.avatar || null,
                 serviceType,
                 startDate: formatDate(startDate),
-                endDate: formatDate(endDate),
+                endDate: formatDate(effectiveEndDate),
                 startTime: formatTime(startDate),
-                endTime: formatTime(endDate),
+                endTime: formatTime(effectiveEndDate),
                 startDateTime: startDate.toISOString(),
-                endDateTime: endDate.toISOString(),
+                endDateTime: effectiveEndDate.toISOString(),
                 totalPrice,
                 petNames,
                 petIds: selectedPets,
                 notes: notes.trim(),
                 status: 'pendiente',
+                walkHours: serviceType === 'walking' ? walkHours : null,
             }).select().single();
 
             if (error) throw error;
@@ -211,17 +217,22 @@ export default function CreateBookingScreen({ route, navigation }) {
                     </View>
 
                     {/* Accepted species */}
-                    {caregiver.acceptedSpecies?.length > 0 && (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
-                            {caregiver.acceptedSpecies.map(sp => (
-                                <View key={sp} style={{ backgroundColor: '#E0F2FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#0891b2' }}>
-                                        {sp === 'perro' ? ' ' + t('species.dogs') : sp === 'gato' ? ' ' + t('species.cats') : sp === 'ave' ? ' ' + t('species.birds') : sp === 'reptil' ? ' ' + t('species.reptiles') : ' ' + sp}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
-                    )}
+                    {caregiver.acceptedSpecies?.length > 0 && (() => {
+                        const normMap = { perro: 'dog', gato: 'cat', ave: 'bird', reptil: 'other' };
+                        const norm = [...new Set(caregiver.acceptedSpecies.map(s => normMap[s] || s))];
+                        const labelMap = { dog: t('species.dogs'), cat: t('species.cats'), bird: t('species.birds'), rabbit: 'Conejo', other: 'Otros' };
+                        return (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+                                {norm.map(sp => (
+                                    <View key={sp} style={{ backgroundColor: '#E0F2FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#0891b2' }}>
+                                            {labelMap[sp] || sp}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        );
+                    })()}
 
                     {/* Bio */}
                     {caregiver.bio ? (
@@ -294,10 +305,34 @@ export default function CreateBookingScreen({ route, navigation }) {
                             </TouchableOpacity>
                         </View>
                         <Text style={{ textAlign: 'center', fontSize: 12, color: theme.textSecondary, marginTop: 8 }}>{t('createBooking.maxHours')}</Text>
+
+                        {/* Start date + time only for walks */}
+                        <View style={{ marginTop: 18 }}>
+                            <View style={[styles.dateRow]}>
+                                <TouchableOpacity
+                                    style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                    onPress={() => setShowStartPicker(true)}
+                                >
+                                    <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>{t('createBooking.startDate')}</Text>
+                                    <Text style={[styles.dateValue, { color: theme.text }]}>{formatDate(startDate)}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.dateBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                    onPress={() => setShowStartTimePicker(true)}
+                                >
+                                    <Text style={[styles.dateLabel, { color: theme.textSecondary }]}>{t('createBooking.startTime')}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Icon name="time-outline" size={14} color={COLORS.primary} />
+                                        <Text style={[styles.dateValue, { color: theme.text }]}>{formatTime(startDate)}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
                 )}
 
-                {/* Dates & Times */}
+                {/* Dates & Times - only for hotel */}
+                {serviceType === 'hotel' && (
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
                         <Icon name="calendar-outline" size={16} color={theme.text} />
@@ -395,6 +430,32 @@ export default function CreateBookingScreen({ route, navigation }) {
                         />
                     )}
                 </View>
+                )}
+
+                {/* Common pickers (also used by walks) */}
+                {showStartPicker && serviceType === 'walking' && (
+                    <DateTimePicker
+                        value={startDate}
+                        mode="date"
+                        minimumDate={new Date()}
+                        onChange={(e, d) => { setShowStartPicker(false); if (d) setStartDate(d); }}
+                    />
+                )}
+                {showStartTimePicker && serviceType === 'walking' && (
+                    <DateTimePicker
+                        value={startDate}
+                        mode="time"
+                        is24Hour={true}
+                        onChange={(e, d) => {
+                            setShowStartTimePicker(false);
+                            if (d) {
+                                const updated = new Date(startDate);
+                                updated.setHours(d.getHours(), d.getMinutes());
+                                setStartDate(updated);
+                            }
+                        }}
+                    />
+                )}
 
                 {/* My Pets */}
                 <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>

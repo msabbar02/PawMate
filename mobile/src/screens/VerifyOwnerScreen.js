@@ -17,8 +17,11 @@ export default function VerifyOwnerScreen({ navigation }) {
     const { t } = useTranslation();
 
     const SPECIES_OPTIONS = [
-        { value: 'dog',    label: t('verify.speciesDog') },
-        { value: 'cat',    label: t('verify.speciesCat') },
+        { value: 'dog',    label: t('verify.speciesDog'), icon: 'dog' },
+        { value: 'cat',    label: t('verify.speciesCat'), icon: 'cat' },
+        { value: 'bird',   label: 'Ave', icon: 'dove' },
+        { value: 'rabbit', label: 'Conejo', icon: 'rabbit' },
+        { value: 'other',  label: 'Otro', icon: 'paw' },
     ];
 
     const SERVICE_OPTIONS = [
@@ -240,6 +243,12 @@ export default function VerifyOwnerScreen({ navigation }) {
                                 style={[styles.selectChip, acceptedSpecies.includes(sp.value) && styles.selectChipActive]}
                                 onPress={() => toggleMulti(sp.value, acceptedSpecies, setAcceptedSpecies)}
                             >
+                                <Icon
+                                    name={sp.icon}
+                                    size={14}
+                                    color={acceptedSpecies.includes(sp.value) ? '#FFF' : COLORS.primary}
+                                    style={{ marginRight: 6 }}
+                                />
                                 <Text style={[styles.selectChipText, acceptedSpecies.includes(sp.value) && { color: '#FFF' }]}>
                                     {sp.label}
                                 </Text>
@@ -467,6 +476,7 @@ const styles = StyleSheet.create({
     },
     multiSelect: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     selectChip: {
+        flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
         borderWidth: 2, borderColor: COLORS.border, backgroundColor: '#FFF',
     },

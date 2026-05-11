@@ -28,7 +28,7 @@ export default function PetsPage() {
     const fetchPets = async () => {
         setLoading(true);
         try {
-            const { data: petsList } = await supabase.from('pets').select('*');
+            const { data: petsList } = await supabase.from('pets').select('*').limit(500);
             
             if (petsList && petsList.length > 0) {
                 // Batch-fetch all unique owner names in a single query

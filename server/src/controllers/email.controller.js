@@ -3,7 +3,7 @@ const { sendSuccess, sendError } = require('../utils/response');
 
 /* --- Shared FROM addresses --- */
 const FROM_DEFAULT = process.env.EMAIL_FROM         || 'PawMate <noreply@apppawmate.com>';
-const FROM_SUPPORT = process.env.EMAIL_FROM_SUPPORT  || 'PawMate Soporte <support@apppawmate.com>';
+const FROM_SUPPORT = process.env.EMAIL_FROM_SUPPORT  || 'PawMate Soporte <soporte@apppawmate.com>';
 const FROM_ADMIN   = process.env.EMAIL_FROM_ADMIN    || 'PawMate Admin <admin@apppawmate.com>';
 
 /* --- Resend send helper --- */
@@ -116,10 +116,10 @@ const sendWelcomeEmail = async (req, res) => {
         Para acceder a todas las funciones, verifica tu cuenta en la sección de Ajustes de la app.
       </p>
       <p style="color:#64748b;font-size:14px;margin:0;">
-        ¿Necesitas ayuda? Escríbenos a <a href="mailto:support@apppawmate.com" style="color:#6366f1;">support@apppawmate.com</a>
+        ¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@apppawmate.com" style="color:#6366f1;">soporte@apppawmate.com</a>
       </p>`,
                 }),
-                text: `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? support@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`,
+                text: `¡Bienvenido a PawMate, ${name}!\n\nNos alegra tenerte en la familia PawMate.\n\nVerifica tu cuenta en Ajustes para acceder a todas las funciones.\n\n¿Necesitas ayuda? soporte@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`,
             });
             sent = true;
         } catch (emailErr) {

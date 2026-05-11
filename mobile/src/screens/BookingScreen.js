@@ -16,6 +16,7 @@ import { createNotification, generateUniqueId } from '../utils/notificationHelpe
 import { useSafeStripe, SafePlatformPay } from '../config/stripe';
 import { useTranslation } from '../context/LanguageContext';
 import { API_BASE_URL } from '../config/api';
+import { useNavigation } from '@react-navigation/native';
 
 // ─────────────────────────────────────────────────
 // STATUS CONFIG
@@ -42,6 +43,7 @@ export default function BookingScreen() {
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { t } = useTranslation();
     const { initPaymentSheet, presentPaymentSheet, confirmPlatformPayPayment, isPlatformPaySupported } = useSafeStripe();
+    const navigation = useNavigation();
 
     const [activeTab, setActiveTab]           = useState('reservations');
     const [reservations, setReservations]     = useState([]);
@@ -354,6 +356,22 @@ export default function BookingScreen() {
                 await supabase.rpc('increment_completed_services', { user_id: user.id }).catch(() => {
                     supabase.from('users').update({ completedServices: (userData?.completedServices || 0) + 1 }).eq('id', user.id);
                 });
+                // Increment owner totalWalks (only for walking service)
+                if (res.serviceType === 'walking' && res.ownerId) {
+                    const { data: ownerRow } = await supabase.from('users').select('totalWalks, saveWalks').eq('id', res.ownerId).maybeSingle();
+                    if (ownerRow?.saveWalks !== false) {
+                        await supabase.from('users').update({
+                            totalWalks: (ownerRow?.totalWalks || 0) + 1,
+                        }).eq('id', res.ownerId);
+                    }
+                    // Increment per-pet walk count
+                    if (Array.isArray(res.petIds) && res.petIds.length > 0) {
+                        for (const pid of res.petIds) {
+                            const { data: petRow } = await supabase.from('pets').select('totalWalks').eq('id', pid).maybeSingle();
+                            await supabase.from('pets').update({ totalWalks: (petRow?.totalWalks || 0) + 1 }).eq('id', pid);
+                        }
+                    }
+                }
                 // Release payment: mark as paymentReleased for backend processing
                 await supabase.from('reservations').update({ paymentReleased: true, paymentReleasedAt: new Date().toISOString() }).eq('id', res.id).catch(() => {});
                 await createNotification(res.ownerId, {
@@ -943,7 +961,26 @@ export default function BookingScreen() {
                             <ScrollView contentContainerStyle={{ padding: 20 }}>
                                 {/* User hero card */}
                                 <View style={[s.infoCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, padding: 20, marginBottom: 16 }]}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                    <TouchableOpacity
+                                        activeOpacity={isCaregiver ? 1 : 0.7}
+                                        disabled={isCaregiver}
+                                        onPress={async () => {
+                                            if (isCaregiver) return;
+                                            // Navigate to caregiver's profile
+                                            const cgId = detailRes.caregiverId;
+                                            if (!cgId) return;
+                                            const { data: cg } = await supabase
+                                                .from('users')
+                                                .select('*')
+                                                .eq('id', cgId)
+                                                .maybeSingle();
+                                            if (cg) {
+                                                setDetailRes(null);
+                                                navigation.navigate('CaregiverProfile', { caregiver: cg });
+                                            }
+                                        }}
+                                        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}
+                                    >
                                         {otherAvatar ? (
                                             <Image source={{ uri: otherAvatar }} style={{ width: 56, height: 56, borderRadius: 28 }} />
                                         ) : (
@@ -960,7 +997,10 @@ export default function BookingScreen() {
                                                 <Text style={{ fontSize: 22, fontWeight: '900', color: theme.primary }}>€{detailRes.totalPrice.toFixed(2)}</Text>
                                             </View>
                                         )}
-                                    </View>
+                                        {!isCaregiver && (
+                                            <Icon name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 4 }} />
+                                        )}
+                                    </TouchableOpacity>
                                     <View style={[s.statusBanner, { backgroundColor: isDarkMode ? theme.primaryBg : st.bg, marginBottom: 0 }]}>
                                         <Icon name={st.icon} size={18} color={isDarkMode ? theme.primary : st.color} />
                                         <Text style={[s.statusBannerText, { color: isDarkMode ? theme.primary : st.color, fontSize: 14 }]}>{t(st.labelKey)}</Text>
@@ -975,10 +1015,28 @@ export default function BookingScreen() {
                                     <DetailRow icon="paw-outline"       label={t('bookings.service')}     value={serviceLbl} />
                                     <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
                                     <DetailRow icon="calendar-outline"  label={t('bookings.startDate')} value={detailRes.startDate || '—'} />
+                                    {detailRes.serviceType === 'walking' && detailRes.walkHours ? (
+                                        <>
+                                            <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
+                                            <DetailRow icon="time-outline" label={t('createBooking.walkDuration')} value={`${detailRes.walkHours} ${detailRes.walkHours === 1 ? t('createBooking.hour') : t('createBooking.hours')}`} />
+                                        </>
+                                    ) : null}
+                                    {detailRes.startTime && (
+                                        <>
+                                            <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
+                                            <DetailRow icon="time-outline" label={t('createBooking.startTime')} value={detailRes.startTime} />
+                                        </>
+                                    )}
                                     {detailRes.endDate && detailRes.endDate !== detailRes.startDate && <>
                                         <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
                                         <DetailRow icon="calendar-outline" label={t('bookings.endDate')} value={detailRes.endDate} />
                                     </>}
+                                    {detailRes.serviceType === 'hotel' && detailRes.endTime ? (
+                                        <>
+                                            <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
+                                            <DetailRow icon="time-outline" label={t('createBooking.endTime')} value={detailRes.endTime} />
+                                        </>
+                                    ) : null}
                                     {detailRes.totalPrice > 0 && <>
                                         <View style={[s.detailDivider, { backgroundColor: theme.border }]} />
                                         <DetailRow icon="card-outline" label={t('bookings.totalPrice')} value={`€${detailRes.totalPrice.toFixed(2)}`} />

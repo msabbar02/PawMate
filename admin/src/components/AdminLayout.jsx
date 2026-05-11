@@ -5,7 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGauge, faUsers, faDog, faCalendarDays, faTriangleExclamation, faRightFromBracket, faBars, faXmark, faChartLine, faSun, faMoon, faShieldHeart, faShieldHalved, faWifi, faComments } from '@fortawesome/free-solid-svg-icons';
+import { faGauge, faUsers, faDog, faCalendarDays, faTriangleExclamation, faRightFromBracket, faBars, faXmark, faChartLine, faSun, faMoon, faShieldHeart, faShieldHalved, faWifi } from '@fortawesome/free-solid-svg-icons';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
@@ -68,7 +68,6 @@ export default function AdminLayout() {
         { path: '/logs', label: t('sidebar.logs'), icon: <FontAwesomeIcon icon={faChartLine} style={{ fontSize: 20 }} /> },
         { path: '/verifications', label: t('sidebar.verifications'), icon: <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 20 }} /> },
         { path: '/admins', label: t('sidebar.admins'), icon: <FontAwesomeIcon icon={faShieldHeart} style={{ fontSize: 20 }} /> },
-        { path: '/community', label: t('sidebar.community'), icon: <FontAwesomeIcon icon={faComments} style={{ fontSize: 20 }} /> },
     ];
 
     return (

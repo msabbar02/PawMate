@@ -23,7 +23,7 @@ export default function PetDetailPage() {
             if (petData?.ownerId) {
                 const [{ data: ownerData }, { data: resData }] = await Promise.all([
                     supabase.from('users').select('id, fullName, email, photoURL').eq('id', petData.ownerId).single(),
-                    supabase.from('reservations').select('*').eq('petId', id).order('created_at', { ascending: false }),
+                    supabase.from('reservations').select('*').contains('petIds', [id]).order('created_at', { ascending: false }),
                 ]);
                 setOwner(ownerData);
                 setReservations(resData || []);

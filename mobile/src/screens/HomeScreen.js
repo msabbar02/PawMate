@@ -57,10 +57,7 @@ export default function HomeScreen({ navigation }) {
     const [panelOpen, setPanelOpen] = useState(true);
     const panelAnim = useRef(new Animated.Value(1)).current; // 1=open, 0=closed
     const [onlineCaregivers, setOnlineCaregivers] = useState([]);
-    const [groupWalkers, setGroupWalkers] = useState([]);
-    const [isGroupWalking, setIsGroupWalking] = useState(false);
     const [selectedCaregiver, setSelectedCaregiver] = useState(null);
-    const [mapMode, setMapMode] = useState('caregivers'); // 'caregivers' | 'pack'
     const realtimeRefs = useRef([]);
 
     // Walk from Home state
@@ -96,7 +93,6 @@ export default function HomeScreen({ navigation }) {
 
             fetchWeather(latitude, longitude);
             fetchOnlineCaregivers();
-            fetchGroupWalkers();
         })();
     }, []);
 
@@ -107,16 +103,6 @@ export default function HomeScreen({ navigation }) {
                 .eq('role', 'caregiver').eq('isOnline', true)
                 .not('latitude', 'is', null).not('longitude', 'is', null);
             setOnlineCaregivers(data || []);
-        } catch { /* ignore */ }
-    };
-
-    const fetchGroupWalkers = async () => {
-        try {
-            const { data } = await supabase.from('users')
-                .select('id,fullName,avatar,photoURL,latitude,longitude')
-                .eq('isGroupWalking', true)
-                .not('latitude', 'is', null).not('longitude', 'is', null);
-            setGroupWalkers(data || []);
         } catch { /* ignore */ }
     };
 
@@ -136,20 +122,8 @@ export default function HomeScreen({ navigation }) {
                 });
             }).subscribe();
 
-        const packChannel = supabase.channel(`group-walkers-${ts}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, ({ new: row }) => {
-                setGroupWalkers(prev => {
-                    if (row.isGroupWalking && row.latitude) {
-                        const exists = prev.find(u => u.id === row.id);
-                        return exists ? prev.map(u => u.id === row.id ? row : u) : [...prev, row];
-                    } else {
-                        return prev.filter(u => u.id !== row.id);
-                    }
-                });
-            }).subscribe();
-
-        realtimeRefs.current = [cgChannel, packChannel];
-        return () => { supabase.removeChannel(cgChannel); supabase.removeChannel(packChannel); };
+        realtimeRefs.current = [cgChannel];
+        return () => { supabase.removeChannel(cgChannel); };
     }, []);
 
 
@@ -193,16 +167,6 @@ export default function HomeScreen({ navigation }) {
             setLocation({ latitude, longitude });
             mapRef.current?.animateToRegion({ latitude, longitude, latitudeDelta: 0.015, longitudeDelta: 0.015 }, 1000);
         } catch { /* ignore */ }
-    };
-
-    const handleToggleGroupWalk = async () => {
-        const newVal = !isGroupWalking;
-        setIsGroupWalking(newVal);
-        setMapMode(newVal ? 'pack' : 'caregivers');
-        if (!user?.id) return;
-        const update = { isGroupWalking: newVal };
-        if (newVal && location) { update.latitude = location.latitude; update.longitude = location.longitude; }
-        await supabase.from('users').update(update).eq('id', user.id);
     };
 
     const handleToggleOnline = async () => {
@@ -327,20 +291,10 @@ export default function HomeScreen({ navigation }) {
                         showsCompass={false}
                         customMapStyle={isDarkMode ? DARK_MAP_STYLE : []}
                     >
-                        {mapMode === 'caregivers' && !isCaregiver && onlineCaregivers.map(cg => (
+                        {!isCaregiver && onlineCaregivers.map(cg => (
                             <Marker key={cg.id} coordinate={{ latitude: Number(cg.latitude), longitude: Number(cg.longitude) }} onPress={() => setSelectedCaregiver(cg)}>
                                 <View style={{ width: 46, height: 46, borderRadius: 23, borderWidth: 3, borderColor: '#22c55e', overflow: 'hidden', backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 6 }}>
                                     <Image source={{ uri: cg.avatar || cg.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
-                                </View>
-                            </Marker>
-                        ))}
-                        {mapMode === 'pack' && groupWalkers.filter(u => u.id !== user?.id).map(u => (
-                            <Marker key={u.id} coordinate={{ latitude: Number(u.latitude), longitude: Number(u.longitude) }}>
-                                <View style={{ alignItems: 'center' }}>
-                                    <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 3, borderColor: '#f97316', overflow: 'hidden', backgroundColor: '#FFF' }}>
-                                        <Image source={{ uri: u.avatar || u.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
-                                    </View>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>Manada</Text>
                                 </View>
                             </Marker>
                         ))}
@@ -453,15 +407,6 @@ export default function HomeScreen({ navigation }) {
                                 <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>■ {t('home.endWalk')}</Text>
                             </TouchableOpacity>
                         </View>
-                    )}
-                    {!isCaregiver && (
-                        <TouchableOpacity 
-                            style={{ flex: 1, backgroundColor: isGroupWalking ? '#f97316' : '#fff7ed', paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#f97316', elevation: isGroupWalking ? 4 : 0 }}
-                            onPress={handleToggleGroupWalk}
-                        >
-                            <Text style={{ fontSize: 16, marginRight: 6 }}></Text>
-                            <Text style={{ color: isGroupWalking ? '#FFF' : '#f97316', fontSize: 13, fontWeight: '800' }}>{isGroupWalking ? t('home.packMode') : t('home.packModeLabel')}</Text>
-                        </TouchableOpacity>
                     )}
                     {isCaregiver && (
                         <TouchableOpacity

@@ -404,25 +404,37 @@ export default function CaregiverDashboardScreen({ navigation }) {
                     )}
                 </View>
 
-                {/* ── IBAN SECTION ── */}
+                {/* ── WITHDRAW SECTION ── */}
                 <TouchableOpacity
                     style={[s.section, { backgroundColor: theme.cardBackground }]}
-                    onPress={() => navigation.navigate('CaregiverSetup')}
+                    onPress={() => {
+                        if (stats.earnings <= 0) {
+                            return;
+                        }
+                        // Trigger withdraw flow (handled by backend or Stripe Connect onboarding)
+                        navigation.navigate('Settings');
+                    }}
+                    activeOpacity={stats.earnings > 0 ? 0.7 : 1}
                 >
                     <View style={s.sectionHeader}>
-                        <Ionicons name="card-outline" size={20} color="#8B5CF6" />
-                        <Text style={[s.sectionTitle, { color: theme.text }]}>Datos de pago</Text>
+                        <Ionicons name="cash-outline" size={20} color="#16A34A" />
+                        <Text style={[s.sectionTitle, { color: theme.text }]}>Retirar ganancias</Text>
                         <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 'auto' }} />
                     </View>
-                    {userData?.iban ? (
-                        <Text style={[{ color: theme.textSecondary, fontSize: 14 }]}>
-                            IBAN: ****{userData.iban.slice(-4)}
-                        </Text>
+                    {stats.earnings > 0 ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
+                                Disponible: €{stats.earnings.toFixed(2)}
+                            </Text>
+                            <View style={{ backgroundColor: '#16A34A', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 }}>
+                                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>Retirar</Text>
+                            </View>
+                        </View>
                     ) : (
-                        <View style={[s.ibanWarning, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="alert-circle" size={16} color="#D97706" />
-                            <Text style={{ color: '#D97706', fontSize: 13, fontWeight: '600', flex: 1 }}>
-                                Añade tu IBAN para recibir pagos
+                        <View style={[s.ibanWarning, { backgroundColor: '#F3F4F6' }]}>
+                            <Ionicons name="information-circle" size={16} color={theme.textSecondary} />
+                            <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600', flex: 1 }}>
+                                Aún no tienes ganancias para retirar
                             </Text>
                         </View>
                     )}

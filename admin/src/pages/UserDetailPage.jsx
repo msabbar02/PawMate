@@ -288,12 +288,11 @@ export default function UserDetailPage() {
                     <div className="detail-card">
                         <h2><FontAwesomeIcon icon={faEnvelope} className="icon" /> Conversaciones ({conversations.length})</h2>
                         {conversations.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>Sin conversaciones.</p> : conversations.slice(0, 10).map(c => (
-                            <div key={c.id} className="detail-list-item" onClick={() => navigate(`/messages/${c.id}`)}>
+                            <div key={c.id} className="detail-list-item">
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 600, fontSize: 13 }}>Conv. {c.id.substring(0, 8)}</div>
                                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(c.updated_at || c.created_at)}</div>
                                 </div>
-                                <FontAwesomeIcon icon={faEye} style={{ color: 'var(--text-muted)' }} />
                             </div>
                         ))}
                     </div>
