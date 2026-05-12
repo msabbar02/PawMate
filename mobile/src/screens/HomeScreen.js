@@ -368,14 +368,14 @@ export default function HomeScreen({ navigation }) {
                 <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF', marginTop: 4, position: 'relative', top: 0, left: 16, right: 16 }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
-                            <Ionicons name="chatbubbles" size={22} color="#0ea5e9" />
+                            <Ionicons name="chatbubbles" size={16} color="#0ea5e9" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.messages')}</Text>
                     </TouchableOpacity>
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Reservas')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                            <Ionicons name="calendar" size={22} color="#f59e0b" />
+                            <Ionicons name="calendar" size={16} color="#f59e0b" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.bookings')}</Text>
                     </TouchableOpacity>
@@ -528,11 +528,11 @@ const styles = StyleSheet.create({
     bottomSection: { flex: 0.5, position: 'relative' },
     
     // Quick Action Bar (Floating)
-    actionBar: { position: 'absolute', top: -38, left: 24, right: 24, flexDirection: 'row', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12, zIndex: 20 },
-    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 10 },
-    actionIconBox: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-    actionBtnText: { fontSize: 16, fontWeight: '800' },
-    actionDivider: { width: 1, height: '60%', alignSelf: 'center', opacity: 0.5 },
+    actionBar: { position: 'absolute', top: -28, left: 32, right: 32, flexDirection: 'row', borderRadius: 18, padding: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10, zIndex: 20 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, gap: 6 },
+    actionIconBox: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    actionBtnText: { fontSize: 13, fontWeight: '700' },
+    actionDivider: { width: 1, height: '55%', alignSelf: 'center', opacity: 0.4 },
 
     // Dashboard content
     dashboardContent: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 30 },

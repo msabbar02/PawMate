@@ -111,7 +111,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             <View style={styles.statsRow}>
                 {[
                     { label: t('caregiverProfile.reviews'), value: String(caregiver.reviewCount || reviews.length || '0'), icon: 'chatbubble-outline' },
-                    { label: t('caregiverProfile.experience'), value: caregiver.experience || t('caregiverProfile.noInfo'), icon: 'time-outline' },
+                    { label: 'Mascotas', value: String((Array.isArray(caregiver.petsCaredIds) ? caregiver.petsCaredIds.length : 0) || caregiver.completedServices || 0), icon: 'paw-outline' },
                     { label: t('caregiverProfile.radius'), value: `${caregiver.serviceRadius || 5} km`, icon: 'location-outline' },
                 ].map((s, i) => (
                     <View key={i} style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>

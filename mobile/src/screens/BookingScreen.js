@@ -92,13 +92,23 @@ export default function BookingScreen() {
                         users.forEach(u => { avatarMap[u.id] = u.avatar || u.photoURL || null; });
                     }
                 }
+                // Enrich with latest pet names (so renames propagate)
+                const allPetIds = [...new Set(data.flatMap(r => Array.isArray(r.petIds) ? r.petIds : (r.petId ? [r.petId] : [])).filter(Boolean))];
+                let petNameMap = {};
+                if (allPetIds.length > 0) {
+                    const { data: petsRows } = await supabase.from('pets').select('id,name').in('id', allPetIds);
+                    if (petsRows) petsRows.forEach(p => { petNameMap[p.id] = p.name; });
+                }
                 const enriched = data.map(r => {
                     const otherId = isCaregiver ? r.ownerId : r.caregiverId;
                     const freshAvatar = avatarMap[otherId] || null;
+                    const ids = Array.isArray(r.petIds) ? r.petIds : (r.petId ? [r.petId] : []);
+                    const freshNames = ids.map(id => petNameMap[id]).filter(Boolean);
+                    const out = { ...r, petNames: freshNames.length > 0 ? freshNames : r.petNames };
                     if (isCaregiver) {
-                        return { ...r, ownerAvatar: freshAvatar || r.ownerAvatar };
+                        return { ...out, ownerAvatar: freshAvatar || r.ownerAvatar };
                     } else {
-                        return { ...r, caregiverAvatar: freshAvatar || r.caregiverAvatar };
+                        return { ...out, caregiverAvatar: freshAvatar || r.caregiverAvatar };
                     }
                 });
                 setReservations(enriched);
@@ -352,10 +362,21 @@ export default function BookingScreen() {
             if (data && data.length > 0) {
                 const res = data[0];
                 await supabase.from('reservations').update({ status: 'completada', completedAt: new Date().toISOString() }).eq('id', res.id);
-                // Increment caregiver completedServices
-                await supabase.rpc('increment_completed_services', { user_id: user.id }).catch(() => {
-                    supabase.from('users').update({ completedServices: (userData?.completedServices || 0) + 1 }).eq('id', user.id);
-                });
+
+                // Refetch caregiver row to ensure latest counters
+                const { data: cgRow } = await supabase.from('users').select('completedServices, totalWalks, petsCaredIds').eq('id', user.id).maybeSingle();
+                const newCompleted = (cgRow?.completedServices || 0) + 1;
+                const cgPatch = { completedServices: newCompleted };
+                if (res.serviceType === 'walking') {
+                    cgPatch.totalWalks = (cgRow?.totalWalks || 0) + 1;
+                }
+                // Track unique pets cared by caregiver
+                if (Array.isArray(res.petIds) && res.petIds.length > 0) {
+                    const existing = Array.isArray(cgRow?.petsCaredIds) ? cgRow.petsCaredIds : [];
+                    cgPatch.petsCaredIds = [...new Set([...existing, ...res.petIds])];
+                }
+                await supabase.from('users').update(cgPatch).eq('id', user.id);
+
                 // Increment owner totalWalks (only for walking service)
                 if (res.serviceType === 'walking' && res.ownerId) {
                     const { data: ownerRow } = await supabase.from('users').select('totalWalks, saveWalks').eq('id', res.ownerId).maybeSingle();

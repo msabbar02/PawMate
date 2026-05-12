@@ -120,20 +120,26 @@ PawMate/
 ### App Móvil
 
 - Autenticación con Supabase Auth (Email/Password, Google OAuth)
-- Perfiles completos de mascotas (fotos, historial médico, chip NFC)
+- Perfiles completos de mascotas (fotos, historial médico, chip NFC, fecha nacimiento con calendario)
 - Seguimiento GPS en tiempo real de paseos con mapa, distancia, duración y velocidad
 - Modo oscuro personalizado en Google Maps
 - Paw-Port QR Biométrico — código QR de emergencia imprimible y descargable
 - Recordatorios de vacunas y citas veterinarias
 - Chat en tiempo real entre dueños y cuidadores (Supabase Realtime)
 - Sistema de cuidadores verificados con reservas y pagos (Stripe)
+  - **Paseo**: reserva por horas (1–24) con fecha/hora de inicio
+  - **Hotel**: reserva por rango de fechas con horarios de entrada/salida
+- Soporte de múltiples mascotas por reserva
+- Historial de paseos por usuario y por mascota (`totalWalks`)
+- Sección "Retirar ganancias" en dashboard de cuidador
 - Flujo de verificación de identidad en 3 pasos (DNI frontal + dorsal + selfie + certificados)
 - Notificaciones push en tiempo real (Expo Notifications)
 - Widget del clima en tiempo real
 - Radar de mascotas cercanas
+- 5 especies soportadas: perro, gato, ave, conejo, otro
 - Dark mode / Light mode con tema naranja-navy
 - Localización completa ES / EN (i18next)
-- Banner de perfil incompleto con indicador de progreso
+- Banner de perfil incompleto con indicador de progreso (4/4 pasos)
 
 ### Landing Page (`pawmate-web/`)
 
