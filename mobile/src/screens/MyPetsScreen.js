@@ -30,7 +30,7 @@ const SPECIES_OPTIONS = [
     { value: 'dog', label: 'Perro', icon: 'dog' },
     { value: 'cat', label: 'Gato', icon: 'cat' },
     { value: 'bird', label: 'Ave', icon: 'dove' },
-    { value: 'rabbit', label: 'Conejo', icon: 'paw' },
+    { value: 'rabbit', label: 'Conejo', icon: 'rabbit' },
     { value: 'other', label: 'Otro', icon: 'paw' },
 ];
 
@@ -139,6 +139,7 @@ export default function PawMatePetsCenter() {
         title: '', description: '', eventTime: new Date(), notificationAdvance: 15,
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showBirthdatePicker, setShowBirthdatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
 
     // ── Health Record State ──────────────────────────
@@ -1545,13 +1546,32 @@ export default function PawMatePetsCenter() {
                                     />
 
                                     <Text style={wizStyles.fieldLabel}>Fecha de Nacimiento</Text>
-                                    <TextInput
+                                    <TouchableOpacity
                                         style={wizStyles.wizardInput}
-                                        value={formParams.birthdate}
-                                        onChangeText={t => setFormParams(p => ({ ...p, birthdate: t }))}
-                                        placeholder="YYYY-MM-DD"
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
-                                    />
+                                        onPress={() => setShowBirthdatePicker(true)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={{ color: formParams.birthdate ? '#FFF' : 'rgba(255,255,255,0.3)', fontSize: 15 }}>
+                                            {formParams.birthdate
+                                                ? new Date(formParams.birthdate).toLocaleDateString('es-ES')
+                                                : 'Selecciona la fecha'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    {showBirthdatePicker && (
+                                        <DateTimePicker
+                                            value={formParams.birthdate ? new Date(formParams.birthdate) : new Date()}
+                                            mode="date"
+                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                            maximumDate={new Date()}
+                                            onChange={(_, date) => {
+                                                setShowBirthdatePicker(Platform.OS === 'ios');
+                                                if (date) {
+                                                    const iso = date.toISOString().split('T')[0];
+                                                    setFormParams(p => ({ ...p, birthdate: iso }));
+                                                }
+                                            }}
+                                        />
+                                    )}
 
                                     <Text style={wizStyles.fieldLabel}>Color del pelaje</Text>
                                     <TextInput

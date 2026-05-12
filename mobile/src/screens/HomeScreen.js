@@ -57,10 +57,7 @@ export default function HomeScreen({ navigation }) {
     const [panelOpen, setPanelOpen] = useState(true);
     const panelAnim = useRef(new Animated.Value(1)).current; // 1=open, 0=closed
     const [onlineCaregivers, setOnlineCaregivers] = useState([]);
-    const [groupWalkers, setGroupWalkers] = useState([]);
-    const [isGroupWalking, setIsGroupWalking] = useState(false);
     const [selectedCaregiver, setSelectedCaregiver] = useState(null);
-    const [mapMode, setMapMode] = useState('caregivers'); // 'caregivers' | 'pack'
     const realtimeRefs = useRef([]);
 
     // Walk from Home state
@@ -96,7 +93,6 @@ export default function HomeScreen({ navigation }) {
 
             fetchWeather(latitude, longitude);
             fetchOnlineCaregivers();
-            fetchGroupWalkers();
         })();
     }, []);
 
@@ -107,16 +103,6 @@ export default function HomeScreen({ navigation }) {
                 .eq('role', 'caregiver').eq('isOnline', true)
                 .not('latitude', 'is', null).not('longitude', 'is', null);
             setOnlineCaregivers(data || []);
-        } catch { /* ignore */ }
-    };
-
-    const fetchGroupWalkers = async () => {
-        try {
-            const { data } = await supabase.from('users')
-                .select('id,fullName,avatar,photoURL,latitude,longitude')
-                .eq('isGroupWalking', true)
-                .not('latitude', 'is', null).not('longitude', 'is', null);
-            setGroupWalkers(data || []);
         } catch { /* ignore */ }
     };
 
@@ -136,20 +122,8 @@ export default function HomeScreen({ navigation }) {
                 });
             }).subscribe();
 
-        const packChannel = supabase.channel(`group-walkers-${ts}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, ({ new: row }) => {
-                setGroupWalkers(prev => {
-                    if (row.isGroupWalking && row.latitude) {
-                        const exists = prev.find(u => u.id === row.id);
-                        return exists ? prev.map(u => u.id === row.id ? row : u) : [...prev, row];
-                    } else {
-                        return prev.filter(u => u.id !== row.id);
-                    }
-                });
-            }).subscribe();
-
-        realtimeRefs.current = [cgChannel, packChannel];
-        return () => { supabase.removeChannel(cgChannel); supabase.removeChannel(packChannel); };
+        realtimeRefs.current = [cgChannel];
+        return () => { supabase.removeChannel(cgChannel); };
     }, []);
 
 
@@ -193,16 +167,6 @@ export default function HomeScreen({ navigation }) {
             setLocation({ latitude, longitude });
             mapRef.current?.animateToRegion({ latitude, longitude, latitudeDelta: 0.015, longitudeDelta: 0.015 }, 1000);
         } catch { /* ignore */ }
-    };
-
-    const handleToggleGroupWalk = async () => {
-        const newVal = !isGroupWalking;
-        setIsGroupWalking(newVal);
-        setMapMode(newVal ? 'pack' : 'caregivers');
-        if (!user?.id) return;
-        const update = { isGroupWalking: newVal };
-        if (newVal && location) { update.latitude = location.latitude; update.longitude = location.longitude; }
-        await supabase.from('users').update(update).eq('id', user.id);
     };
 
     const handleToggleOnline = async () => {
@@ -327,20 +291,10 @@ export default function HomeScreen({ navigation }) {
                         showsCompass={false}
                         customMapStyle={isDarkMode ? DARK_MAP_STYLE : []}
                     >
-                        {mapMode === 'caregivers' && !isCaregiver && onlineCaregivers.map(cg => (
+                        {!isCaregiver && onlineCaregivers.map(cg => (
                             <Marker key={cg.id} coordinate={{ latitude: Number(cg.latitude), longitude: Number(cg.longitude) }} onPress={() => setSelectedCaregiver(cg)}>
                                 <View style={{ width: 46, height: 46, borderRadius: 23, borderWidth: 3, borderColor: '#22c55e', overflow: 'hidden', backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 6 }}>
                                     <Image source={{ uri: cg.avatar || cg.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
-                                </View>
-                            </Marker>
-                        ))}
-                        {mapMode === 'pack' && groupWalkers.filter(u => u.id !== user?.id).map(u => (
-                            <Marker key={u.id} coordinate={{ latitude: Number(u.latitude), longitude: Number(u.longitude) }}>
-                                <View style={{ alignItems: 'center' }}>
-                                    <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 3, borderColor: '#f97316', overflow: 'hidden', backgroundColor: '#FFF' }}>
-                                        <Image source={{ uri: u.avatar || u.photoURL || 'https://via.placeholder.com/40' }} style={{ width: '100%', height: '100%' }} />
-                                    </View>
-                                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#f97316', marginTop: 2 }}>Manada</Text>
                                 </View>
                             </Marker>
                         ))}
@@ -414,14 +368,14 @@ export default function HomeScreen({ navigation }) {
                 <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF', marginTop: 4, position: 'relative', top: 0, left: 16, right: 16 }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
-                            <Ionicons name="chatbubbles" size={22} color="#0ea5e9" />
+                            <Ionicons name="chatbubbles" size={16} color="#0ea5e9" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.messages')}</Text>
                     </TouchableOpacity>
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Reservas')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                            <Ionicons name="calendar" size={22} color="#f59e0b" />
+                            <Ionicons name="calendar" size={16} color="#f59e0b" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.bookings')}</Text>
                     </TouchableOpacity>
@@ -453,15 +407,6 @@ export default function HomeScreen({ navigation }) {
                                 <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>■ {t('home.endWalk')}</Text>
                             </TouchableOpacity>
                         </View>
-                    )}
-                    {!isCaregiver && (
-                        <TouchableOpacity 
-                            style={{ flex: 1, backgroundColor: isGroupWalking ? '#f97316' : '#fff7ed', paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#f97316', elevation: isGroupWalking ? 4 : 0 }}
-                            onPress={handleToggleGroupWalk}
-                        >
-                            <Text style={{ fontSize: 16, marginRight: 6 }}></Text>
-                            <Text style={{ color: isGroupWalking ? '#FFF' : '#f97316', fontSize: 13, fontWeight: '800' }}>{isGroupWalking ? t('home.packMode') : t('home.packModeLabel')}</Text>
-                        </TouchableOpacity>
                     )}
                     {isCaregiver && (
                         <TouchableOpacity
@@ -583,11 +528,11 @@ const styles = StyleSheet.create({
     bottomSection: { flex: 0.5, position: 'relative' },
     
     // Quick Action Bar (Floating)
-    actionBar: { position: 'absolute', top: -38, left: 24, right: 24, flexDirection: 'row', borderRadius: 24, padding: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12, zIndex: 20 },
-    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 10 },
-    actionIconBox: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-    actionBtnText: { fontSize: 16, fontWeight: '800' },
-    actionDivider: { width: 1, height: '60%', alignSelf: 'center', opacity: 0.5 },
+    actionBar: { position: 'absolute', top: -28, left: 32, right: 32, flexDirection: 'row', borderRadius: 18, padding: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10, zIndex: 20 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, gap: 6 },
+    actionIconBox: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    actionBtnText: { fontSize: 13, fontWeight: '700' },
+    actionDivider: { width: 1, height: '55%', alignSelf: 'center', opacity: 0.4 },
 
     // Dashboard content
     dashboardContent: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 30 },

@@ -2,6 +2,7 @@
 import {
     StyleSheet, View, Text, TouchableOpacity, ScrollView,
     Image, Alert, ActivityIndicator, Platform, Linking,
+    Modal, TextInput, KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -48,6 +49,12 @@ export default function CaregiverDashboardScreen({ navigation }) {
     const [reviews, setReviews] = useState([]);
     const [activeReservations, setActiveReservations] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [withdrawVisible, setWithdrawVisible] = useState(false);
+    const [wName, setWName] = useState('');
+    const [wCountry, setWCountry] = useState('');
+    const [wIban, setWIban] = useState('');
+    const [wPhone, setWPhone] = useState('');
+    const [wSaving, setWSaving] = useState(false);
     const [photos, setPhotos] = useState(userData?.galleryPhotos || []);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
@@ -62,16 +69,19 @@ export default function CaregiverDashboardScreen({ navigation }) {
                 { data: reviewsData },
                 { data: activeData },
             ] = await Promise.all([
-                supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('caregiverId', user.id).eq('status', 'completada'),
-                supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('caregiverId', user.id).eq('status', 'activa'),
-                supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('caregiverId', user.id).eq('status', 'pendiente'),
-                supabase.from('reservations').select('totalPrice').eq('caregiverId', user.id).eq('status', 'completada'),
+                supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('caregiverId', user.id).in('status', ['completada', 'completed', 'finalizada']),
+                supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('caregiverId', user.id).in('status', ['activa', 'in_progress']),
+                supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('caregiverId', user.id).in('status', ['pendiente', 'aceptada']),
+                supabase.from('reservations').select('totalPrice').eq('caregiverId', user.id).in('status', ['completada', 'completed', 'finalizada']),
                 supabase.from('reviews').select('*').eq('revieweeId', user.id).order('created_at', { ascending: false }).limit(5),
-                supabase.from('reservations').select('*').eq('caregiverId', user.id).in('status', ['activa', 'aceptada']).order('created_at', { ascending: false }).limit(5),
+                supabase.from('reservations').select('*').eq('caregiverId', user.id).in('status', ['activa', 'aceptada', 'in_progress']).order('created_at', { ascending: false }).limit(5),
             ]);
 
             const earnings = (completedData || []).reduce((sum, r) => sum + (r.totalPrice || 0), 0);
-            setStats({ completed: completed || 0, active: active || 0, pending: pending || 0, earnings });
+            // Fallback: take the max between live query and counter on users row,
+            // so if the trigger missed an increment we still display correctly.
+            const completedCount = Math.max(completed || 0, userData?.completedServices || 0);
+            setStats({ completed: completedCount, active: active || 0, pending: pending || 0, earnings });
             setReviews(reviewsData || []);
             setActiveReservations(activeData || []);
         } catch (e) {
@@ -79,7 +89,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
         } finally {
             setLoading(false);
         }
-    }, [user?.id]);
+    }, [user?.id, userData?.completedServices]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -404,29 +414,104 @@ export default function CaregiverDashboardScreen({ navigation }) {
                     )}
                 </View>
 
-                {/* ── IBAN SECTION ── */}
+                {/* ── WITHDRAW SECTION ── */}
                 <TouchableOpacity
                     style={[s.section, { backgroundColor: theme.cardBackground }]}
-                    onPress={() => navigation.navigate('CaregiverSetup')}
+                    onPress={() => {
+                        if (stats.earnings <= 0) return;
+                        setWName(userData?.withdrawName || userData?.fullName || '');
+                        setWCountry(userData?.withdrawCountry || userData?.country || 'España');
+                        setWIban(userData?.withdrawIban || userData?.iban || '');
+                        setWPhone(userData?.withdrawPhone || userData?.phone || '');
+                        setWithdrawVisible(true);
+                    }}
+                    activeOpacity={stats.earnings > 0 ? 0.7 : 1}
                 >
                     <View style={s.sectionHeader}>
-                        <Ionicons name="card-outline" size={20} color="#8B5CF6" />
-                        <Text style={[s.sectionTitle, { color: theme.text }]}>Datos de pago</Text>
+                        <Ionicons name="cash-outline" size={20} color="#16A34A" />
+                        <Text style={[s.sectionTitle, { color: theme.text }]}>Retirar ganancias</Text>
                         <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} style={{ marginLeft: 'auto' }} />
                     </View>
-                    {userData?.iban ? (
-                        <Text style={[{ color: theme.textSecondary, fontSize: 14 }]}>
-                            IBAN: ****{userData.iban.slice(-4)}
-                        </Text>
+                    {stats.earnings > 0 ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
+                                Disponible: €{stats.earnings.toFixed(2)}
+                            </Text>
+                            <View style={{ backgroundColor: '#16A34A', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 }}>
+                                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>Retirar</Text>
+                            </View>
+                        </View>
                     ) : (
-                        <View style={[s.ibanWarning, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="alert-circle" size={16} color="#D97706" />
-                            <Text style={{ color: '#D97706', fontSize: 13, fontWeight: '600', flex: 1 }}>
-                                Añade tu IBAN para recibir pagos
+                        <View style={[s.ibanWarning, { backgroundColor: '#F3F4F6' }]}>
+                            <Ionicons name="information-circle" size={16} color={theme.textSecondary} />
+                            <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600', flex: 1 }}>
+                                Aún no tienes ganancias para retirar
                             </Text>
                         </View>
                     )}
                 </TouchableOpacity>
+
+                {/* ── WITHDRAW MODAL ── */}
+                <Modal visible={withdrawVisible} animationType="slide" transparent onRequestClose={() => setWithdrawVisible(false)}>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                        <View style={{ backgroundColor: theme.cardBackground, padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                <Ionicons name="cash-outline" size={22} color="#16A34A" />
+                                <Text style={{ flex: 1, marginLeft: 8, fontSize: 18, fontWeight: '800', color: theme.text }}>Retirar ganancias</Text>
+                                <TouchableOpacity onPress={() => setWithdrawVisible(false)}><Ionicons name="close" size={24} color={theme.textSecondary} /></TouchableOpacity>
+                            </View>
+                            <ScrollView keyboardShouldPersistTaps="handled">
+                                <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 16 }}>Disponible: €{stats.earnings.toFixed(2)}</Text>
+                                {[
+                                    { label: 'Nombre completo *', val: wName, set: setWName, ph: 'Nombre y apellidos' },
+                                    { label: 'País *', val: wCountry, set: setWCountry, ph: 'España' },
+                                    { label: 'IBAN *', val: wIban, set: setWIban, ph: 'ES00 0000 0000 0000 0000 0000', auto: 'characters' },
+                                    { label: 'Teléfono móvil *', val: wPhone, set: setWPhone, ph: '+34 600 000 000', kbd: 'phone-pad' },
+                                ].map((f, i) => (
+                                    <View key={i} style={{ marginBottom: 12 }}>
+                                        <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600', marginBottom: 6 }}>{f.label}</Text>
+                                        <TextInput
+                                            value={f.val}
+                                            onChangeText={f.set}
+                                            placeholder={f.ph}
+                                            placeholderTextColor={theme.textSecondary}
+                                            keyboardType={f.kbd || 'default'}
+                                            autoCapitalize={f.auto || 'sentences'}
+                                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 10, fontSize: 14, borderWidth: 1, borderColor: theme.border || '#E5E7EB' }}
+                                        />
+                                    </View>
+                                ))}
+                                <TouchableOpacity
+                                    disabled={wSaving}
+                                    onPress={async () => {
+                                        if (!wName.trim() || !wCountry.trim() || !wIban.trim() || !wPhone.trim()) {
+                                            Alert.alert('Campos obligatorios', 'Completa todos los campos.');
+                                            return;
+                                        }
+                                        setWSaving(true);
+                                        try {
+                                            const { error } = await supabase.from('users').update({
+                                                withdrawName: wName.trim(),
+                                                withdrawCountry: wCountry.trim(),
+                                                withdrawIban: wIban.trim().replace(/\s+/g, '').toUpperCase(),
+                                                withdrawPhone: wPhone.trim(),
+                                            }).eq('id', user.id);
+                                            if (error) throw error;
+                                            await refreshUserData?.();
+                                            setWithdrawVisible(false);
+                                            Alert.alert('Solicitud registrada', 'Procesaremos tu retiro en 1–3 días hábiles.');
+                                        } catch (e) {
+                                            Alert.alert('Error', e.message || 'No se pudo guardar');
+                                        } finally { setWSaving(false); }
+                                    }}
+                                    style={{ backgroundColor: '#16A34A', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 8, opacity: wSaving ? 0.6 : 1 }}
+                                >
+                                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 15 }}>{wSaving ? 'Guardando...' : 'Confirmar retiro'}</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </View>
+                    </KeyboardAvoidingView>
+                </Modal>
 
             </ScrollView>
         </View>

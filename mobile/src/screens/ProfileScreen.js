@@ -186,15 +186,12 @@ export default function ProfileScreen({ navigation }) {
     };
 
     // ── Profile Completion ──────────────────────────────────
+    // Same 4 visual steps as in the completion card to keep bar+counter in sync
     const completionFields = [
-        !!firstName.trim(),
-        !!lastName.trim(),
+        !!photoUri,
         !!phone.trim(),
         !!city.trim(),
-        !!postalCode.trim(),
-        !!province.trim(),
-        !!photoUri,
-        birthDate && birthDate.getFullYear() !== 1990,
+        !!firstName.trim(),
     ];
     const completionPercent = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
 

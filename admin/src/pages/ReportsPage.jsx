@@ -26,7 +26,7 @@ export default function ReportsPage() {
         setLoading(true);
         try {
             if (tab === 'reports') {
-                const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false });
+                const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
                 if (data) setReports(data);
             } else {
                 const { data } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShieldHalved, faClock, faXmark, faEye, faUserCheck, faRotateLeft, faFileImage } from '@fortawesome/free-solid-svg-icons';
+import { faShieldHalved, faClock, faXmark, faEye, faUserCheck, faRotateLeft, faFileImage, faCheck, faBan } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
 import './VerificationsPage.css';
 
@@ -160,8 +160,8 @@ export default function VerificationsPage() {
                 </h1>
                 <div className="stat-pills">
                     <span className="stat-pill pending"><FontAwesomeIcon icon={faClock} style={{ fontSize: 14 }} /> {counts.pending} {t('verifications.pendingCount')}</span>
-                    <span className="stat-pill approved"><FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 14 }} /> {counts.approved} {t('verifications.approvedCount')}</span>
-                    <span className="stat-pill rejected"><FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 14 }} /> {counts.rejected} {t('verifications.rejectedCount')}</span>
+                    <span className="stat-pill approved"><FontAwesomeIcon icon={faCheck} style={{ fontSize: 14 }} /> {counts.approved} {t('verifications.approvedCount')}</span>
+                    <span className="stat-pill rejected"><FontAwesomeIcon icon={faBan} style={{ fontSize: 14 }} /> {counts.rejected} {t('verifications.rejectedCount')}</span>
                 </div>
             </div>
 
@@ -256,7 +256,7 @@ export default function VerificationsPage() {
                                             <FontAwesomeIcon icon={faUserCheck} style={{ fontSize: 16 }} /> {t('verifications.approve')}
                                         </button>
                                         <button className="reject-btn" onClick={() => handleReject(req)}>
-                                            <FontAwesomeIcon icon={faShieldHalved} style={{ fontSize: 16 }} /> {t('verifications.reject')}
+                                            <FontAwesomeIcon icon={faBan} style={{ fontSize: 16 }} /> {t('verifications.reject')}
                                         </button>
                                     </>
                                 )}

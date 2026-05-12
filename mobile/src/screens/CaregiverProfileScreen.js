@@ -111,7 +111,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             <View style={styles.statsRow}>
                 {[
                     { label: t('caregiverProfile.reviews'), value: String(caregiver.reviewCount || reviews.length || '0'), icon: 'chatbubble-outline' },
-                    { label: t('caregiverProfile.experience'), value: caregiver.experience || t('caregiverProfile.noInfo'), icon: 'time-outline' },
+                    { label: 'Mascotas', value: String((Array.isArray(caregiver.petsCaredIds) ? caregiver.petsCaredIds.length : 0) || caregiver.completedServices || 0), icon: 'paw-outline' },
                     { label: t('caregiverProfile.radius'), value: `${caregiver.serviceRadius || 5} km`, icon: 'location-outline' },
                 ].map((s, i) => (
                     <View key={i} style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
@@ -153,21 +153,27 @@ export default function CaregiverProfileScreen({ route, navigation }) {
             ) : null}
 
             {/* Accepted species */}
-            {(caregiver.acceptedSpecies?.length > 0) && (
-                <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.acceptedPets')}</Text>
-                    <View style={styles.serviceChips}>
-                        {caregiver.acceptedSpecies.map(s => (
-                            <View key={s} style={[styles.chip, { backgroundColor: '#E0F2FE', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-                                <Icon name={s === 'perro' ? 'dog' : s === 'gato' ? 'cat' : 'paw'} size={13} color="#0891b2" />
-                                <Text style={[styles.chipText, { color: '#0891b2' }]}>
-                                    {s === 'perro' ? t('species.dogs') : s === 'gato' ? t('species.cats') : s}
-                                </Text>
-                            </View>
-                        ))}
+            {(caregiver.acceptedSpecies?.length > 0) && (() => {
+                const normMap = { perro: 'dog', gato: 'cat', ave: 'bird', reptil: 'other' };
+                const norm = [...new Set(caregiver.acceptedSpecies.map(s => normMap[s] || s))];
+                const labelMap = { dog: t('species.dogs'), cat: t('species.cats'), bird: t('species.birds'), rabbit: 'Conejo', other: 'Otros' };
+                const iconMap = { dog: 'dog', cat: 'cat', bird: 'dove', rabbit: 'rabbit', other: 'paw' };
+                return (
+                    <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverProfile.acceptedPets')}</Text>
+                        <View style={styles.serviceChips}>
+                            {norm.map(s => (
+                                <View key={s} style={[styles.chip, { backgroundColor: '#E0F2FE', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                                    <Icon name={iconMap[s] || 'paw'} size={13} color="#0891b2" />
+                                    <Text style={[styles.chipText, { color: '#0891b2' }]}>
+                                        {labelMap[s] || s}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
-                </View>
-            )}
+                );
+            })()}
 
 
         </>

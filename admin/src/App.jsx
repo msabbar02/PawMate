@@ -17,7 +17,6 @@ import LogsPage from './pages/LogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminsPage from './pages/AdminsPage';
 import VerificationsPage from './pages/VerificationsPage';
-import CommunityPage from './pages/CommunityPage';
 
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated } = useContext(AuthContext);
@@ -47,7 +46,6 @@ function App() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admins" element={<AdminsPage />} />
         <Route path="verifications" element={<VerificationsPage />} />
-        <Route path="community" element={<CommunityPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

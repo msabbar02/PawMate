@@ -1,7 +1,7 @@
 # PawMate — Documentación Técnica
 
 > Plataforma móvil + web para conectar dueños de mascotas con cuidadores verificados.
-> Versión: 1.0 · Última revisión: 2026-04
+> Versión: 1.1 · Última revisión: 2026-05
 
 ---
 
@@ -16,7 +16,6 @@
 7. [Seguridad](#7-seguridad)
 8. [Despliegue](#8-despliegue)
 9. [Variables de entorno](#9-variables-de-entorno)
-10. [Issues conocidos](#10-issues-conocidos)
 
 ---
 
@@ -50,7 +49,7 @@ mindmap
 | Usuarios objetivo | Dueños de mascotas + cuidadores particulares |
 | Mercado           | España (escalable)                           |
 | Modelo de negocio | Comisión por reserva (Stripe)                |
-| Modalidades       | Paseo · Hotel ·                             |
+| Modalidades       | Paseo (por horas) · Hotel (por fechas)        |
 
 ---
 
@@ -165,27 +164,25 @@ graph LR
 ```mermaid
 erDiagram
     users ||--o{ pets : "tiene"
-    users ||--o{ reservations : "como dueño"
-    users ||--o{ reservations : "como cuidador"
+    users ||--o{ reservations : "dueño/cuidador"
     users ||--o{ messages : "envía"
     users ||--o{ notifications : "recibe"
     users ||--o{ reviews : "escribe"
     users ||--o{ reports : "reporta"
+    users ||--o{ recent_activity : "genera"
+    users ||--o{ posts : "publica"
+    users ||--o{ preferences : "configura"
     pets  ||--o{ walks : "registra"
     pets  ||--o{ reservations : "incluido en"
     reservations ||--o| reviews : "genera"
     conversations ||--o{ messages : "contiene"
+    users ||--o{ conversations : "participa"
 
     users {
         uuid id PK
         text email
-        text fullName
-        text role "normal/caregiver/admin"
-        text photoURL
-        boolean isOnline
-        boolean isWalking
+        text role
         text verificationStatus
-        jsonb services
         numeric rating
     }
     pets {
@@ -194,25 +191,20 @@ erDiagram
         text name
         text species
         text breed
-        jsonb vaccines
-        jsonb reminders
-        text medicalConditions
     }
     reservations {
         uuid id PK
         uuid ownerId FK
         uuid caregiverId FK
-        text serviceType
         text status
-        timestamptz startDateTime
         numeric totalPrice
     }
-    walks {
+    conversations {
         uuid id PK
-        uuid petId FK
-        jsonb route
-        numeric totalKm
-        int durationSeconds
+        uuid ownerId FK
+        uuid caregiverId FK
+        text lastMessage
+        timestamptz lastMessageAt
     }
     messages {
         uuid id PK
@@ -220,6 +212,60 @@ erDiagram
         uuid senderId FK
         text text
         boolean read
+    }
+    notifications {
+        uuid id PK
+        uuid userId FK
+        text type
+        text title
+        boolean read
+    }
+    reviews {
+        uuid id PK
+        uuid reviewerId FK
+        uuid revieweeId FK
+        int rating
+        text comment
+    }
+    walks {
+        uuid id PK
+        uuid petId FK
+        numeric totalKm
+        int durationSeconds
+        jsonb route
+    }
+    reports {
+        uuid id PK
+        uuid reporterUserId FK
+        uuid reportedUserId FK
+        text reason
+        text status
+    }
+    recent_activity {
+        uuid id PK
+        uuid userId FK
+        text title
+        text type
+        text icon
+    }
+    system_logs {
+        uuid id PK
+        text userId
+        text actionType
+        text entity
+        text details
+    }
+    posts {
+        uuid id PK
+        uuid authorUid FK
+        text caption
+        int likes
+        int comments
+    }
+    preferences {
+        uuid userId FK
+        text species
+        int count
     }
 ```
 
@@ -319,11 +365,14 @@ flowchart LR
 flowchart TD
     A[Usuario crea recordatorio] --> B[Auto-detectar categoría<br/>por palabras clave]
     B --> C{Categoría detectada}
-    C -->|vacuna| D[]
-    C -->|vet/médico| E[]
-    C -->|antiparásito| F[]
-    C -->|otro| G[]
-    D & E & F --> H[Guardar en pets.reminders]
+    C -->|vacuna| D[Categoría: vacuna]
+    C -->|vet/médico| E[Categoría: visita vet]
+    C -->|antiparásito| F[Categoría: antiparásito]
+    C -->|otro| G[Categoría: genérico]
+    D --> H[Guardar en pets.reminders]
+    E --> H
+    F --> H
+    G --> H
     H --> I[Programar push notification]
     I --> J{¿Es categoría salud?}
     J -->|Sí| K[Alert: ¿Añadir al historial?]
@@ -577,7 +626,7 @@ STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 RESEND_API_KEY=re_xxxxxxxxxxxx
 EMAIL_FROM=PawMate <noreply@apppawmate.com>
-EMAIL_FROM_SUPPORT=PawMate Soporte <support@apppawmate.com>
+EMAIL_FROM_SUPPORT=PawMate Soporte <soporte@apppawmate.com>
 EMAIL_FROM_ADMIN=PawMate Admin <admin@apppawmate.com>
 SUPABASE_AUTH_HOOK_SECRET=
 ALLOWED_ORIGINS=https://apppawmate.com,https://admin.apppawmate.com
@@ -590,43 +639,5 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 ```
 
----
 
-## 10. Issues conocidos
-
-> Lista priorizada de mejoras pendientes.
-
-### Críticos
-
-
-| # | Problema                                  | Solución propuesta                         |
-| - | ----------------------------------------- | ------------------------------------------- |
-| 1 | RLS policies =`USING (true)`              | Reescribir policies por tabla con ownership |
-| 2 | `updateUser` permite cambiar `role`       | Whitelist de campos editables               |
-| 3 | API keys hardcodeadas (Weather)            | Mover a variables de entorno                |
-
-### Altos
-
-
-| # | Problema                                 | Solución                                      |
-| - | ---------------------------------------- | ---------------------------------------------- |
-| 4 | Email endpoints sin rate limit estricto  | Aplicar 10 emails/hora/IP                      |
-| 5 | IBAN en plaintext                        | Encriptar con KMS                              |
-| 6 | Sin índices en`ownerId`, `status`       | `CREATE INDEX` en schema                       |
-| 7 | Vercel bloquea SMTP outbound (plan free) | Migrar server a Render/Railway o usar plan Pro |
-
-### Medios
-
-
-| #  | Problema                                                          | Solución                               |
-| -- | ----------------------------------------------------------------- | --------------------------------------- |
-| 8  | Lógica paseos duplicada en Home + MyPets                         | Extraer a hook`useWalkTracking()`       |
-| 9  | N+1 queries en Admin PetsPage                                     | Join con`select(..., owner:users(...))` |
-| 10 | Columnas duplicadas (`birthdate`/`birthDate`, `image`/`photoURL`) | Unificar a una sola                     |
-
-### Bajos
-
-- `Math.random()` como key en LogsPage
-
-
-*PawMate © 2026 · Documentación técnica v1.0*
+*PawMate � 2026 � Documentaci�n t�cnica v1.1*

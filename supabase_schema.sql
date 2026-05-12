@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS public.users (
   is_banned boolean DEFAULT false,
   "isVerified" boolean DEFAULT false,
   gender text,
+  "hotelPrice" numeric,
+  "withdrawName" text,
+  "withdrawCountry" text,
+  "withdrawIban" text,
+  "withdrawPhone" text,
+  "petsCaredIds" uuid[] DEFAULT '{}',
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -85,7 +91,13 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS "walkingPets" uuid[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS iban text,
   ADD COLUMN IF NOT EXISTS gender text,
-  ADD COLUMN IF NOT EXISTS last_seen timestamp with time zone;
+  ADD COLUMN IF NOT EXISTS last_seen timestamp with time zone,
+  ADD COLUMN IF NOT EXISTS "hotelPrice" numeric,
+  ADD COLUMN IF NOT EXISTS "withdrawName" text,
+  ADD COLUMN IF NOT EXISTS "withdrawCountry" text,
+  ADD COLUMN IF NOT EXISTS "withdrawIban" text,
+  ADD COLUMN IF NOT EXISTS "withdrawPhone" text,
+  ADD COLUMN IF NOT EXISTS "petsCaredIds" uuid[] DEFAULT '{}';
 
 -- ── PETS ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.pets (
@@ -438,6 +450,34 @@ SELECT
 FROM auth.users au
 LEFT JOIN public.users pu ON pu.id = au.id
 WHERE pu.id IS NULL;
+
+-- ── Backfill: recalcular completedServices y petsCaredIds para cuidadores ──
+-- Ejecutable múltiples veces; recalcula desde reservaciones ya completadas.
+UPDATE public.users u
+SET "completedServices" = sub.cnt,
+    "petsCaredIds"      = sub.pet_ids
+FROM (
+  SELECT
+    r."caregiverId" AS cg_id,
+    COUNT(*)::int   AS cnt,
+    COALESCE(
+      ARRAY(
+        SELECT DISTINCT pid
+        FROM   public.reservations r2,
+               unnest(COALESCE(r2."petIds", ARRAY[]::uuid[])) AS pid
+        WHERE  r2."caregiverId" = r."caregiverId"
+          AND  r2.status IN ('completada','completed','finalizada')
+      ),
+      ARRAY[]::uuid[]
+    ) AS pet_ids
+  FROM public.reservations r
+  WHERE r.status IN ('completada','completed','finalizada')
+    AND r."caregiverId" IS NOT NULL
+  GROUP BY r."caregiverId"
+) AS sub
+WHERE u.id = sub.cg_id
+  AND (COALESCE(u."completedServices",0) < sub.cnt
+       OR COALESCE(array_length(u."petsCaredIds",1),0) < COALESCE(array_length(sub.pet_ids,1),0));
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 5. RLS — POLÍTICAS PERMISIVAS (panel admin con anon key)

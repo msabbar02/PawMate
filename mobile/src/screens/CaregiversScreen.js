@@ -56,7 +56,10 @@ export default function CaregiversScreen({ navigation }) {
             (cg.firstName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
             (cg.city?.toLowerCase() || '').includes(searchQuery.toLowerCase());
         const matchesService = filterService === 'all' || (cg.serviceTypes || []).includes(filterService);
-        const matchesSpecies = filterSpecies === 'all' || (cg.acceptedSpecies || []).includes(filterSpecies);
+        // Match against both legacy Spanish and canonical English keys
+        const legacyMap = { dog: 'perro', cat: 'gato', bird: 'ave' };
+        const matchesSpecies = filterSpecies === 'all' ||
+            (cg.acceptedSpecies || []).some(s => s === filterSpecies || s === legacyMap[filterSpecies]);
         const matchesVerified = !filterVerified || cg.verificationStatus === 'verified';
         return matchesSearch && matchesService && matchesSpecies && matchesVerified;
     });
@@ -171,18 +174,31 @@ export default function CaregiversScreen({ navigation }) {
                 )}
 
                 {/* Accepted species */}
-                {species.length > 0 && (
-                    <View style={[styles.servicesRow, { paddingTop: 0 }]}>
-                        {species.map(sp => (
-                            <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                                <Icon name={sp === 'perro' ? 'dog' : sp === 'gato' ? 'cat' : 'paw'} size={11} color="#0891b2" />
-                                <Text style={{ fontSize: 11, color: '#0891b2', fontWeight: '700' }}>
-                                    {sp === 'perro' ? t('species.dogs') : sp === 'gato' ? t('species.cats') : sp}
-                                </Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
+                {species.length > 0 && (() => {
+                    // Normalize and dedupe to avoid duplicates like 'perro'+'dog'
+                    const normMap = { perro: 'dog', gato: 'cat', ave: 'bird', reptil: 'other' };
+                    const norm = [...new Set(species.map(s => normMap[s] || s))];
+                    const labelMap = {
+                        dog: t('species.dogs'),
+                        cat: t('species.cats'),
+                        bird: t('species.birds'),
+                        rabbit: 'Conejo',
+                        other: 'Otros',
+                    };
+                    const iconMap = { dog: 'dog', cat: 'cat', bird: 'dove', rabbit: 'rabbit', other: 'paw' };
+                    return (
+                        <View style={[styles.servicesRow, { paddingTop: 0 }]}>
+                            {norm.map(sp => (
+                                <View key={sp} style={[styles.serviceChip, { backgroundColor: '#E0F2FE', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                                    <Icon name={iconMap[sp] || 'paw'} size={11} color="#0891b2" />
+                                    <Text style={{ fontSize: 11, color: '#0891b2', fontWeight: '700' }}>
+                                        {labelMap[sp] || sp}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    );
+                })()}
 
                 <View style={[styles.cardActions, { borderTopColor: theme.border }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => handleMessage(item)}>
@@ -246,8 +262,10 @@ export default function CaregiversScreen({ navigation }) {
                     {/* Species filter */}
                     {[
                         { key: 'all', label: 'Todos', icon: 'paw' },
-                        { key: 'perro', label: t('species.dogs'), icon: 'dog' },
-                        { key: 'gato', label: t('species.cats'), icon: 'cat' },
+                        { key: 'dog', label: t('species.dogs'), icon: 'dog' },
+                        { key: 'cat', label: t('species.cats'), icon: 'cat' },
+                        { key: 'bird', label: t('species.birds'), icon: 'dove' },
+                        { key: 'rabbit', label: 'Conejo', icon: 'rabbit' },
                     ].map(f => (
                         <TouchableOpacity
                             key={f.key}

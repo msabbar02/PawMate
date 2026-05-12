@@ -22,7 +22,7 @@ export default function ReservationsPage() {
 
     const fetchReservations = useCallback(async () => {
         try {
-            const { data: resData } = await supabase.from('reservations').select('*').order('created_at', { ascending: false });
+            const { data: resData } = await supabase.from('reservations').select('*').order('created_at', { ascending: false }).limit(200);
             if (resData) setReservations(resData);
         } catch (error) {
             console.error("Error fetching reservations:", error);

@@ -22,8 +22,11 @@ export default function CaregiverSetupScreen({ navigation }) {
     ];
 
     const SPECIES = [
-        { value: 'perro', label: t('species.dogs'), icon: 'dog' },
-        { value: 'gato', label: t('species.cats'), icon: 'cat' },
+        { value: 'dog',    label: t('species.dogs'),  icon: 'dog' },
+        { value: 'cat',    label: t('species.cats'),  icon: 'cat' },
+        { value: 'bird',   label: t('species.birds'), icon: 'dove' },
+        { value: 'rabbit', label: 'Conejo',           icon: 'rabbit' },
+        { value: 'other',  label: 'Otros',            icon: 'paw' },
     ];
 
     const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -33,33 +36,24 @@ export default function CaregiverSetupScreen({ navigation }) {
     const [saving, setSaving] = useState(false);
     const [bio, setBio] = useState(userData?.bio || '');
     const [price, setPrice] = useState(String(userData?.price || ''));
+    const [hotelPrice, setHotelPrice] = useState(String(userData?.hotelPrice || ''));
     const [experience, setExperience] = useState(userData?.experience || '');
     const [serviceRadius, setServiceRadius] = useState(String(userData?.serviceRadius || '5'));
-    const [maxWalks, setMaxWalks] = useState(String(userData?.maxConcurrentWalks || '5'));
-    const [maxHotel, setMaxHotel] = useState(String(userData?.maxConcurrentHotel || '3'));
-    const [iban, setIban] = useState(userData?.iban || '');
 
     const [selectedServices, setSelectedServices] = useState(userData?.serviceTypes || []);
-    const [acceptedSpecies, setAcceptedSpecies] = useState(userData?.acceptedSpecies || []);
-
-    const defaultSchedule = {};
-    DAYS.forEach(d => { defaultSchedule[d] = { available: true, from: '09:00', to: '18:00' }; });
-    const [schedule, setSchedule] = useState(userData?.schedule || defaultSchedule);
+    // Migrate any legacy 'perro'/'gato' to canonical 'dog'/'cat'
+    const normalizeSpecies = (arr) => (arr || []).map(v => v === 'perro' ? 'dog' : v === 'gato' ? 'cat' : v === 'ave' ? 'bird' : v === 'reptil' ? 'other' : v);
+    const [acceptedSpecies, setAcceptedSpecies] = useState(normalizeSpecies(userData?.acceptedSpecies));
 
     useEffect(() => {
         if (userData) {
             setBio(userData.bio || '');
             setPrice(String(userData.price || ''));
+            setHotelPrice(String(userData.hotelPrice || ''));
             setExperience(userData.experience || '');
             setServiceRadius(String(userData.serviceRadius || '5'));
-            setMaxWalks(String(userData.maxConcurrentWalks || '5'));
-            setMaxHotel(String(userData.maxConcurrentHotel || '3'));
-            setIban(userData.iban || '');
             setSelectedServices(userData.serviceTypes || []);
-            setAcceptedSpecies(userData.acceptedSpecies || []);
-            if (userData.schedule && Object.keys(userData.schedule).length > 0) {
-                setSchedule(userData.schedule);
-            }
+            setAcceptedSpecies(normalizeSpecies(userData.acceptedSpecies));
         }
     }, [userData]);
 
@@ -75,21 +69,6 @@ export default function CaregiverSetupScreen({ navigation }) {
         );
     };
 
-    const toggleDay = (day) => {
-        setSchedule(prev => ({
-            ...prev,
-            [day]: { ...prev[day], available: !prev[day]?.available },
-        }));
-    };
-
-    const updateTime = (day, field, value) => {
-        const cleaned = value.replace(/[^0-9:]/g, '');
-        setSchedule(prev => ({
-            ...prev,
-            [day]: { ...prev[day], [field]: cleaned },
-        }));
-    };
-
     const handleSave = async () => {
         if (!price || parseFloat(price) <= 0) {
             Alert.alert(t('common.error'), t('caregiverSetup.priceError'));
@@ -103,24 +82,17 @@ export default function CaregiverSetupScreen({ navigation }) {
             Alert.alert(t('common.error'), t('caregiverSetup.speciesRequired'));
             return;
         }
-        if (!iban.trim()) {
-            Alert.alert(t('common.error'), t('caregiverSetup.ibanRequired'));
-            return;
-        }
 
         setSaving(true);
         try {
             const { error } = await supabase.from('users').update({
                 bio: bio.trim(),
                 price: parseFloat(price),
+                hotelPrice: hotelPrice ? parseFloat(hotelPrice) : null,
                 experience: experience.trim(),
                 serviceRadius: parseInt(serviceRadius) || 5,
-                maxConcurrentWalks: parseInt(maxWalks) || 5,
-                maxConcurrentHotel: parseInt(maxHotel) || 3,
                 serviceTypes: selectedServices,
                 acceptedSpecies,
-                schedule,
-                iban: iban.trim(),
             }).eq('id', user.id);
 
             if (error) throw error;
@@ -216,38 +188,20 @@ export default function CaregiverSetupScreen({ navigation }) {
                                 placeholderTextColor={theme.textSecondary}
                             />
                         </View>
-                        <View style={styles.fieldHalf}>
-                            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{t('caregiverSetup.maxWalks')}</Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                                value={maxWalks}
-                                onChangeText={setMaxWalks}
-                                keyboardType="number-pad"
-                                placeholder="5"
-                                placeholderTextColor={theme.textSecondary}
-                            />
-                        </View>
+                        {selectedServices.includes('hotel') && (
+                            <View style={styles.fieldHalf}>
+                                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Precio noche hotel (€)</Text>
+                                <TextInput
+                                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                                    value={hotelPrice}
+                                    onChangeText={setHotelPrice}
+                                    keyboardType="decimal-pad"
+                                    placeholder="30"
+                                    placeholderTextColor={theme.textSecondary}
+                                />
+                            </View>
+                        )}
                     </View>
-                </View>
-
-                {/* IBAN */}
-                <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <View style={styles.sectionHeader}>
-                        <Icon name="card-outline" size={20} color="#8B5CF6" />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.paymentData')}</Text>
-                    </View>
-                    <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 6 }]}>
-                        {t('caregiverSetup.ibanLabel')}
-                    </Text>
-                    <TextInput
-                        style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                        value={iban}
-                        onChangeText={setIban}
-                        placeholder="ES00 0000 0000 0000 0000 0000"
-                        placeholderTextColor={theme.textSecondary}
-                        autoCapitalize="characters"
-                        maxLength={34}
-                    />
                 </View>
 
                 {/* Servicios */}
@@ -298,50 +252,7 @@ export default function CaregiverSetupScreen({ navigation }) {
                     </View>
                 </View>
 
-                {/* Horario semanal */}
-                <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                    <View style={styles.sectionHeader}>
-                        <Icon name="calendar-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('caregiverSetup.weeklySchedule')}</Text>
-                    </View>
-                    {DAYS.map(day => {
-                        const dayData = schedule[day] || { available: false, from: '09:00', to: '18:00' };
-                        return (
-                            <View key={day} style={[styles.scheduleRow, { borderBottomColor: theme.border }]}>
-                                <View style={styles.dayHeader}>
-                                    <Text style={[styles.dayText, { color: theme.text }]}>{getDayLabel(day)}</Text>
-                                    <Switch
-                                        value={dayData.available !== false}
-                                        onValueChange={() => toggleDay(day)}
-                                        trackColor={{ false: theme.border, true: COLORS.primary }}
-                                        thumbColor="#FFF"
-                                    />
-                                </View>
-                                {dayData.available !== false && (
-                                    <View style={styles.timeRow}>
-                                        <TextInput
-                                            style={[styles.timeInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                                            value={dayData.from || '09:00'}
-                                            onChangeText={(v) => updateTime(day, 'from', v)}
-                                            placeholder="09:00"
-                                            placeholderTextColor={theme.textSecondary}
-                                            maxLength={5}
-                                        />
-                                        <Text style={[styles.timeSep, { color: theme.textSecondary }]}>—</Text>
-                                        <TextInput
-                                            style={[styles.timeInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                                            value={dayData.to || '18:00'}
-                                            onChangeText={(v) => updateTime(day, 'to', v)}
-                                            placeholder="18:00"
-                                            placeholderTextColor={theme.textSecondary}
-                                            maxLength={5}
-                                        />
-                                    </View>
-                                )}
-                            </View>
-                        );
-                    })}
-                </View>
+                {/* Horario semanal — REMOVED (FASE 4: cuidador no controla horario) */}
 
                 <View style={{ height: 100 }} />
             </ScrollView>

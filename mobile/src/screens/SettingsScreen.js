@@ -99,11 +99,8 @@ export default function SettingsScreen({ navigation }) {
     const [deviceContacts, setDeviceContacts]               = useState([]);
     const [loadingDeviceContacts, setLoadingDeviceContacts] = useState(false);
 
-    // Policy modal & Invites
+    // Policy modal
     const [showPolicy, setShowPolicy] = useState(false);
-    const [showInviteModal, setShowInviteModal] = useState(false);
-    const [inviteEmail, setInviteEmail] = useState('');
-    const [sendingInvite, setSendingInvite] = useState(false);
 
     // Notification local state
     const [notifsEnabled, setNotifsEnabled] = useState(userData?.notificationsEnabled !== false);
@@ -160,28 +157,6 @@ export default function SettingsScreen({ navigation }) {
             })();
         }, [user?.id])
     );
-
-    // ── Invites ──
-    const handleInviteFriend = async () => {
-        if (!inviteEmail || !inviteEmail.includes('@')) {
-            return Alert.alert('Email inválido', 'Introduce un correo válido por favor.');
-        }
-        setSendingInvite(true);
-        try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email: inviteEmail.trim(),
-                options: { emailRedirectTo: 'pawmate://' }
-            });
-            if (error) throw error;
-            Alert.alert('¡Magia enviada!', 'Tu amigo recibirá un enlace mágico en su correo. ¡Suma 10 amigos unidos para ganar un paseo gratis!');
-            setShowInviteModal(false);
-            setInviteEmail('');
-        } catch (err) {
-            Alert.alert('Error', err.message || 'No se pudo enviar la invitación');
-        } finally {
-            setSendingInvite(false);
-        }
-    };
 
     // ── Photo ──
     const handleChangePhoto = async () => {
@@ -703,19 +678,6 @@ export default function SettingsScreen({ navigation }) {
                     </>
                 )}
 
-                {/* ── RECOMPENSAS ── */}
-                <SectionTitle>RECOMPENSAS</SectionTitle>
-                <SettingGroup>
-                    <SettingRow
-                        icon="gift-outline"
-                        iconBg="#FEF3C7"
-                        label="Invitar a un amigo"
-                        sublabel="Invita a 10 amigos y gana un paseo gratis"
-                        last
-                        onPress={() => setShowInviteModal(true)}
-                    />
-                </SettingGroup>
-
                 {/* ── INFORMACIÓN ── */}
                 <SectionTitle>INFORMACIÓN</SectionTitle>
                 <SettingGroup>
@@ -739,9 +701,9 @@ export default function SettingsScreen({ navigation }) {
                     <SettingRow
                         icon="chatbubble-ellipses-outline"
                         label="Contactar soporte"
-                        sublabel="soporte@pawmate.app"
+                        sublabel="soporte@apppawmate.com"
                         last
-                        onPress={() => Linking.openURL('mailto:soporte@pawmate.app')}
+                        onPress={() => Linking.openURL('mailto:soporte@apppawmate.com')}
                     />
                 </SettingGroup>
 
@@ -946,44 +908,6 @@ export default function SettingsScreen({ navigation }) {
                     <ScrollView contentContainerStyle={{ padding: 20 }}>
                         <Text style={[s.policyText, { color: theme.text }]}>{POLICY_TEXT}</Text>
                     </ScrollView>
-                </View>
-            </Modal>
-
-            {/* ════════════════════════════════════════
-                MODAL: INVITAR AMIGO
-            ════════════════════════════════════════ */}
-            <Modal visible={showInviteModal} animationType="slide" transparent>
-                <View style={[s.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)', flex: 1, justifyContent: 'center', padding: 20 }]}>
-                    <View style={[{ backgroundColor: theme.cardBackground, borderRadius: 24, padding: 24, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10, position: 'relative' }]}>
-                        <TouchableOpacity style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 8 }} onPress={() => setShowInviteModal(false)}>
-                            <Ionicons name="close" size={24} color={theme.textSecondary} />
-                        </TouchableOpacity>
-                        <Text style={{ fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center', color: theme.text }}>Regala Magia</Text>
-                        <Text style={{ fontSize: 13, marginBottom: 20, textAlign: 'center', lineHeight: 18, color: theme.textSecondary }}>
-                            Ingresa el email de tu amigo. Le enviaremos un enlace mágico y si se une, estarás más cerca de ganar un paseo gratis o una pulsera PawMate.
-                        </Text>
-                        
-                        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, height: 50, marginBottom: 20, backgroundColor: theme.background, borderColor: theme.border }}>
-                            <Ionicons name="mail-outline" size={20} color={theme.textSecondary} style={{ marginRight: 10 }} />
-                            <TextInput
-                                style={{ flex: 1, fontSize: 15, color: theme.text }}
-                                placeholder="amigo@email.com"
-                                placeholderTextColor={theme.textSecondary}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={inviteEmail}
-                                onChangeText={setInviteEmail}
-                            />
-                        </View>
-
-                        <TouchableOpacity 
-                            style={{ height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.primary }} 
-                            onPress={handleInviteFriend} 
-                            disabled={sendingInvite}
-                        >
-                            {sendingInvite ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Enviar Enlace Mágico</Text>}
-                        </TouchableOpacity>
-                    </View>
                 </View>
             </Modal>
 

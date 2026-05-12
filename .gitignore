@@ -10,13 +10,13 @@
 **/supabase/.temp/
 **/supabase-service-key*
 
-# Environment Variables
-# .env files tracked intentionally (private repo)
-.env.local
-.env.development
-.env.test
-.env.production
-.env.*.local
+# Environment Variables (NEVER commit - repo is public)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
 
 # API Keys & Secrets
 **/*secret*

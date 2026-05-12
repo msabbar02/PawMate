@@ -26,7 +26,7 @@ export default function ReservationDetailPage() {
     const [res, setRes] = useState(null);
     const [owner, setOwner] = useState(null);
     const [caregiver, setCaregiver] = useState(null);
-    const [pet, setPet] = useState(null);
+    const [pets, setPets] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchAll = useCallback(async () => {
@@ -35,12 +35,13 @@ export default function ReservationDetailPage() {
             const { data: resData } = await supabase.from('reservations').select('*').eq('id', id).single();
             setRes(resData);
             if (resData) {
+                const petIds = Array.isArray(resData.petIds) ? resData.petIds : (resData.petId ? [resData.petId] : []);
                 const [{ data: o }, { data: c }, { data: p }] = await Promise.all([
                     resData.ownerId ? supabase.from('users').select('id, fullName, email, photoURL').eq('id', resData.ownerId).single() : Promise.resolve({ data: null }),
                     resData.caregiverId ? supabase.from('users').select('id, fullName, email, photoURL').eq('id', resData.caregiverId).single() : Promise.resolve({ data: null }),
-                    resData.petId ? supabase.from('pets').select('id, name, photoURL, species, breed').eq('id', resData.petId).single() : Promise.resolve({ data: null }),
+                    petIds.length > 0 ? supabase.from('pets').select('id, name, photoURL, species, breed').in('id', petIds) : Promise.resolve({ data: [] }),
                 ]);
-                setOwner(o); setCaregiver(c); setPet(p);
+                setOwner(o); setCaregiver(c); setPets(p || []);
             }
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
@@ -144,19 +145,21 @@ export default function ReservationDetailPage() {
                         </div>
                     )}
 
-                    {pet && (
+                    {pets.length > 0 && (
                         <div className="detail-card">
-                            <h2><FontAwesomeIcon icon={faPaw} className="icon" /> Mascota</h2>
-                            <div className="detail-list-item" onClick={() => navigate(`/pets/${pet.id}`)}>
-                                <div style={{ width: 40, height: 40, borderRadius: 20, background: 'var(--primary-color)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
-                                    {pet.photoURL ? <img src={pet.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (pet.name || '?').charAt(0)}
+                            <h2><FontAwesomeIcon icon={faPaw} className="icon" /> Mascotas ({pets.length})</h2>
+                            {pets.map(pet => (
+                                <div key={pet.id} className="detail-list-item" onClick={() => navigate(`/pets/${pet.id}`)}>
+                                    <div style={{ width: 40, height: 40, borderRadius: 20, background: 'var(--primary-color)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
+                                        {pet.photoURL ? <img src={pet.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (pet.name || '?').charAt(0)}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 600 }}>{pet.name}</div>
+                                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pet.species} · {pet.breed || '-'}</div>
+                                    </div>
+                                    <FontAwesomeIcon icon={faEye} style={{ color: 'var(--text-muted)' }} />
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 600 }}>{pet.name}</div>
-                                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pet.species} · {pet.breed || '-'}</div>
-                                </div>
-                                <FontAwesomeIcon icon={faEye} style={{ color: 'var(--text-muted)' }} />
-                            </div>
+                            ))}
                         </div>
                     )}
                 </div>

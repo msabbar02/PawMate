@@ -24,7 +24,7 @@ export default function UsersPage() {
 
     const fetchUsers = useCallback(async () => {
         try {
-            const { data: usersData, error } = await supabase.from('users').select('*');
+            const { data: usersData, error } = await supabase.from('users').select('*').limit(500);
             if (!error && usersData) {
                 setUsers(usersData);
             }
