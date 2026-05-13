@@ -76,7 +76,7 @@ export default function AdminLayout() {
 
             <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <img src="/logo.svg" alt="PawMate" style={{ height: 40, width: 'auto', objectFit: 'contain' }} />
+                    <img src="/icon.png" alt="PawMate" style={{ height: 56, width: 56, objectFit: 'cover', borderRadius: '50%' }} />
                     <button className="mobile-close-btn" onClick={closeSidebar}>
                         <FontAwesomeIcon icon={faXmark} style={{ fontSize: 24 }} />
                     </button>
@@ -102,7 +102,8 @@ export default function AdminLayout() {
                         <span>{theme === 'dark' ? t('sidebar.lightMode') : t('sidebar.darkMode')}</span>
                     </button>
                     <button onClick={toggleLang} className="theme-toggle-btn">
-                        {i18n.language === 'es' ? 'English' : 'Español'}
+                        <span className={`fi fi-${i18n.language === 'es' ? 'gb' : 'es'}`} style={{ borderRadius: 3, fontSize: 18 }}></span>
+                        <span>{i18n.language === 'es' ? 'English' : 'Español'}</span>
                     </button>
                     <button onClick={handleLogout} className="logout-btn">
                         <FontAwesomeIcon icon={faRightFromBracket} style={{ fontSize: 20 }} />

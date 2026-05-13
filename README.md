@@ -8,7 +8,7 @@
 
 ## Descripción
 
-PawMate es un ecosistema digital completo para el cuidado y gestión de mascotas en España. Conecta a dueños de animales con cuidadores verificados, ofrece seguimiento GPS en tiempo real, historial médico completo, chat integrado, pagos con Stripe y una comunidad activa de amantes de los animales.
+PawMate es un ecosistema digital completo para el cuidado y gestión de mascotas en España. Conecta a dueños de animales con cuidadores verificados, ofrece seguimiento GPS en tiempo real, historial médico completo, chat integrado, pagos seguros con Stripe.
 
 ---
 
@@ -240,4 +240,4 @@ npm run dev
 
 ## Licencia
 
-Proyecto educativo · Uso académico · © 2026 PawMate
+Proyecto educativo · Uso académico · © 2025 PawMate

@@ -15,7 +15,7 @@ import { supabase } from '../config/supabase';
 import { createNotification, generateUniqueId } from '../utils/notificationHelpers';
 import { useSafeStripe, SafePlatformPay } from '../config/stripe';
 import { useTranslation } from '../context/LanguageContext';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, notifyRatingRequest } from '../config/api';
 import { useNavigation } from '@react-navigation/native';
 
 // ─────────────────────────────────────────────────
@@ -305,6 +305,7 @@ export default function BookingScreen() {
                         await supabase.from('reservations').update({
                             status: 'completada'
                         }).eq('id', reservation.id);
+                        notifyRatingRequest(reservation.id);
                         await createNotification(reservation.ownerId, {
                             type: 'booking_completed',
                             bookingId: reservation.id,

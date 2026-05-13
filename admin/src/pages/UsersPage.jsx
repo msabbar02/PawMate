@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
+import { sendBanEmail } from '../config/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCircleExclamation, faShield, faShieldHalved, faEye, faDog, faBan } from '@fortawesome/free-solid-svg-icons';
 import './UsersPage.css';
@@ -62,6 +63,10 @@ export default function UsersPage() {
             const { error } = await supabase.from('users').update({ is_banned: !currentlyBanned }).eq('id', userId);
             if (error) throw error;
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: !currentlyBanned } : u));
+            if (!currentlyBanned) {
+                const bannedUser = users.find(u => u.id === userId);
+                if (bannedUser?.email) sendBanEmail(bannedUser.email, bannedUser.fullName);
+            }
         } catch (error) {
             console.error("Error banning user:", error);
             alert(t('users.errorUpdateStatus'));

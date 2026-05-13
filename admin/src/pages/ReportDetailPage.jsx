@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import { sendBanEmail } from '../config/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faTriangleExclamation, faUser, faEye, faCheck, faTrash, faBan } from '@fortawesome/free-solid-svg-icons';
 import './DetailPage.css';
@@ -54,6 +55,7 @@ export default function ReportDetailPage() {
         if (!window.confirm(`¿Banear a ${reported.fullName || reported.email}?`)) return;
         const { error } = await supabase.from('users').update({ is_banned: true }).eq('id', reported.id);
         if (error) return alert('Error: ' + error.message);
+        if (reported.email) sendBanEmail(reported.email, reported.fullName);
         setReported({ ...reported, is_banned: true });
     };
 

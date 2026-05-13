@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import { sendBanEmail } from '../config/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faArrowLeft, faUser, faPaw, faCalendarCheck, faTriangleExclamation,
@@ -82,6 +83,7 @@ export default function UserDetailPage() {
         if (!window.confirm(`¿Seguro que quieres ${action} a este usuario?`)) return;
         const { error } = await supabase.from('users').update({ is_banned: !user.is_banned }).eq('id', id);
         if (error) { alert('Error: ' + error.message); return; }
+        if (!user.is_banned && user.email) sendBanEmail(user.email, user.fullName);
         setUser({ ...user, is_banned: !user.is_banned });
     };
 
