@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PawMate",
-    "slug": "mobile",
+    "slug": "pawmate",
     "scheme": "pawmate",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -59,7 +59,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "5d1d4f80-4363-4151-ad0b-bc0ecafe146d"
+        "projectId": "7ff372f8-b232-4176-a8ac-3e2c58137ae1"
       }
     },
     "owner": "msabbar"
