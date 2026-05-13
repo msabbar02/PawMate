@@ -6,6 +6,8 @@ const FROM_DEFAULT = process.env.EMAIL_FROM         || 'PawMate <noreply@apppawm
 const FROM_SUPPORT = process.env.EMAIL_FROM_SUPPORT  || 'PawMate Soporte <soporte@apppawmate.com>';
 const FROM_ADMIN   = process.env.EMAIL_FROM_ADMIN    || 'PawMate Admin <admin@apppawmate.com>';
 
+const LOGO_URL = process.env.APP_LOGO_URL || 'https://apppawmate.com/icon.png';
+
 /* --- Resend send helper --- */
 async function sendEmail({ from, to, subject, html, text }) {
     const apiKey = process.env.RESEND_API_KEY;
@@ -46,18 +48,24 @@ function emailLayout({ icon, title, subtitle, gradient, body }) {
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-    <div style="background:linear-gradient(135deg,${gradient});border-radius:24px 24px 0 0;padding:40px 30px;text-align:center;">
-      <div style="font-size:60px;margin-bottom:16px;">${icon}</div>
-      <h1 style="color:white;font-size:28px;margin:0 0 8px;">${title}</h1>
-      ${subtitle ? `<p style="color:rgba(255,255,255,0.85);font-size:16px;margin:0;">${subtitle}</p>` : ''}
+  <div style="max-width:600px;margin:0 auto;padding:32px 20px;">
+    <div style="background:white;border-radius:24px 24px 0 0;padding:18px 30px 14px;text-align:center;border-bottom:1px solid #f1f5f9;">
+      <img src="${LOGO_URL}" alt="PawMate" style="height:50px;width:auto;" />
+    </div>
+    <div style="background:linear-gradient(135deg,${gradient});padding:32px 30px 40px;text-align:center;">
+      <div style="font-size:52px;margin-bottom:12px;">${icon}</div>
+      <h1 style="color:white;font-size:26px;margin:0 0 8px;font-weight:800;">${title}</h1>
+      ${subtitle ? `<p style="color:rgba(255,255,255,0.85);font-size:15px;margin:0;">${subtitle}</p>` : ''}
     </div>
     <div style="background:white;border-radius:0 0 24px 24px;padding:36px 30px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
       ${body}
     </div>
-    <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:24px;">
-      &copy; ${new Date().getFullYear()} PawMate &middot; apppawmate.com
-    </p>
+    <div style="text-align:center;margin-top:20px;">
+      <img src="${LOGO_URL}" alt="PawMate" style="height:28px;width:auto;opacity:0.45;margin-bottom:8px;" />
+      <p style="color:#94a3b8;font-size:12px;margin:4px 0 0;">
+        &copy; ${new Date().getFullYear()} PawMate &middot; <a href="https://apppawmate.com" style="color:#94a3b8;text-decoration:none;">apppawmate.com</a>
+      </p>
+    </div>
   </div>
 </body>
 </html>`;
@@ -314,4 +322,53 @@ const handleAuthEmail = async (req, res) => {
     }
 };
 
-module.exports = { sendWelcomeEmail, handleAuthEmail, sendEmail, createTransporter, FROM_DEFAULT, FROM_SUPPORT, FROM_ADMIN };
+/* --- Route handler: POST /api/notifications/ban-email --- */
+const sendBanEmail = async (req, res) => {
+    try {
+        const { email, fullName } = req.body;
+        if (!email || !email.includes('@')) return sendError(res, 'email is required', 400);
+        const name = escapeHtml(fullName || email.split('@')[0]);
+        let sent = false;
+        try {
+            await sendEmail({
+                from: FROM_ADMIN,
+                to: email,
+                subject: 'Tu cuenta de PawMate ha sido suspendida',
+                html: emailLayout({
+                    icon: '🚫',
+                    title: 'Cuenta suspendida',
+                    subtitle: 'Tu acceso a PawMate ha sido restringido',
+                    gradient: '#ef4444 0%, #b91c1c 100%',
+                    body: `
+      <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${name},</h2>
+      <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 20px;">
+        Tu cuenta en PawMate ha sido <strong style="color:#ef4444;">suspendida temporalmente</strong> por nuestro equipo de seguridad debido a una posible infracción de nuestros términos de uso.
+      </p>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:20px;margin-bottom:24px;">
+        <p style="margin:0 0 8px;font-size:13px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Motivo</p>
+        <p style="margin:0;color:#7f1d1d;font-size:14px;line-height:1.6;">Razones de seguridad y protección de la comunidad PawMate.</p>
+      </div>
+      <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 24px;">
+        Si crees que esto es un error o deseas resolverlo, contáctanos. Nuestro equipo revisará tu caso en un plazo de 24–48 horas.
+      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="mailto:admin@apppawmate.com" style="display:inline-block;background:#ef4444;color:white;font-size:16px;font-weight:600;padding:14px 36px;border-radius:12px;text-decoration:none;">Contactar soporte</a>
+      </div>
+      <p style="color:#64748b;font-size:13px;margin:0;text-align:center;">
+        O escríbenos a <a href="mailto:admin@apppawmate.com" style="color:#ef4444;">admin@apppawmate.com</a>
+      </p>`,
+                }),
+                text: `Hola ${name},\n\nTu cuenta en PawMate ha sido suspendida temporalmente por razones de seguridad.\n\nSi crees que es un error, escríbenos a admin@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`,
+            });
+            sent = true;
+        } catch (emailErr) {
+            console.error('[Email] Ban email error:', emailErr.message);
+        }
+        return sendSuccess(res, { sent }, sent ? 'Ban email sent' : 'Could not send email');
+    } catch (error) {
+        console.error('sendBanEmail error:', error);
+        return sendError(res, 'Error sending ban email', 500);
+    }
+};
+
+module.exports = { sendWelcomeEmail, handleAuthEmail, sendEmail, createTransporter, emailLayout, emailButton, escapeHtml, sendBanEmail, FROM_DEFAULT, FROM_SUPPORT, FROM_ADMIN };

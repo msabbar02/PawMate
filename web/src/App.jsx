@@ -1,5 +1,6 @@
-﻿import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -9,12 +10,14 @@ import {
   Download, Menu, X, Sun, Moon, ArrowDown, MapPin,
   Shield, Star, Heart, Brain, Users,
   Mail, Globe, ChevronRight, Sparkles, Target,
-  Rocket, Zap, Clock, Phone, Smartphone
+  Rocket, Zap, Clock, Phone, Smartphone, Check
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import './App.css';
 import ConfirmPage from './pages/ConfirmPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+
+const APK_URL = 'https://expo.dev/accounts/msabbar/projects/pawmate/builds/ad6b1f57-060c-4463-9568-bfdd7079a3a7';
 
 /* ─── Animation Variants ──────────────────────── */
 const fadeUp = {
@@ -48,10 +51,35 @@ function usePawCursor() {
   }, []);
 }
 
-/* ─── Theme Hook Removed ─────────────────────── */
+/* ─── Theme Hook ─────────────────────────────── */
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('pawmate-theme') || 'dark');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('pawmate-theme', theme);
+  }, [theme]);
+  const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+  return [theme, toggle];
+}
+
 /* ═══════════════════════════════════════════════════
    THREE.JS 3D COMPONENTS
    ═══════════════════════════════════════════════════ */
+
+/* Pre-generate particle positions at module level — outside React render */
+const _particleCache = new Map();
+function getParticlePositions(count) {
+  if (!_particleCache.has(count)) {
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3]     = (Math.random() - 0.5) * 20;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 20;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 10;
+    }
+    _particleCache.set(count, pos);
+  }
+  return _particleCache.get(count);
+}
 
 /* Floating 3D Paw Pad */
 function PawPad({ position, scale = 1, speed = 1, color = '#F5A623' }) {
@@ -103,15 +131,7 @@ function GlowOrb({ position, color = '#F5A623', size = 1 }) {
 /* Floating particles */
 function Particles({ count = 60 }) {
   const points = useRef();
-  const positions = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 20;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 20;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 10;
-    }
-    return pos;
-  }, [count]);
+  const positions = getParticlePositions(count);
 
   useFrame((state) => {
     if (points.current) {
@@ -171,10 +191,11 @@ function SectionScene({ color1 = '#F5A623', color2 = '#FF6B35' }) {
    ═══════════════════════════════════════════════════ */
 
 /* ─── Navbar ───────────────────────────────────── */
-function Navbar() {
+function Navbar({ theme, toggleTheme }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { t, i18n } = useTranslation();
+  const isES = i18n.language === 'es';
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -204,7 +225,7 @@ function Navbar() {
     >
       <div className="navbar-inner">
         <div className="nav-logo" onClick={() => scrollTo('hero')}>
-          <img src="/logo.svg" alt="PawMate" style={{ height: 38, width: 'auto', objectFit: 'contain' }} />
+          <img src="/icon.png" alt="PawMate" style={{ height: 48, width: 48, objectFit: 'cover', borderRadius: '50%' }} />
         </div>
         <ul className="nav-links">
           {links.map(([label, id]) => (
@@ -212,9 +233,13 @@ function Navbar() {
           ))}
         </ul>
         <div className="nav-actions">
-          <button className="nav-btn-icon" onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')} aria-label="Language">
-            <Globe size={18} />
-            <span>{i18n.language === 'es' ? 'EN' : 'ES'}</span>
+          <button className="theme-toggle-btn" onClick={toggleTheme} aria-label="Toggle theme">
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            <span>{theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}</span>
+          </button>
+          <button className="lang-flag-btn" onClick={() => i18n.changeLanguage(isES ? 'en' : 'es')} aria-label="Language">
+            <span className={`fi fi-${isES ? 'gb' : 'es'}`} style={{ borderRadius: 3 }}></span>
+            <span>{isES ? 'EN' : 'ES'}</span>
           </button>
           <motion.button className="btn-primary btn-sm" onClick={() => scrollTo('download')} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
             <Download size={16} /> {t('nav.download')}
@@ -231,8 +256,13 @@ function Navbar() {
               <a key={id} className="mobile-link" onClick={() => scrollTo(id)}>{label}</a>
             ))}
             <div className="mobile-row">
-              <a className="mobile-link" onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')}>
-                <Globe size={16} /> {i18n.language === 'es' ? 'English' : 'Español'}
+              <a className="mobile-link" onClick={toggleTheme}>
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
+              </a>
+              <a className="mobile-link" onClick={() => i18n.changeLanguage(isES ? 'en' : 'es')}>
+                <span className={`fi fi-${isES ? 'gb' : 'es'}`} style={{ borderRadius: 3 }}></span>
+                {isES ? 'English' : 'Español'}
               </a>
             </div>
             <button className="btn-primary mobile-cta" onClick={() => scrollTo('download')}>
@@ -248,6 +278,12 @@ function Navbar() {
 /* ─── Hero ─────────────────────────────────────── */
 function Hero() {
   const { t } = useTranslation();
+  const stats = [
+    { num: '100%', label: t('hero.statVerified') },
+    { num: 'GPS', label: t('hero.statGps') },
+    { num: 'SOS', label: t('hero.statSos') },
+    { num: '5★', label: t('hero.statRating') },
+  ];
   return (
     <section className="hero" id="hero">
       <div className="hero-3d">
@@ -270,14 +306,16 @@ function Hero() {
             {t('hero.desc')}
           </motion.p>
           <motion.div className="hero-actions" variants={fadeUp}>
-            <motion.button
+            <motion.a
               className="btn-primary btn-lg btn-glow"
+              href={APK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.96 }}
-              onClick={() => document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' })}
             >
               <Download size={20} /> {t('hero.downloadBtn')}
-            </motion.button>
+            </motion.a>
             <motion.button
               className="btn-glass btn-lg"
               whileHover={{ scale: 1.04 }}
@@ -286,6 +324,14 @@ function Hero() {
             >
               {t('hero.learnMore')} <ChevronRight size={18} />
             </motion.button>
+          </motion.div>
+          <motion.div className="hero-stats" variants={fadeUp}>
+            {stats.map((s, i) => (
+              <div key={i} className="hero-stat">
+                <div className="hero-stat-num">{s.num}</div>
+                <div className="hero-stat-label">{s.label}</div>
+              </div>
+            ))}
           </motion.div>
         </AnimatedSection>
       </div>
@@ -318,11 +364,8 @@ function About() {
 
         <AnimatedSection className="about-grid">
           <motion.div className="about-image-group" variants={scaleIn}>
-            <div className="about-img about-img-main">
-              <img src="/community_dogs.png" alt="PawMate Community" />
-            </div>
-            <div className="about-img about-img-secondary">
-              <img src="/caring_puppy.png" alt="Caring for puppy" />
+            <div className="about-img-single">
+              <img src="/hero_dog_walk.png" alt="PawMate" />
             </div>
           </motion.div>
           <div className="about-cards">
@@ -469,6 +512,9 @@ function Contact() {
 /* ─── Download CTA ─────────────────────────────── */
 function DownloadSection() {
   const { t } = useTranslation();
+  const features = [
+    t('download.feat1'), t('download.feat2'), t('download.feat3'), t('download.feat4'),
+  ].filter(Boolean);
   return (
     <section className="download-section" id="download">
       <div className="download-3d">
@@ -494,14 +540,27 @@ function DownloadSection() {
           <motion.p variants={fadeUp} className="download-desc">
             {t('download.desc')}
           </motion.p>
-          <motion.div className="download-actions" variants={fadeUp}>
+          {features.length > 0 && (
+            <motion.ul className="download-features" variants={fadeUp}>
+              {features.map((f, i) => (
+                <li key={i}><Check size={15} style={{ color: '#F5A623', flexShrink: 0 }} /> {f}</li>
+              ))}
+            </motion.ul>
+          )}
+          <motion.div className="download-badges" variants={fadeUp}>
             <motion.a
-              href="#"
-              className="btn-download"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.96 }}
+              href={APK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="badge-android"
+              whileHover={{ scale: 1.04, y: -3 }}
+              whileTap={{ scale: 0.97 }}
             >
-              <Download size={22} /> {t('download.btn')}
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C14.15 1.23 13.1 1 12 1c-1.1 0-2.15.23-3.1.63L7.43.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.3 1.3C6.45 3.28 5 5.52 5 8h14c0-2.48-1.45-4.72-3.47-5.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>
+              <div className="badge-android-label">
+                <span className="badge-android-sub">{t('download.btnSub') || 'Android APK'}</span>
+                <span className="badge-android-main">{t('download.btn')}</span>
+              </div>
             </motion.a>
           </motion.div>
           <motion.p className="download-note" variants={fadeUp}>{t('download.note')}</motion.p>
@@ -516,17 +575,10 @@ function Footer() {
   const { t } = useTranslation();
   return (
     <footer className="footer">
-      <div className="container">
-        <div className="footer-content">
-          <div className="footer-brand">
-            <div className="nav-logo"><span className="logo-icon"></span><span className="logo-text">PawMate</span></div>
-            <p>{t('footer.desc')}</p>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <span>{t('footer.copyright')} <strong>Mohamed Sabbar</strong></span>
-          <span>{t('footer.madeWith')}</span>
-        </div>
+      <div className="container footer-simple">
+        <img src="/icon.png" alt="PawMate" style={{ height: 36, width: 36, objectFit: 'cover', borderRadius: '50%' }} />
+        <span>{t('footer.copyright')}</span>
+        <span>{t('footer.desc')}</span>
       </div>
     </footer>
   );
@@ -535,9 +587,10 @@ function Footer() {
 /* ─── Landing Page ─────────────────────────────── */
 function LandingPage() {
   usePawCursor();
+  const [theme, toggleTheme] = useTheme();
   return (
     <>
-      <Navbar />
+      <Navbar theme={theme} toggleTheme={toggleTheme} />
       <Hero />
       <About />
       <Mission />

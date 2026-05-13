@@ -76,3 +76,21 @@ export const sendWelcomeEmail = async (email, fullName) => {
         return false;
     }
 };
+
+/**
+ * Notify owner by email to rate the caregiver after a reservation is completed.
+ */
+export const notifyRatingRequest = async (reservationId) => {
+    try {
+        const headers = await authHeaders();
+        const res = await fetch(`${API_BASE_URL}/api/notifications/rating-request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: JSON.stringify({ reservationId }),
+        });
+        return res.ok;
+    } catch (e) {
+        console.warn('Rating request email:', e.message);
+        return false;
+    }
+};

@@ -1,7 +1,7 @@
 {
   "nav": {
     "home": "Inicio",
-    "about": "Quiénes Somos",
+    "about": "Sobre Mí",
     "mission": "Objetivo",
     "future": "Futuro",
     "contact": "Contacto",
@@ -15,17 +15,21 @@
     "title2": "con cuidadores de confianza",
     "desc": "PawMate es la app que une a dueños de mascotas con cuidadores profesionales verificados. Paseos, hotel, cuidado diario — todo en un solo lugar.",
     "downloadBtn": "Descargar PawMate",
-    "learnMore": "Descubre más"
+    "learnMore": "Descubre más",
+    "statVerified": "Cuidadores verificados",
+    "statGps": "Seguimiento en tiempo real",
+    "statSos": "Botón de emergencia",
+    "statRating": "Sistema de valoraciones"
   },
   "about": {
-    "label": "Quiénes Somos",
-    "title1": "Un equipo apasionado",
+    "label": "Sobre Mí",
+    "title1": "Un desarrollador apasionado",
     "title2": "por los animales",
-    "desc": "Somos un equipo joven que cree que cada mascota merece el mejor cuidado posible. PawMate nació de la necesidad real de conectar a dueños ocupados con cuidadores de confianza en su zona.",
-    "card1Title": "Nuestra Historia",
-    "card1Desc": "PawMate empezó como un proyecto personal para ayudar a amigos a encontrar cuidadores de confianza para sus mascotas. Hoy, estamos construyendo una plataforma que facilita el cuidado responsable.",
-    "card2Title": "Nuestro Equipo",
-    "card2Desc": "Somos desarrolladores, diseñadores y amantes de los animales. Cada decisión que tomamos está guiada por el bienestar de las mascotas y la tranquilidad de sus dueños."
+    "desc": "Soy Mohamed Sabbar, desarrollador independiente que cree que cada mascota merece el mejor cuidado. PawMate nació de la necesidad real de conectar a dueños ocupados con cuidadores de confianza.",
+    "card1Title": "Mi Historia",
+    "card1Desc": "PawMate empezó como proyecto personal para ayudar a amigos a encontrar cuidadores para sus mascotas. Hoy es una plataforma completa que facilita el cuidado responsable.",
+    "card2Title": "Mi Visión",
+    "card2Desc": "Diseño y desarrollo cada parte de PawMate pensando en el bienestar de las mascotas y la tranquilidad de sus dueños. Cada detalle importa."
   },
   "mission": {
     "label": "Nuestro Objetivo",
@@ -68,11 +72,15 @@
     "title2": "y empieza hoy",
     "desc": "Disponible para Android. Descarga la APK directamente y prueba la app.",
     "btn": "Descargar APK",
+    "btnSub": "Obténlo en",
+    "feat1": "Cuidadores verificados y valorados",
+    "feat2": "GPS en tiempo real durante los paseos",
+    "feat3": "Pagos seguros dentro de la app",
+    "feat4": "Botón SOS para emergencias",
     "note": "Versión Android • Gratis"
   },
   "footer": {
     "desc": "Conectando mascotas con el mejor cuidado.",
-    "copyright": "© 2025 PawMate — Creado por",
-    "madeWith": "Hecho con ❤️ para los amantes de los animales"
+    "copyright": "© 2025 PawMate"
   }
 }

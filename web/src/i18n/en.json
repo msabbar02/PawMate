@@ -1,7 +1,7 @@
 {
   "nav": {
     "home": "Home",
-    "about": "About Us",
+    "about": "About Me",
     "mission": "Mission",
     "future": "Future",
     "contact": "Contact",
@@ -15,17 +15,21 @@
     "title2": "with trusted caregivers",
     "desc": "PawMate is the app that connects pet owners with verified professional caregivers. Walks, pet sitting, daily care — all in one place.",
     "downloadBtn": "Download PawMate",
-    "learnMore": "Learn More"
+    "learnMore": "Learn More",
+    "statVerified": "Verified caregivers",
+    "statGps": "Real-time tracking",
+    "statSos": "Emergency button",
+    "statRating": "Review system"
   },
   "about": {
-    "label": "About Us",
-    "title1": "A team passionate",
-    "title2": "about animals",
-    "desc": "We are a young team that believes every pet deserves the best possible care. PawMate was born from the real need to connect busy owners with trusted caregivers in their area.",
-    "card1Title": "Our Story",
-    "card1Desc": "PawMate started as a personal project to help friends find trusted caregivers for their pets. Today, we're building a platform that makes responsible pet care easy.",
-    "card2Title": "Our Team",
-    "card2Desc": "We are developers, designers, and animal lovers. Every decision we make is guided by the well-being of pets and the peace of mind of their owners."
+    "label": "About Me",
+    "title1": "A passionate developer",
+    "title2": "who loves animals",
+    "desc": "I'm Mohamed Sabbar, an independent developer who believes every pet deserves the best care. PawMate was born from the real need to connect busy owners with trusted caregivers nearby.",
+    "card1Title": "My Story",
+    "card1Desc": "PawMate started as a personal project to help friends find trusted caregivers for their pets. Today it's a full platform that makes responsible pet care easy.",
+    "card2Title": "My Vision",
+    "card2Desc": "I design and build every part of PawMate with one goal: the well-being of pets and the peace of mind of their owners. Every detail matters."
   },
   "mission": {
     "label": "Our Mission",
@@ -68,11 +72,15 @@
     "title2": "and start today",
     "desc": "Available for Android. Download the APK directly and try the app.",
     "btn": "Download APK",
+    "btnSub": "Get it on",
+    "feat1": "Verified & reviewed caregivers",
+    "feat2": "Real-time GPS tracking during walks",
+    "feat3": "In-app secure payments",
+    "feat4": "SOS emergency button",
     "note": "Android Version • Free"
   },
   "footer": {
     "desc": "Connecting pets with the best care.",
-    "copyright": "© 2025 PawMate — Created by",
-    "madeWith": "Made with ❤️ for animal lovers"
+    "copyright": "© 2025 PawMate"
   }
 }

@@ -49,7 +49,7 @@ mindmap
 | Usuarios objetivo | Dueños de mascotas + cuidadores particulares |
 | Mercado           | España (escalable)                           |
 | Modelo de negocio | Comisión por reserva (Stripe)                |
-| Modalidades       | Paseo (por horas) · Hotel (por fechas)        |
+| Modalidades       | Paseo (por horas) · Hotel (por fechas)       |
 
 ---
 
@@ -95,7 +95,7 @@ flowchart TB
 | **Supabase como backend principal**      | Auth + DB + Storage + Realtime en uno. Reduce complejidad y coste.              |
 | **Express solo para tareas server-side** | Emails, pagos Stripe, lógica que requiere service-key (no exponer al cliente). |
 | **Cliente directo a Supabase**           | Latencia mínima, RLS protege los datos a nivel de fila.                        |
-| **Resend cloud API**                     | Entrega fiable, dashboard de logs, sin servidor de correo propio.             |
+| **Resend cloud API**                     | Entrega fiable, dashboard de logs, sin servidor de correo propio.               |
 
 ---
 
@@ -639,5 +639,4 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 ```
 
-
-*PawMate � 2026 � Documentaci�n t�cnica v1.1*
+*PawMate ©  2025 - Documentación técnica.*

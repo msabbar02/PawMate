@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import { sendRatingRequestEmail } from '../config/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faCalendarCheck, faUser, faPaw, faEye, faCheck, faXmark, faTrash, faMoneyBill } from '@fortawesome/free-solid-svg-icons';
 import './DetailPage.css';
@@ -52,6 +53,7 @@ export default function ReservationDetailPage() {
     const updateStatus = async (status) => {
         const { error } = await supabase.from('reservations').update({ status }).eq('id', id);
         if (error) return alert('Error: ' + error.message);
+        if (status === 'completada') sendRatingRequestEmail(id);
         setRes({ ...res, status });
     };
 
