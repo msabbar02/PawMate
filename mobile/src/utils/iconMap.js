@@ -1,6 +1,6 @@
 /**
- * Maps Ionicons names to FontAwesome solid icons.
- * Used across the mobile app after migrating from Ionicons to FontAwesome.
+ * Mapeo de nombres de iconos de Ionicons a definiciones de FontAwesome solid.
+ * Se usa en toda la app móvil después de migrar de Ionicons a FontAwesome.
  */
 import {
   faHouse, faPaw, faUsers, faCalendarDays, faGear, faLock,
@@ -32,9 +32,9 @@ import {
   faGoogle, faApple as fabApple,
 } from '@fortawesome/free-brands-svg-icons';
 
-// Mapping from Ionicons name to FA icon definition
+// Tabla de equivalencias Ionicons → FontAwesome
 const iconMap = {
-  // Navigation / Arrows
+  // Navegación / flechas
   'chevron-forward': faChevronRight,
   'chevron-back': faChevronLeft,
   'arrow-forward': faArrowRight,
@@ -265,8 +265,11 @@ const iconMap = {
 };
 
 /**
- * Get a FontAwesome icon definition from an Ionicons name.
- * Returns faPaw as fallback for unknown icons.
+ * Devuelve la definición FontAwesome correspondiente al nombre Ionicons indicado.
+ * Si el nombre no está mapeado se devuelve `faPaw` como icono por defecto.
+ *
+ * @param {string} ionName Nombre del icono en notación Ionicons.
+ * @returns {object} Definición del icono de FontAwesome.
  */
 export function getIcon(ionName) {
   return iconMap[ionName] || faPaw;

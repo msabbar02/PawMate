@@ -22,20 +22,29 @@ export const AuthProvider = ({ children }) => {
     const [unreadMessages, setUnreadMessages] = useState(0);
     const [pendingBookings, setPendingBookings] = useState(0);
 
-    // Track all channels for cleanup
+    // Referencias a todos los canales Realtime activos para limpiarlos al cerrar sesión.
     const channelsRef = useRef([]);
     const presenceIntervalRef = useRef(null);
     const userDataRef = useRef(null);
-    // Keep a ref to the last logged-in user so SIGNED_OUT can log the real id/email
+    // Último usuario autenticado, necesario para registrar el SIGNED_OUT con su id real.
     const lastUserRef = useRef(null);
 
-    // Keep ref in sync for use in callbacks
+    // Mantenemos un ref con userData para poder leerlo desde callbacks.
     useEffect(() => { userDataRef.current = userData; }, [userData]);
 
+    /**
+     * Aplica un parche local sobre `userData` sin esperar a la BD. Sirve para
+     * que la UI reaccione al instante (avatar, settings, etc.).
+     *
+     * @param {object} partial Campos a sobrescribir.
+     */
     const updateUserOptimistic = (partial) => {
         setUserData(prev => prev ? { ...prev, ...partial } : prev);
     };
 
+    /**
+     * Vuelve a leer la fila del usuario desde Supabase y refresca el estado.
+     */
     const refreshUserData = useCallback(async () => {
         const currentUser = user;
         if (!currentUser) return;
@@ -49,17 +58,21 @@ export const AuthProvider = ({ children }) => {
         }
     }, [user]);
 
-    // ── Presence: update last_seen ──────────────
+    /**
+     * Marca al usuario como "presente" actualizando `last_seen` cada minuto y
+     * cuando la app vuelve a primer plano. No toca `isOnline` (lo controlan
+     * los cuidadores manualmente).
+     *
+     * @param {string} userId Identificador del usuario.
+     * @returns {object} Suscripción de AppState para poder eliminarla luego.
+     */
     const startPresence = (userId) => {
-        // Update last_seen on login (don't force isOnline — caregivers control it manually)
         supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
 
-        // Heartbeat every 60s — only last_seen
         presenceIntervalRef.current = setInterval(() => {
             supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
         }, 60000);
 
-        // AppState listener: only update last_seen, don't override manual online toggle
         const appStateListener = AppState.addEventListener('change', (nextState) => {
             if (nextState === 'active') {
                 supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
@@ -69,6 +82,11 @@ export const AuthProvider = ({ children }) => {
         return appStateListener;
     };
 
+    /**
+     * Detiene el heartbeat de presencia y deja al usuario como desconectado.
+     *
+     * @param {string} userId Identificador del usuario.
+     */
     const stopPresence = (userId) => {
         if (presenceIntervalRef.current) {
             clearInterval(presenceIntervalRef.current);
@@ -79,7 +97,9 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // ── Cleanup all realtime channels ───────────────────────
+    /**
+     * Cancela todos los canales Realtime que tengamos abiertos.
+     */
     const cleanupChannels = () => {
         channelsRef.current.forEach(ch => {
             try { supabase.removeChannel(ch); } catch {}
@@ -102,7 +122,7 @@ export const AuthProvider = ({ children }) => {
                     .eq('id', uid)
                     .single();
 
-                // Fallback: if no row exists in public.users (trigger missing/failed), create it
+                // Si el trigger handle_new_user no creó la fila pública, la creamos aquí.
                 if (!profile && (error?.code === 'PGRST116' || error?.details?.includes('0 rows'))) {
                     const meta = session.user.user_metadata || {};
                     const fullName = meta.full_name || meta.name || meta.fullName || '';
@@ -132,7 +152,7 @@ export const AuthProvider = ({ children }) => {
                 }
 
                 if (profile && !error) {
-                    // ── Ban check on login ──
+                    // Si el usuario está baneado lo expulsamos antes de cargar nada más.
                     if (profile.is_banned) {
                         Alert.alert('Cuenta suspendida', 'Tu cuenta ha sido suspendida por un administrador.');
                         await supabase.auth.signOut();
@@ -147,30 +167,28 @@ export const AuthProvider = ({ children }) => {
                 }
                 setIsLoading(false);
 
-                // Clean previous channels
                 cleanupChannels();
 
-                // ── Channel 1: User profile realtime (ban detection + data sync) ──
+                // Canal 1: cambios sobre la fila del usuario (incluye detección de baneo).
                 const userChannel = supabase
                     .channel(`rt:user:${uid}`)
                     .on('postgres_changes', {
                         event: '*', schema: 'public', table: 'users',
                         filter: `id=eq.${uid}`
                     }, async (payload) => {
-                        // Ban check from payload (small field, always delivered)
                         if (payload.new?.is_banned) {
                             Alert.alert('Cuenta suspendida', 'Tu cuenta ha sido suspendida por un administrador.');
                             await supabase.auth.signOut();
                             return;
                         }
-                        // Refresh from DB instead of using payload (payload may be truncated with large fields like galleryPhotos)
+                        // Releemos la fila para evitar payloads truncados con campos jsonb grandes.
                         const { data: freshData } = await supabase.from('users').select('*').eq('id', uid).single();
                         if (freshData) setUserData(freshData);
                     })
                     .subscribe();
                 channelsRef.current.push(userChannel);
 
-                // ── Channel 2: Unread messages ──
+                // Canal 2: contador de mensajes sin leer.
                 const fetchUnread = async () => {
                     const { count } = await supabase
                         .from('messages')
@@ -190,7 +208,7 @@ export const AuthProvider = ({ children }) => {
                     .subscribe();
                 channelsRef.current.push(msgChannel);
 
-                // ── Channel 3: Pending bookings ──
+                // Canal 3: contador de reservas pendientes (cambia según el rol).
                 const fetchPending = async () => {
                     const role = userDataRef.current?.role || profile?.role;
                     const field = role === 'caregiver' ? 'caregiverId' : 'ownerId';
@@ -211,11 +229,11 @@ export const AuthProvider = ({ children }) => {
                     .subscribe();
                 channelsRef.current.push(bookChannel);
 
-                // ── Start presence heartbeat ──
+                // Heartbeat de presencia.
                 appStateListener = startPresence(uid);
 
             } else {
-                // Signed out
+                // El usuario ha cerrado sesión.
                 const prevUid = user?.id;
                 stopPresence(prevUid);
                 cleanupChannels();
@@ -227,12 +245,12 @@ export const AuthProvider = ({ children }) => {
             }
         };
 
-        // Get initial session
+        // Lectura inicial de la sesión almacenada en AsyncStorage.
         supabase.auth.getSession().then(({ data: { session } }) => {
             handleAuthChange(session);
         });
 
-        // Listen for auth changes
+        // Suscripción a los cambios de autenticación (login / logout).
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
             handleAuthChange(session);
             if (_evt === 'SIGNED_IN' && session?.user) {

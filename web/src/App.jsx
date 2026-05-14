@@ -1,4 +1,12 @@
-﻿import { useState, useEffect, useRef, Suspense } from 'react';
+﻿/**
+ * Landing principal de PawMate.
+ *
+ * Componente raíz que monta el router (`/`, `/confirm`, `/reset-password`),
+ * la landing animada con escenas Three.js (fiber/drei), Framer Motion para
+ * transiciones, i18next para idiomas y un toggle de tema oscuro/claro
+ * persistente en `localStorage`.
+ */
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +27,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 
 const APK_URL = 'https://expo.dev/accounts/msabbar/projects/pawmate/builds/ad6b1f57-060c-4463-9568-bfdd7079a3a7';
 
-/* ─── Animation Variants ──────────────────────── */
+/** Variantes de animación de Framer Motion reutilizadas en toda la landing. */
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
   show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] } },
@@ -33,6 +41,11 @@ const stagger = (delay = 0.1) => ({
   show: { transition: { staggerChildren: delay } },
 });
 
+/**
+ * Envuelve un bloque para animarlo cuando entra en viewport (una sola vez).
+ * Usa `react-intersection-observer` con un umbral muy bajo para disparar
+ * la animación en cuanto asoma cualquier píxel de la sección.
+ */
 function AnimatedSection({ children, className, delay = 0.1 }) {
   const [ref, inView] = useInView({ threshold: 0.06, triggerOnce: true });
   return (
@@ -42,7 +55,10 @@ function AnimatedSection({ children, className, delay = 0.1 }) {
   );
 }
 
-/* ─── Custom Paw Cursor ────────────────────────── */
+/**
+ * Hook que sustituye el cursor del documento por una huellita SVG
+ * embebida (data URI). Se restaura al desmontar.
+ */
 function usePawCursor() {
   useEffect(() => {
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 100 100'><circle cx='35' cy='22' r='10' fill='%23F5A623'/><circle cx='65' cy='22' r='10' fill='%23F5A623'/><circle cx='18' cy='46' r='8' fill='%23FF6B35'/><circle cx='82' cy='46' r='8' fill='%23FF6B35'/><ellipse cx='50' cy='64' rx='20' ry='18' fill='%23F5A623'/></svg>`;
@@ -51,7 +67,12 @@ function usePawCursor() {
   }, []);
 }
 
-/* ─── Theme Hook ─────────────────────────────── */
+/**
+ * Hook que gestiona el tema oscuro/claro persistido en `localStorage`
+ * y aplicado mediante el atributo `data-theme` del `<html>`.
+ *
+ * @returns {[string, () => void]} Tupla `[tema, toggle]`.
+ */
 function useTheme() {
   const [theme, setTheme] = useState(() => localStorage.getItem('pawmate-theme') || 'dark');
   useEffect(() => {
@@ -62,12 +83,16 @@ function useTheme() {
   return [theme, toggle];
 }
 
-/* ═══════════════════════════════════════════════════
-   THREE.JS 3D COMPONENTS
-   ═══════════════════════════════════════════════════ */
+/* ===================================================
+   COMPONENTES 3D (THREE.JS)
+   =================================================== */
 
-/* Pre-generate particle positions at module level — outside React render */
+/**
+ * Caché a nivel de módulo de las posiciones de partículas para evitar
+ * recalcularlas en cada render. La clave es el número de partículas.
+ */
 const _particleCache = new Map();
+/** Devuelve un `Float32Array` con `count*3` posiciones aleatorias cacheadas. */
 function getParticlePositions(count) {
   if (!_particleCache.has(count)) {
     const pos = new Float32Array(count * 3);
@@ -81,7 +106,10 @@ function getParticlePositions(count) {
   return _particleCache.get(count);
 }
 
-/* Floating 3D Paw Pad */
+/**
+ * Almohadilla 3D animada (huella) compuesta por una esfera principal y
+ * cuatro "dedos". Flota suavemente con `useFrame`.
+ */
 function PawPad({ position, scale = 1, speed = 1, color = '#F5A623' }) {
   const ref = useRef();
   useFrame((state) => {
@@ -93,12 +121,13 @@ function PawPad({ position, scale = 1, speed = 1, color = '#F5A623' }) {
   });
   return (
     <group ref={ref} position={position} scale={scale}>
-      {/* Main pad */}
+      {/* Almohadilla principal */}
       <mesh position={[0, -0.15, 0]}>
         <sphereGeometry args={[0.5, 32, 32]} />
         <meshStandardMaterial color={color} roughness={0.3} metalness={0.1} />
       </mesh>
-      {/* Toes */}
+      {/* Almohadilla principal */}
+      {/* Dedos de la huella */}
       {[[-0.35, 0.35, 0.1], [0.35, 0.35, 0.1], [-0.2, 0.55, 0.15], [0.2, 0.55, 0.15]].map((p, i) => (
         <mesh key={i} position={p}>
           <sphereGeometry args={[0.18, 16, 16]} />
@@ -109,7 +138,7 @@ function PawPad({ position, scale = 1, speed = 1, color = '#F5A623' }) {
   );
 }
 
-/* Animated gradient sphere */
+/** Esfera con material distorsionado y flotación suave (efecto "orb"). */
 function GlowOrb({ position, color = '#F5A623', size = 1 }) {
   return (
     <Float speed={2} floatIntensity={1.5} rotationIntensity={0.5}>
@@ -128,7 +157,7 @@ function GlowOrb({ position, color = '#F5A623', size = 1 }) {
   );
 }
 
-/* Floating particles */
+/** Sistema de partículas que gira lentamente sobre sí mismo. */
 function Particles({ count = 60 }) {
   const points = useRef();
   const positions = getParticlePositions(count);
@@ -150,7 +179,7 @@ function Particles({ count = 60 }) {
   );
 }
 
-/* Hero 3D Scene */
+/** Escena 3D principal del hero (varias huellas, orbs y partículas). */
 function HeroScene() {
   return (
     <Canvas camera={{ position: [0, 0, 7], fov: 60 }} style={{ position: 'absolute', inset: 0 }}>
@@ -173,7 +202,7 @@ function HeroScene() {
   );
 }
 
-/* Section 3D Background — abstract floating orbs */
+/** Fondo 3D abstracto reutilizado por secciones secundarias. */
 function SectionScene({ color1 = '#F5A623', color2 = '#FF6B35' }) {
   return (
     <Canvas camera={{ position: [0, 0, 5], fov: 50 }} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -186,11 +215,11 @@ function SectionScene({ color1 = '#F5A623', color2 = '#FF6B35' }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════
-   PAGE COMPONENTS
-   ═══════════════════════════════════════════════════ */
+/* ===================================================
+   COMPONENTES DE PÁGINA
+   =================================================== */
 
-/* ─── Navbar ───────────────────────────────────── */
+/** Barra de navegación con scroll-spy, menú móvil y selector de tema/idioma. */
 function Navbar({ theme, toggleTheme }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -275,7 +304,7 @@ function Navbar({ theme, toggleTheme }) {
   );
 }
 
-/* ─── Hero ─────────────────────────────────────── */
+/** Sección hero con escena 3D, título, CTAs y barra de estadísticas. */
 function Hero() {
   const { t } = useTranslation();
   const stats = [
@@ -346,7 +375,7 @@ function Hero() {
   );
 }
 
-/* ─── About Us ─────────────────────────────────── */
+/** Sección "Sobre nosotros" con imágenes y dos tarjetas descriptivas. */
 function About() {
   const { t } = useTranslation();
   return (
@@ -386,7 +415,7 @@ function About() {
   );
 }
 
-/* ─── Mission / Objetivo ───────────────────────── */
+/** Sección de misión/objetivo con imagen, descripción y lista de puntos clave. */
 function Mission() {
   const { t } = useTranslation();
   const points = [
@@ -434,7 +463,7 @@ function Mission() {
   );
 }
 
-/* ─── Future Ideas ─────────────────────────────── */
+/** Sección con tarjetas de funcionalidades futuras ("Próximamente"). */
 function Future() {
   const { t } = useTranslation();
   const ideas = [
@@ -471,7 +500,7 @@ function Future() {
   );
 }
 
-/* ─── Contact ──────────────────────────────────── */
+/** Sección de contacto: email, redes sociales y ubicación. */
 function Contact() {
   const { t } = useTranslation();
   return (
@@ -509,7 +538,7 @@ function Contact() {
   );
 }
 
-/* ─── Download CTA ─────────────────────────────── */
+/** Llamada a la acción final con escena 3D y botón de descarga del APK. */
 function DownloadSection() {
   const { t } = useTranslation();
   const features = [
@@ -570,7 +599,7 @@ function DownloadSection() {
   );
 }
 
-/* ─── Footer ───────────────────────────────────── */
+/** Pie de página con logo, copyright y descripción breve. */
 function Footer() {
   const { t } = useTranslation();
   return (
@@ -584,7 +613,7 @@ function Footer() {
   );
 }
 
-/* ─── Landing Page ─────────────────────────────── */
+/** Composición de la landing (orden de secciones). */
 function LandingPage() {
   usePawCursor();
   const [theme, toggleTheme] = useTheme();
@@ -602,7 +631,7 @@ function LandingPage() {
   );
 }
 
-/* ─── Main App ─────────────────────────────────── */
+/** Componente raíz de la web. Define las rutas públicas. */
 export default function App() {
   return (
     <BrowserRouter>

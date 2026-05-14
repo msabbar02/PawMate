@@ -95,6 +95,7 @@ admin/
 - **Tema**: claro/oscuro con persistencia en localStorage
 - **Realtime**: heartbeat en el layout + suscripciones en usuarios y reservas
 - **Acceso restringido**: solo `role: 'admin'` en la tabla `users`; timeout de seguridad de 5 s en la inicialización de auth
+- **RLS reales**: todas las consultas respetan las políticas de `supabase_schema.sql`. El helper SQL `public.is_admin()` permite que los administradores vean/modifiquen filas ajenas sin necesidad de service key en el cliente.
 
 ## Variables de entorno
 
@@ -113,7 +114,3 @@ cd admin
 npm install
 npm run dev
 ```
-
-## Despliegue
-
-Desplegado automáticamente en **Vercel**. Las variables de entorno deben estar configuradas en el dashboard de Vercel.

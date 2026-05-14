@@ -1,9 +1,7 @@
 # PawMate — Documentación Técnica
 
 > Plataforma móvil + web para conectar dueños de mascotas con cuidadores verificados.
-> Versión: 1.1 · Última revisión: 2026-05
-
----
+> Versión: 1.2 · Última revisión: 2026-05
 
 ## Índice
 
@@ -16,8 +14,6 @@
 7. [Seguridad](#7-seguridad)
 8. [Despliegue](#8-despliegue)
 9. [Variables de entorno](#9-variables-de-entorno)
-
----
 
 ## 1. Visión general
 
@@ -50,8 +46,6 @@ mindmap
 | Mercado           | España (escalable)                           |
 | Modelo de negocio | Comisión por reserva (Stripe)                |
 | Modalidades       | Paseo (por horas) · Hotel (por fechas)       |
-
----
 
 ## 2. Arquitectura del sistema
 
@@ -99,8 +93,6 @@ flowchart TB
 | **Cliente directo a Supabase**           | Latencia mínima, RLS protege los datos a nivel de fila.                        |
 | **Resend cloud API**                     | Entrega fiable, dashboard de logs, sin servidor de correo propio.               |
 
----
-
 ## 3. Stack tecnológico
 
 ### Móvil
@@ -137,6 +129,7 @@ graph LR
     B --> E[Resend SDK]
     B --> F[express-rate-limit]
     B --> G[jsonwebtoken]
+    B --> H[helmet]
 ```
 
 ### Resumen tabular
@@ -158,8 +151,6 @@ graph LR
 | **i18n**            | i18next (ES + EN)                                  |
 | **DNS**             | Namecheap                                          |
 | **Hosting**         | Vercel (web/admin/server) + Hetzner (mail)         |
-
----
 
 ## 4. Modelo de datos
 
@@ -298,8 +289,6 @@ erDiagram
 | `pawmate` | Fotos mascotas, documentos verificación, imágenes reportes, galería cuidadores |
 | `avatars` | Fotos perfil de usuarios                                                          |
 
----
-
 ## 5. Flujos clave
 
 ### 5.1 Registro y verificación
@@ -340,10 +329,12 @@ sequenceDiagram
     SR-->>M: client_secret
     M->>ST: Confirma pago (3D Secure)
     ST-->>M: Éxito
-    M->>DB: insert reservations (status: pendiente)
+    M->>DB: insert reservations (status: pendiente, paymentStatus: paid)
+    ST->>SR: webhook payment_intent.succeeded (firma verificada)
+    SR->>DB: confirma paymentStatus=paid
     DB-->>C: Realtime notification
-    C->>M: Acepta reserva
-    M->>DB: update status: confirmada
+    C->>M: Acepta reserva manualmente
+    M->>DB: update status: aceptada
     DB-->>O: Realtime notification
 ```
 
@@ -398,8 +389,6 @@ sequenceDiagram
     B->>DB: update read=true al abrir
     DB-->>A: Confirmación lectura
 ```
-
----
 
 ## 6. Módulos
 
@@ -506,8 +495,6 @@ Landing page de marketing con secciones animadas.
 | Testimonials | Carrusel de reseñas                        |
 | CTA          | Botones App Store + Google Play             |
 
----
-
 ## 7. Seguridad
 
 ### Arquitectura de seguridad
@@ -538,20 +525,26 @@ flowchart TB
 ### Medidas implementadas
 
 
-| Medida                | Implementación                                                |
-| --------------------- | -------------------------------------------------------------- |
-| **Autenticación**    | Supabase Auth con email/password + Magic Link + OAuth Google   |
-| **Autorización**     | Roles`normal` / `caregiver` / `admin` con middleware `isAdmin` |
-| **Tokens**            | JWT firmados, expiran en 1h, refresh automático               |
-| **Hashing**           | bcrypt (gestionado por Supabase Auth)                          |
-| **HTTPS**             | Forzado en Vercel + TLS gestionado por Resend                  |
-| **CORS**              | Whitelist configurada en server                                |
-| **Rate limiting**     | express-rate-limit en endpoints públicos                      |
-| **Email auth hook**   | JWT firmado con`SUPABASE_AUTH_HOOK_SECRET`                     |
-| **Service key**       | Solo en server, nunca expuesta al cliente                      |
-| **Auto-eliminación** | Endpoint DELETE protegido (self o admin)                       |
-| **Ban detection**     | Realtime listener cierra sesión al banear                     |
-| **DKIM/SPF/DMARC**    | Configurados en Namecheap para anti-phishing                   |
+| Medida                      | Implementación                                                                                                                                             |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Autenticación**          | Supabase Auth con email/password + Magic Link + OAuth Google                                                                                                |
+| **Autorización**           | Roles`normal` / `caregiver` / `admin` con middleware `isAdmin`                                                                                              |
+| **Tokens**                  | JWT firmados, expiran en 1h, refresh automático                                                                                                            |
+| **Hashing**                 | bcrypt (gestionado por Supabase Auth)                                                                                                                       |
+| **HTTPS**                   | Forzado en Vercel + TLS gestionado por Resend                                                                                                               |
+| **CORS**                    | Whitelist configurada en server                                                                                                                             |
+| **Cabeceras HTTP**          | `helmet` (CSP mínima, HSTS, X-Frame-Options, Referrer-Policy)                                                                                              |
+| **Rate limiting**           | 200 req/15 min global + 20/5 min en`/api/auth/*` + 10/1 min en `/api/payments/*`                                                                            |
+| **Webhook Stripe**          | Firma`STRIPE_WEBHOOK_SECRET` **obligatoria en producción** (503 si falta). No auto-acepta reservas. Devuelve 500 si falla la BD para que Stripe reintente. |
+| **errorHandler**            | En producción sólo mensajes genéricos por código HTTP, sin`err.message` ni stack                                                                        |
+| **Borrado de cuenta**       | DELETE primero en Supabase Auth (CASCADE limpia`public.users`); evita cuentas zombie                                                                        |
+| **RLS reales**              | Políticas owner-based en todas las tablas + helper`public.is_admin()` `SECURITY DEFINER`                                                                   |
+| **Email auth hook**         | JWT firmado con`SUPABASE_AUTH_HOOK_SECRET`                                                                                                                  |
+| **Service key**             | Solo en server, nunca expuesta al cliente                                                                                                                   |
+| **Auto-eliminación**       | Endpoint DELETE protegido (self o admin)                                                                                                                    |
+| **Ban detection**           | Realtime listener cierra sesión al banear                                                                                                                  |
+| **DKIM/SPF/DMARC**          | Configurados en Namecheap para anti-phishing                                                                                                                |
+| **Sin secretos en código** | WeatherAPI, URL backend y demás vienen de variables`EXPO_PUBLIC_*`                                                                                         |
 
 ### Privacidad
 
@@ -559,8 +552,6 @@ flowchart TB
 - Endpoint `/auth/profile` filtra campos sensibles (`idFrontUrl`, `idBackUrl`, `selfieUrl`, `expoPushToken`).
 - IBAN encriptado pendiente (issue conocido).
 - GDPR: usuario puede auto-eliminar cuenta + datos.
-
----
 
 ## 8. Despliegue
 
@@ -607,8 +598,6 @@ flowchart LR
 | Email         | Resend Cloud   | resend.com           |
 | Base de datos | Supabase Cloud | xxxx.supabase.co     |
 
----
-
 ## 9. Variables de entorno
 
 ### Mobile (`mobile/.env`)
@@ -617,16 +606,20 @@ flowchart LR
 EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-EXPO_PUBLIC_API_URL=
+EXPO_PUBLIC_API_BASE_URL=https://api.apppawmate.com
+# Opcional: si falta el widget de clima del TopBar muestra el fallback de carga.
+EXPO_PUBLIC_WEATHER_API_KEY=
 ```
 
 ### Server (`server/.env`)
 
 ```ini
 PORT=3000
+NODE_ENV=production
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
 STRIPE_SECRET_KEY=
+# Obligatorio en producción: sin esta clave el endpoint de webhook responde 503.
 STRIPE_WEBHOOK_SECRET=
 RESEND_API_KEY=re_xxxxxxxxxxxx
 EMAIL_FROM=PawMate <noreply@apppawmate.com>

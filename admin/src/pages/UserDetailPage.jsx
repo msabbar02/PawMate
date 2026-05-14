@@ -1,4 +1,13 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿/**
+ * Página de detalle de un usuario.
+ *
+ * Carga en paralelo el perfil y todas sus colecciones relacionadas:
+ * mascotas, reservas como dueño y como cuidador (deduplicadas), reportes
+ * en cualquiera de los dos lados, los últimos 50 logs de sistema y las
+ * conversaciones donde participa. Permite banear/desbanear, cambiar rol,
+ * cambiar estado de verificación y eliminar al usuario vía RPC.
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendBanEmail } from '../config/api';
@@ -13,12 +22,19 @@ import './DetailPage.css';
 
 const DETAIL_LABELS = {
     event: 'Evento', platform: 'Plataforma', version: 'Versión',
-    totalkmm: 'Distancia (km)', totalkm: 'Distancia (km)', distance: 'Distancia (km)',
+    totalKm: 'Distancia (km)', totalkmm: 'Distancia (km)', totalkm: 'Distancia (km)', distance: 'Distancia (km)',
     calories: 'Calorías', petName: 'Mascota', duration: 'Duración (s)',
     steps: 'Pasos', reason: 'Motivo', type: 'Tipo',
     serviceType: 'Servicio', status: 'Estado', role: 'Rol', amount: 'Importe',
 };
 
+/**
+ * Convierte el JSON de detalles de un log en una cadena legible
+ * usando `DETAIL_LABELS` para traducir las claves al español.
+ *
+ * @param {string|null|undefined} raw JSON serializado o nulo.
+ * @returns {string|null}
+ */
 function formatDetails(raw) {
     if (!raw) return null;
     try {
@@ -45,6 +61,7 @@ const ACTION_COLOR = {
     REPORT_CREATED: '#ef4444', WALK_COMPLETED: '#06b6d4',
 };
 
+/** Etiqueta de estado coloreada (aprobado, rechazado, pendiente, etc.). */
 function Badge({ status }) {
     const map = {
         approved:   { cls: 'green', label: 'Aprobado' },
@@ -65,6 +82,7 @@ function Badge({ status }) {
     return <span className={`detail-badge ${m.cls}`}>{m.label}</span>;
 }
 
+/** Formatea una fecha ISO al formato corto en castellano. */
 function formatDate(d) {
     if (!d) return '-';
     return new Date(d).toLocaleString('es-ES');
@@ -81,6 +99,9 @@ export default function UserDetailPage() {
     const [logs, setLogs] = useState([]);
     const [conversations, setConversations] = useState([]);
 
+    /**
+     * Carga en paralelo todas las colecciones relacionadas con el usuario.
+     */
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
@@ -96,7 +117,7 @@ export default function UserDetailPage() {
             setUser(u.data || null);
             setPets(p.data || []);
             const all = [...(rOwn.data || []), ...(rCare.data || [])];
-            // Dedupe by id
+            // Deduplica por id (un usuario puede aparecer como dueño y cuidador en la misma reserva).
             const dedup = Array.from(new Map(all.map(r => [r.id, r])).values());
             setReservations(dedup);
             setReports(rep.data || []);
@@ -115,6 +136,7 @@ export default function UserDetailPage() {
         return () => window.removeEventListener('pawmate:wake', fetchAll);
     }, [fetchAll]);
 
+    /** Banea o desbanea al usuario; al banear emite el email de aviso. */
     const handleBan = async () => {
         if (!user) return;
         const action = user.is_banned ? 'desbanear' : 'banear';
@@ -125,6 +147,7 @@ export default function UserDetailPage() {
         setUser({ ...user, is_banned: !user.is_banned });
     };
 
+    /** Borra el usuario vía RPC `admin_delete_user`. */
     const handleDelete = async () => {
         if (!window.confirm('¿Seguro que quieres ELIMINAR este usuario? Esta acción es irreversible.')) return;
         const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid: id });
@@ -140,6 +163,7 @@ export default function UserDetailPage() {
         navigate('/users');
     };
 
+    /** Cambia el estado de verificación del usuario. */
     const handleVerify = async (status) => {
         if (!user) return;
         const { error } = await supabase.from('users').update({ verificationStatus: status }).eq('id', id);
@@ -147,6 +171,7 @@ export default function UserDetailPage() {
         setUser({ ...user, verificationStatus: status });
     };
 
+    /** Cambia el rol del usuario (normal/owner/caregiver/admin). */
     const handleRoleChange = async (role) => {
         if (!user) return;
         const { error } = await supabase.from('users').update({ role }).eq('id', id);
@@ -214,7 +239,7 @@ export default function UserDetailPage() {
                             <div className="detail-row"><span className="label">Max hotel simultáneos</span><span className="value">{user.maxConcurrentHotel || '-'}</span></div>
                             <div className="detail-row"><span className="label">Rating</span><span className="value">{user.rating ? `${user.rating} (${user.reviewCount || 0})` : '-'}</span></div>
                             <div className="detail-row"><span className="label">Total paseos</span><span className="value">{logs.filter(l => l.actionType === 'WALK_COMPLETED').length}</span></div>
-                            <div className="detail-row"><span className="label">Distancia total</span><span className="value">{(() => { const km = logs.filter(l => l.actionType === 'WALK_COMPLETED').reduce((s, l) => { try { const d = JSON.parse(l.details); return s + parseFloat(d.totalkmm || d.totalkm || d.distance || 0); } catch { return s; } }, 0); return km > 0 ? `${km.toFixed(2)} km` : '-'; })()}</span></div>
+                            <div className="detail-row"><span className="label">Distancia total</span><span className="value">{(() => { const km = logs.filter(l => l.actionType === 'WALK_COMPLETED').reduce((s, l) => { try { const d = JSON.parse(l.details); return s + parseFloat(d.totalKm || d.totalkmm || d.totalkm || d.distance || 0); } catch { return s; } }, 0); return km > 0 ? `${km.toFixed(2)} km` : '-'; })()}</span></div>
                         </div>
                     )}
 

@@ -1,4 +1,13 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿/**
+ * Página de gestión de verificaciones de identidad.
+ *
+ * Muestra todos los usuarios que han iniciado el proceso de
+ * verificación (DNI/selfie/certificado de cuidador). Permite aprobar
+ * (asignando el rol pendiente, p. ej. `caregiver`), rechazar con
+ * motivo o resetear a pendiente. Incluye visor de imágenes a tamaño
+ * completo.
+ */
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShieldHalved, faClock, faXmark, faEye, faUserCheck, faRotateLeft, faFileImage, faCheck, faBan } from '@fortawesome/free-solid-svg-icons';
@@ -17,6 +26,7 @@ export default function VerificationsPage() {
         fetchVerifications();
     }, []);
 
+    /** Carga todos los usuarios con `verificationStatus` no nulo. */
     const fetchVerifications = async () => {
         setLoading(true);
         try {
@@ -34,6 +44,10 @@ export default function VerificationsPage() {
         }
     };
 
+    /**
+     * Aprueba la verificación y promueve el rol al `pendingRole`
+     * solicitado (por defecto `owner`).
+     */
     const handleApprove = async (user) => {
         if (!window.confirm(t('verifications.confirmApprove', { name: user.fullName || user.email, role: user.pendingRole || 'owner' }))) return;
 
@@ -59,6 +73,7 @@ export default function VerificationsPage() {
         }
     };
 
+    /** Rechaza la verificación almacenando el motivo proporcionado. */
     const handleReject = async (user) => {
         const reason = window.prompt(t('verifications.rejectPrompt', { name: user.fullName || user.email }), t('verifications.rejectDefaultReason'));
         if (reason === null) return;
@@ -84,6 +99,7 @@ export default function VerificationsPage() {
         }
     };
 
+    /** Devuelve un usuario aprobado/rechazado al estado `pending`. */
     const handleResetToPending = async (user) => {
         if (!window.confirm(t('verifications.confirmRevert', { name: user.fullName || user.email }))) return;
 
@@ -107,17 +123,19 @@ export default function VerificationsPage() {
         }
     };
 
+    /** Abre el modal de previsualización de un documento. */
     const openPreview = (url, label) => {
         setPreviewImage(url);
         setPreviewLabel(label);
     };
 
+    /** Cierra el modal de previsualización. */
     const closePreview = () => {
         setPreviewImage(null);
         setPreviewLabel('');
     };
 
-    // ── Derived data ──────────────────────────
+    // Datos derivados.
     const counts = {
         all: requests.length,
         pending: requests.filter(r => r.verificationStatus === 'pending').length,
@@ -129,6 +147,7 @@ export default function VerificationsPage() {
         ? requests
         : requests.filter(r => r.verificationStatus === statusFilter);
 
+    /** Formatea una fecha ISO en formato corto en castellano. */
     const formatDate = (iso) => {
         if (!iso) return '—';
         return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -137,7 +156,7 @@ export default function VerificationsPage() {
     const getUserName = (u) => u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email?.split('@')[0] || t('verifications.userFallback');
     const getInitial = (u) => getUserName(u).charAt(0).toUpperCase();
 
-    // ── Render ──────────────────────────
+    // Renderizado.
     if (loading) {
         return (
             <div className="verifications-page">

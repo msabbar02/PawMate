@@ -1,4 +1,4 @@
-﻿// Shared app constants — single source of truth
+﻿// Constantes compartidas — fuente única de verdad para toda la app.
 
 export const SPECIES_OPTIONS = [
     { value: 'dog',    icon: 'dog',    label: 'Perro' },

@@ -14,13 +14,18 @@ export const ThemeContext = createContext({
     toggleHandedness: () => { },
 });
 
+/**
+ * Provee el tema activo (claro / oscuro) y la preferencia de mano (zurdo /
+ * diestro). Ambas opciones se persisten en AsyncStorage y se inicializan
+ * respetando el esquema del sistema operativo si no hay valor guardado.
+ */
 export const ThemeProvider = ({ children }) => {
     const systemColorScheme = useColorScheme();
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isLeftHanded, setIsLeftHanded] = useState(false);
     const [loaded, setLoaded] = useState(false);
 
-    // Load saved preference on mount
+    // Recupera las preferencias guardadas al montar el provider.
     useEffect(() => {
         (async () => {
             try {
@@ -34,25 +39,31 @@ export const ThemeProvider = ({ children }) => {
                 if (savedLefty !== null) {
                     setIsLeftHanded(savedLefty === 'true');
                 }
-            } catch { /* ignore */ }
+            } catch { /* sin acción */ }
             setLoaded(true);
         })();
     }, []);
 
+    /**
+     * Conmuta entre tema claro y oscuro y persiste la elección.
+     */
     const toggleTheme = async () => {
         const newValue = !isDarkMode;
         setIsDarkMode(newValue);
         try {
             await AsyncStorage.setItem(THEME_KEY, String(newValue));
-        } catch { /* ignore */ }
+        } catch { /* sin acción */ }
     };
 
+    /**
+     * Conmuta el modo zurdo/diestro y persiste la elección.
+     */
     const toggleHandedness = async () => {
         const newValue = !isLeftHanded;
         setIsLeftHanded(newValue);
         try {
             await AsyncStorage.setItem(LEFTY_KEY, String(newValue));
-        } catch { /* ignore */ }
+        } catch { /* sin acción */ }
     };
 
     const theme = isDarkMode ? darkTheme : lightTheme;

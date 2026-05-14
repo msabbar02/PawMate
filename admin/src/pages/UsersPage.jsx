@@ -1,4 +1,14 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿/**
+ * Página de gestión de usuarios.
+ *
+ * Lista hasta 500 usuarios, se sincroniza por Realtime y al volver al
+ * foco (`pawmate:wake`), permite filtrar por rol y buscar por nombre/
+ * email. Permite banear/desbanear (con email automático de aviso),
+ * borrar vía RPC `admin_delete_user` (necesaria en Supabase para
+ * eliminar de Auth + tabla en cascada) y editar rol/estado de
+ * verificación desde modales.
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
@@ -15,7 +25,7 @@ export default function UsersPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     
-    // Modal state
+    // Estado del modal.
     const [selectedUser, setSelectedUser] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -23,6 +33,7 @@ export default function UsersPage() {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [editForm, setEditForm] = useState({ role: '', verificationStatus: '' });
 
+    /** Carga la lista completa de usuarios. */
     const fetchUsers = useCallback(async () => {
         try {
             const { data: usersData, error } = await supabase.from('users').select('*').limit(500);
@@ -39,10 +50,10 @@ export default function UsersPage() {
     useEffect(() => {
         fetchUsers();
 
-        // Re-fetch when tab becomes visible again (prevents stuck-loading after browser throttles background tabs)
+        // Recarga al volver al foco (evita carga bloqueada si el navegador ralentizó el tab en segundo plano).
         window.addEventListener('pawmate:wake', fetchUsers);
 
-        // ── Realtime: auto-refresh users on any change ──
+        // Actualización automática de usuarios en tiempo real.
         const channel = supabase
             .channel('admin:users')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
@@ -62,6 +73,13 @@ export default function UsersPage() {
         };
     }, [fetchUsers]);
 
+    /**
+     * Banea o desbanea a un usuario. Al banear lanza un email de aviso
+     * a través del endpoint privado del backend.
+     *
+     * @param {string}  userId
+     * @param {boolean} currentlyBanned
+     */
     const handleBanUser = async (userId, currentlyBanned) => {
         const action = currentlyBanned ? t('users.confirmBanActionUnban') : t('users.confirmBanActionBan');
         if (!window.confirm(t('users.confirmBan', { action }))) return;
@@ -79,6 +97,12 @@ export default function UsersPage() {
         }
     };
 
+    /**
+     * Borra a un usuario llamando a la RPC `admin_delete_user` que
+     * elimina del esquema público y de Supabase Auth en cascada. Si
+     * falla, muestra un mensaje claro indicando que el script SQL
+     * aún no se ha ejecutado.
+     */
     const handleDeleteUser = async (userId) => {
         if (!window.confirm(t('users.confirmDelete'))) return;
         try {
@@ -99,6 +123,7 @@ export default function UsersPage() {
         }
     };
 
+    /** Abre el modal de edición con los valores actuales. */
     const openEditModal = (user) => {
         setSelectedUser(user);
         setEditForm({
@@ -108,11 +133,13 @@ export default function UsersPage() {
         setIsEditModalOpen(true);
     };
 
+    /** Cierra el modal de edición. */
     const closeEditModal = () => {
         setIsEditModalOpen(false);
         setSelectedUser(null);
     };
 
+    /** Abre el modal de visualización cargando las mascotas del usuario. */
     const openViewModal = async (user) => {
         setSelectedUser(user);
         setIsViewModalOpen(true);
@@ -127,17 +154,19 @@ export default function UsersPage() {
         setLoadingDetails(false);
     };
 
+    /** Cierra el modal de visualización. */
     const closeViewModal = () => {
         setIsViewModalOpen(false);
         setSelectedUser(null);
     };
 
+    /** Persiste los cambios del modal de edición. */
     const handleSaveEdit = async () => {
         try {
             const { error } = await supabase.from('users').update(editForm).eq('id', selectedUser.id);
             if (error) throw error;
             
-            // Update local state
+            // Actualiza el estado local.
             setUsers(prev => prev.map(u => 
                 u.id === selectedUser.id ? { ...u, ...editForm } : u
             ));
@@ -149,7 +178,7 @@ export default function UsersPage() {
         }
     };
 
-    // Filtering logic
+    // Lógica de filtrado.
     const filteredUsers = users.filter(user => {
         const matchesSearch = (user.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                               (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());

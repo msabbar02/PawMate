@@ -56,6 +56,13 @@ export default function VerifyOwnerScreen({ navigation }) {
         if (!result.canceled) setter(result.assets[0].uri);
     };
 
+    /**
+     * Alterna un valor en un array de selección múltiple.
+     *
+     * @param {string}   value  Valor a conmutar.
+     * @param {string[]} arr    Array actual.
+     * @param {Function} setter `setState` del array.
+     */
     const toggleMulti = (value, arr, setter) => {
         setter(arr.includes(value)
             ? arr.filter(v => v !== value)
@@ -63,9 +70,10 @@ export default function VerifyOwnerScreen({ navigation }) {
         );
     };
 
-    // ─────────────────────────────────────────────────
-    // SUBMIT
-    // ─────────────────────────────────────────────────
+    /**
+     * Sube los documentos a Supabase Storage y crea la solicitud de
+     * verificación en la tabla `users` (estado `pending`).
+     */
     const handleSubmit = async () => {
         if (!idFront || !idBack || !selfie) {
             return Alert.alert(t('verify.docsRequired'), t('verify.docsRequiredMsg'));
@@ -82,7 +90,7 @@ export default function VerifyOwnerScreen({ navigation }) {
             const uid = user?.id;
             const ts = Date.now();
 
-            // Upload all docs to Supabase Storage in parallel
+            // Sube todos los documentos a Supabase Storage en paralelo.
             const [frontUrl, backUrl, selfieUrl, certUrl] = await Promise.all([
                 uploadVerificationDoc(idFront, `verification/${uid}/${ts}_front.jpg`),
                 uploadVerificationDoc(idBack, `verification/${uid}/${ts}_back.jpg`),
@@ -122,9 +130,7 @@ export default function VerifyOwnerScreen({ navigation }) {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // RENDER: Step 1 — Choose Role
-    // ─────────────────────────────────────────────────
+    // Paso 1: elegir el rol (dueño o cuidador).
     const renderStep1 = () => (
         <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>{t('verify.chooseRole')}</Text>
@@ -187,9 +193,7 @@ export default function VerifyOwnerScreen({ navigation }) {
         </View>
     );
 
-    // ─────────────────────────────────────────────────
-    // RENDER: Step 2 — Documents + Caregiver Config
-    // ─────────────────────────────────────────────────
+    // Paso 2: subir documentos y configurar el perfil (cuidadores).
     const renderStep2 = () => (
         <View style={styles.stepContainer}>
             <TouchableOpacity onPress={() => setStep(1)} style={styles.backBtn}>

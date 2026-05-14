@@ -3,21 +3,30 @@ import { View, Image, Text, StyleSheet, Animated, TouchableOpacity } from 'react
 import { Marker, Callout } from 'react-native-maps';
 import Icon from './Icon';
 
+/**
+ * Marker animado que aparece en el mapa para representar a un cuidador o a
+ * un dueño que está paseando en grupo.
+ *
+ * @param {object}   props
+ * @param {object}   props.user            Usuario remoto a pintar (id, role, location…).
+ * @param {string[]} [props.userPetSpecies] Especies del usuario actual; sirve para detectar match con cuidadores.
+ * @param {Function} [props.onMessagePress] Callback al pulsar el botón del callout.
+ */
 const PetMarker = ({ user, userPetSpecies = [], onMessagePress }) => {
     const isCaregiver = user.role === 'caregiver';
 
-    // Match logic only applies to caregivers
+    // El cálculo de match solo aplica a cuidadores: hay match si alguna especie del dueño coincide con las que el cuidador acepta.
     const acceptedSpecies = user.acceptedSpecies || [];
     const isMatch = isCaregiver && userPetSpecies.some(species =>
         acceptedSpecies.map(s => s.toLowerCase()).includes(species.toLowerCase())
     );
 
-    // Animated pulsing border for match (Caregiver) or active group walk (Owner)
+    // Borde animado: dorado cuando hay match con cuidador, azul cuando es dueño en paseo grupal.
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
         let animation;
-        if (isMatch || !isCaregiver) { // Owners in group walk also pulse
+        if (isMatch || !isCaregiver) {
             animation = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, {

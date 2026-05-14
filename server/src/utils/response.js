@@ -1,13 +1,16 @@
-/**
- * Standardized API response helper
+﻿/**
+ * Helpers para emitir respuestas JSON estandarizadas desde la API.
+ * Todas las rutas devuelven `{ success, message, data?, error? }` para que
+ * el cliente pueda parsearlas de forma uniforme.
  */
 
 /**
- * Send success response
- * @param {Object} res - Express response object
- * @param {*} data - Response data
- * @param {String} message - Success message
- * @param {Number} statusCode - HTTP status code (default: 200)
+ * Envía una respuesta de éxito.
+ *
+ * @param {import('express').Response} res        Respuesta de Express.
+ * @param {*}                          [data]     Carga útil a devolver.
+ * @param {string}                     [message]  Mensaje legible.
+ * @param {number}                     [statusCode] Código HTTP (200 por defecto).
  */
 const sendSuccess = (res, data = null, message = 'Success', statusCode = 200) => {
     return res.status(statusCode).json({
@@ -18,11 +21,14 @@ const sendSuccess = (res, data = null, message = 'Success', statusCode = 200) =>
 };
 
 /**
- * Send error response
- * @param {Object} res - Express response object
- * @param {String} message - Error message
- * @param {Number} statusCode - HTTP status code (default: 500)
- * @param {*} error - Error details (optional)
+ * Envía una respuesta de error.
+ * En modo desarrollo incluye el objeto de error original para depurar;
+ * en producción se omite para no filtrar información sensible.
+ *
+ * @param {import('express').Response} res          Respuesta de Express.
+ * @param {string}                     [message]    Mensaje legible.
+ * @param {number}                     [statusCode] Código HTTP (500 por defecto).
+ * @param {*}                          [error]      Detalles internos del error.
  */
 const sendError = (res, message = 'Internal Server Error', statusCode = 500, error = null) => {
     const response = {
@@ -30,7 +36,6 @@ const sendError = (res, message = 'Internal Server Error', statusCode = 500, err
         message,
     };
 
-    // Include error details in development mode
     if (process.env.NODE_ENV === 'development' && error) {
         response.error = error;
     }

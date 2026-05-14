@@ -3,6 +3,18 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, TextInput } 
 import Icon from './Icon';
 import { useTranslation } from '../context/LanguageContext';
 
+/**
+ * Selector múltiple con chips y modal. Permite escoger varias opciones de
+ * una lista predefinida y, opcionalmente, añadir entradas personalizadas.
+ *
+ * @param {object}   props
+ * @param {string}   props.label             Etiqueta visible encima del campo.
+ * @param {string[]} props.options           Lista de opciones disponibles.
+ * @param {string[]} props.selectedValues    Valores actualmente seleccionados.
+ * @param {Function} props.onSelectionChange Callback `(nuevos) => void`.
+ * @param {object}   props.theme             Tema activo de la app.
+ * @param {boolean}  [props.allowCustom]     Permite añadir entradas libres.
+ */
 const CustomMultiSelect = ({
     label,
     options,
@@ -15,6 +27,9 @@ const CustomMultiSelect = ({
     const [customInput, setCustomInput] = useState('');
     const { t } = useTranslation();
 
+    /**
+     * Añade o quita un ítem del array de seleccionados.
+     */
     const toggleSelection = (item) => {
         if (selectedValues.includes(item)) {
             onSelectionChange(selectedValues.filter(val => val !== item));
@@ -23,6 +38,9 @@ const CustomMultiSelect = ({
         }
     };
 
+    /**
+     * Añade el texto introducido como nueva opción personalizada.
+     */
     const addCustom = () => {
         if (customInput.trim() && !selectedValues.includes(customInput.trim())) {
             onSelectionChange([...selectedValues, customInput.trim()]);
@@ -30,6 +48,9 @@ const CustomMultiSelect = ({
         }
     };
 
+    /**
+     * Elimina un chip de la selección.
+     */
     const removeSelection = (item) => {
         onSelectionChange(selectedValues.filter(val => val !== item));
     };

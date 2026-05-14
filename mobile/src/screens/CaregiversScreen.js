@@ -56,7 +56,7 @@ export default function CaregiversScreen({ navigation }) {
             (cg.firstName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
             (cg.city?.toLowerCase() || '').includes(searchQuery.toLowerCase());
         const matchesService = filterService === 'all' || (cg.serviceTypes || []).includes(filterService);
-        // Match against both legacy Spanish and canonical English keys
+        // Compara contra las claves en español antiguas y las canónicas en inglés.
         const legacyMap = { dog: 'perro', cat: 'gato', bird: 'ave' };
         const matchesSpecies = filterSpecies === 'all' ||
             (cg.acceptedSpecies || []).some(s => s === filterSpecies || s === legacyMap[filterSpecies]);
@@ -66,7 +66,7 @@ export default function CaregiversScreen({ navigation }) {
 
     const handleMessage = async (caregiver) => {
         try {
-            // Find or create conversation
+            // Busca o crea la conversación con el cuidador.
             const { data: existing } = await supabase
                 .from('conversations')
                 .select('*')
@@ -175,7 +175,7 @@ export default function CaregiversScreen({ navigation }) {
 
                 {/* Accepted species */}
                 {species.length > 0 && (() => {
-                    // Normalize and dedupe to avoid duplicates like 'perro'+'dog'
+                    // Normaliza y elimina duplicados (ej. 'perro'+'dog').
                     const normMap = { perro: 'dog', gato: 'cat', ave: 'bird', reptil: 'other' };
                     const norm = [...new Set(species.map(s => normMap[s] || s))];
                     const labelMap = {

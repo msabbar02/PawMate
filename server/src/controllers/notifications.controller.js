@@ -1,11 +1,22 @@
+/**
+ * Controlador de notificaciones por email para reservas.
+ *
+ * Envía emails al dueño cuando el cuidador acepta o rechaza una reserva,
+ * al cuidador cuando recibe una nueva solicitud, y al dueño cuando el
+ * servicio termina para que valore la experiencia.
+ */
 const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 const { createTransporter, emailLayout, emailButton, escapeHtml, FROM_DEFAULT, FROM_SUPPORT } = require('./email.controller');
 
 /**
- * Notificar al due�o por email cuando el cuidador acepta o rechaza la reserva.
  * POST /api/notifications/reservation-status
- * Body: { reservationId }
+ *
+ * Notifica por email al dueño (aceptación/rechazo) y al cuidador
+ * (nueva solicitud pendiente) según el estado actual de la reserva.
+ *
+ * @param {import('express').Request}  req Petición con `{ reservationId }`.
+ * @param {import('express').Response} res Respuesta con flags `{ owner, caregiver }`.
  */
 const sendReservationStatusEmail = async (req, res) => {
     try {
@@ -24,12 +35,12 @@ const sendReservationStatusEmail = async (req, res) => {
             return sendError(res, 'Reservation not found', 404);
         }
 
-        // Verify the requesting user is a participant of this reservation
+        // Verifica que el usuario que hace la petición es participante de la reserva.
         if (req.user.uid !== data.ownerId && req.user.uid !== data.caregiverId) {
             return sendError(res, 'Not authorized for this reservation', 403);
         }
 
-        // Look up the owner's email and caregiver email from users table in parallel
+        // Busca en paralelo el email del dueño y del cuidador en la tabla users.
         const [{ data: ownerData }, { data: caregiverData }] = await Promise.all([
             supabase.from('users').select('email').eq('id', data.ownerId).single(),
             supabase.from('users').select('email').eq('id', data.caregiverId).single(),
@@ -50,11 +61,11 @@ const sendReservationStatusEmail = async (req, res) => {
             : 'Paseo';
         const startDate     = data.startDate || '';
         const endDate       = data.endDate   || '';
-        const totalPrice    = data.totalPrice != null ? `${Number(data.totalPrice).toFixed(2)} �` : null;
+        const totalPrice    = data.totalPrice != null ? `${Number(data.totalPrice).toFixed(2)} €` : null;
 
         const results = { owner: false, caregiver: false };
 
-        // -- Email to owner --------------------------------------------------
+        // Email al dueño cuando la reserva ha sido aceptada o rechazada.
         if (ownerEmail?.includes('@') && (isAccepted || isRejected)) {
             try {
                 const transporter = createTransporter();
@@ -62,13 +73,13 @@ const sendReservationStatusEmail = async (req, res) => {
                 if (isAccepted) {
                     const html = emailLayout({
                         icon: '',
-                        title: '�Tu reserva ha sido aceptada!',
-                        subtitle: `${caregiverName} est� listo para cuidar a ${petName}`,
+                        title: '¡Tu reserva ha sido aceptada!',
+                        subtitle: `${caregiverName} está listo para cuidar a ${petName}`,
                         gradient: '#16A34A 0%, #15803d 100%',
                         body: `
   <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${ownerName},</h2>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 20px;">
-    �Buenas noticias! <strong>${caregiverName}</strong> ha <strong style="color:#16A34A;">aceptado</strong> tu solicitud de reserva.
+    ¡Buenas noticias! <strong>${caregiverName}</strong> ha <strong style="color:#16A34A;">aceptado</strong> tu solicitud de reserva.
   </p>
   <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;padding:20px;margin-bottom:24px;">
     <p style="margin:0 0 10px;font-size:14px;color:#166534;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Detalles de la reserva</p>
@@ -81,22 +92,22 @@ const sendReservationStatusEmail = async (req, res) => {
     </table>
   </div>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 24px;">
-    Puedes chatear con ${caregiverName} directamente en la app para coordinar todos los detalles. �Tu mascota est� en buenas manos!
+    Puedes chatear con ${caregiverName} directamente en la app para coordinar todos los detalles. ¡Tu mascota está en buenas manos!
   </p>
-  <p style="color:#64748b;font-size:13px;margin:0;">�Tienes alguna pregunta? Escr�benos a <a href="mailto:soporte@apppawmate.com" style="color:#16A34A;">soporte@apppawmate.com</a></p>`,
+  <p style="color:#64748b;font-size:13px;margin:0;">¿Tienes alguna pregunta? Escríbenos a <a href="mailto:soporte@apppawmate.com" style="color:#16A34A;">soporte@apppawmate.com</a></p>`,
                     });
                     await transporter.sendMail({
                         from: `"PawMate" <${FROM_DEFAULT}>`,
                         to: ownerEmail,
-                        subject: `${caregiverName} ha aceptado tu reserva � PawMate`,
+                        subject: `${caregiverName} ha aceptado tu reserva · PawMate`,
                         html,
-                        text: `Hola ${ownerName},\n\n${caregiverName} ha aceptado tu reserva para ${petName} (${serviceLabel}).\n\nDetalles: ${startDate}${endDate && endDate !== startDate ? ' ? ' + endDate : ''}${totalPrice ? ' � ' + totalPrice : ''}.\n\nGracias por usar PawMate.`,
+                        text: `Hola ${ownerName},\n\n${caregiverName} ha aceptado tu reserva para ${petName} (${serviceLabel}).\n\nDetalles: ${startDate}${endDate && endDate !== startDate ? ' → ' + endDate : ''}${totalPrice ? ' · ' + totalPrice : ''}.\n\nGracias por usar PawMate.`,
                     });
                 } else {
                     const html = emailLayout({
                         icon: '',
                         title: 'Reserva no disponible',
-                        subtitle: `${caregiverName} no puede atenderte en esta ocasi�n`,
+                        subtitle: `${caregiverName} no puede atenderte en esta ocasión`,
                         gradient: '#64748b 0%, #475569 100%',
                         body: `
   <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${ownerName},</h2>
@@ -105,15 +116,15 @@ const sendReservationStatusEmail = async (req, res) => {
   </p>
   <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-bottom:24px;">
     <p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">
-      No te preocupes, en PawMate hay muchos cuidadores verificados cerca de ti. �Encuentra el cuidador perfecto para tu mascota!
+      No te preocupes, en PawMate hay muchos cuidadores verificados cerca de ti. ¡Encuentra el cuidador perfecto para tu mascota!
     </p>
   </div>
-  <p style="color:#64748b;font-size:13px;margin:0;">�Necesitas ayuda? <a href="mailto:soporte@apppawmate.com" style="color:#F5A623;">soporte@apppawmate.com</a></p>`,
+  <p style="color:#64748b;font-size:13px;margin:0;">¿Necesitas ayuda? <a href="mailto:soporte@apppawmate.com" style="color:#F5A623;">soporte@apppawmate.com</a></p>`,
                     });
                     await transporter.sendMail({
                         from: `"PawMate" <${FROM_DEFAULT}>`,
                         to: ownerEmail,
-                        subject: `Actualizaci�n de tu reserva � PawMate`,
+                        subject: `Actualización de tu reserva · PawMate`,
                         html,
                         text: `Hola ${ownerName},\n\n${caregiverName} no pudo aceptar tu reserva para ${petName}. Puedes buscar otro cuidador en la app.\n\nGracias por usar PawMate.`,
                     });
@@ -124,7 +135,7 @@ const sendReservationStatusEmail = async (req, res) => {
             }
         }
 
-        // -- Email to caregiver (new booking request notification) -----------
+        // Email al cuidador con la nueva solicitud de reserva pendiente.
         if (caregiverEmail?.includes('@') && data.status === 'pendiente') {
             try {
                 const transporter = createTransporter();
@@ -136,7 +147,7 @@ const sendReservationStatusEmail = async (req, res) => {
                     body: `
   <h2 style="color:#1e293b;font-size:22px;margin:0 0 16px;">Hola ${caregiverName},</h2>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 20px;">
-    <strong>${ownerName}</strong> ha enviado una solicitud de reserva. Rev�sala y responde en la app.
+    <strong>${ownerName}</strong> ha enviado una solicitud de reserva. Revísala y responde en la app.
   </p>
   <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:16px;padding:20px;margin-bottom:24px;">
     <p style="margin:0 0 10px;font-size:14px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Detalles</p>
@@ -151,12 +162,12 @@ const sendReservationStatusEmail = async (req, res) => {
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 24px;">
     Abre la app PawMate para aceptar o rechazar esta solicitud.
   </p>
-  <p style="color:#64748b;font-size:13px;margin:0;">�Necesitas ayuda? <a href="mailto:soporte@apppawmate.com" style="color:#F5A623;">soporte@apppawmate.com</a></p>`,
+  <p style="color:#64748b;font-size:13px;margin:0;">¿Necesitas ayuda? <a href="mailto:soporte@apppawmate.com" style="color:#F5A623;">soporte@apppawmate.com</a></p>`,
                 });
                 await transporter.sendMail({
                     from: `"PawMate" <${FROM_DEFAULT}>`,
                     to: caregiverEmail,
-                    subject: `Nueva reserva de ${ownerName} � PawMate`,
+                    subject: `Nueva reserva de ${ownerName} · PawMate`,
                     html,
                     text: `Hola ${caregiverName},\n\n${ownerName} ha solicitado una reserva para ${petName} (${serviceLabel}).\n\nAbre la app para responder.\n\nGracias por ser parte de PawMate.`,
                 });
@@ -180,9 +191,13 @@ const sendReservationStatusEmail = async (req, res) => {
 };
 
 /**
- * Enviar email al dueño para valorar al cuidador al completar la reserva.
  * POST /api/notifications/rating-request
- * Body: { reservationId }
+ *
+ * Envía al dueño un email pidiéndole que valore al cuidador tras finalizar
+ * el servicio. Si no hay email válido del dueño, responde sin enviar.
+ *
+ * @param {import('express').Request}  req Petición con `{ reservationId }`.
+ * @param {import('express').Response} res Respuesta con `{ sent }`.
  */
 const sendRatingRequestEmail = async (req, res) => {
     try {

@@ -67,6 +67,9 @@ export default function CaregiverProfileScreen({ route, navigation }) {
         );
     }
 
+    /**
+     * Crea o recupera la conversación con el cuidador y navega a `ChatScreen`.
+     */
     const startChat = async () => {
         try {
             const myId = user.id;
@@ -100,11 +103,14 @@ export default function CaregiverProfileScreen({ route, navigation }) {
         }
     };
 
+    /**
+     * Navega a la pantalla de creación de reserva con los datos del cuidador.
+     */
     const makeReservation = () => {
         navigation.navigate('CreateBooking', { caregiver });
     };
 
-    // ── Tab: General ──────────────────────────
+    // Pestaña General: estadísticas, servicios, bio y mascotas aceptadas.
     const renderGeneralTab = () => (
         <>
             {/* Stats row */}
@@ -179,7 +185,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
         </>
     );
 
-    // ── Tab: Disponibilidad ──────────────────
+    // Pestaña Disponibilidad: horario semanal del cuidador.
     const renderAvailabilityTab = () => {
         const sched = caregiver.schedule || {};
         const hasSchedule = Object.keys(sched).length > 0;
@@ -217,7 +223,7 @@ export default function CaregiverProfileScreen({ route, navigation }) {
         );
     };
 
-    // ── Tab: Reseñas ─────────────────────────
+    // Pestaña Reseñas: lista de reviews con nota media.
     const renderReviewsTab = () => (
         <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.reviewHeader}>

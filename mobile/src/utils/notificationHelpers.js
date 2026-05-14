@@ -1,8 +1,12 @@
 import { supabase } from '../config/supabase';
 
 /**
- * Sends an Expo push notification to a device.
- * Requires the user to have registered an expoPushToken.
+ * Envía una notificación push de Expo al dispositivo del usuario indicado.
+ * Requiere que el usuario tenga un `expoPushToken` registrado.
+ *
+ * @param {string} userId Identificador del usuario destinatario.
+ * @param {string} title  Título que se muestra en la notificación.
+ * @param {string} body   Texto del cuerpo de la notificación.
  */
 async function sendPushNotification(userId, title, body) {
     try {
@@ -28,14 +32,15 @@ async function sendPushNotification(userId, title, body) {
 }
 
 /**
- * Creates a notification record for a specific user.
- * Table: notifications
+ * Crea un registro en la tabla `notifications` para un usuario y dispara, en
+ * paralelo, una notificación push hacia su dispositivo.
  *
- * Known columns: type, title, body, icon, iconBg, iconColor
- * Everything else goes into the `data` jsonb column.
+ * Las claves conocidas (`type`, `title`, `body`, `icon`, `iconBg`,
+ * `iconColor`) se guardan en columnas dedicadas; el resto se serializa en la
+ * columna `data` (jsonb).
  *
- * @param {string} userId  - Target user's UID
- * @param {object} payload - Notification payload
+ * @param {string} userId  Identificador del destinatario.
+ * @param {object} payload Carga útil con campos conocidos y datos extra.
  */
 export async function createNotification(userId, payload) {
     if (!userId) return;
@@ -48,14 +53,18 @@ export async function createNotification(userId, payload) {
             read: false,
         });
 
-        // Also fire a push notification to the user's device
         sendPushNotification(userId, title, body);
     } catch (e) {
         console.warn('createNotification failed:', e.message);
     }
 }
 
-/** Generates a simple unique string suitable for QR codes */
+/**
+ * Genera una cadena única corta apta para identificar un QR de reserva.
+ * Combina la marca de tiempo y un sufijo aleatorio en base 36.
+ *
+ * @returns {string} Identificador único.
+ */
 export function generateUniqueId() {
     return (
         Date.now().toString(36) +

@@ -12,7 +12,14 @@ import { supabase } from '../config/supabase';
 import { createNotification } from '../utils/notificationHelpers';
 import { useTranslation } from '../context/LanguageContext';
 
-// Relative time helper
+/**
+ * Convierte un timestamp en una cadena relativa al momento actual
+ * ("hace 5 min", "hace 2h", etc.).
+ *
+ * @param {string|object} ts Timestamp ISO o objeto con `.toMillis()`.
+ * @param {Function}      t  Función de traducción del LanguageContext.
+ * @returns {string} Texto relativo localizado.
+ */
 function relativeTime(ts, t) {
     if (!ts) return '';
     const time = ts.toMillis ? ts.toMillis() : new Date(ts).getTime();
@@ -38,7 +45,7 @@ export default function NotificationsScreen({ navigation }) {
 
     const isCaregiver = userData?.role === 'caregiver';
 
-    // ── SUPABASE LISTENER ────────────────────────
+    // Suscripción Realtime a las notificaciones del usuario.
     useEffect(() => {
         if (!user?.id) { setLoading(false); return; }
         
@@ -98,16 +105,16 @@ export default function NotificationsScreen({ navigation }) {
     };
 
     const openNotif = async (notif) => {
-        // Mark as read
+        // Marca como leída al abrirla.
         if (!notif.read && user?.id) {
             await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
         }
 
-        // Navigate based on notification type
+        // Navega según el tipo de notificación.
         const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data || '{}') : (notif.data || {});
 
         if (notif.type === 'new_message' && notifData.conversationId) {
-            // Navigate directly to the conversation
+            // Navega directamente a la conversación.
             try {
                 const { data: convo } = await supabase
                     .from('conversations').select('*').eq('id', notifData.conversationId).single();
@@ -121,7 +128,7 @@ export default function NotificationsScreen({ navigation }) {
                     });
                     return;
                 }
-            } catch { /* fall through to detail */ }
+            } catch { /* cae al detalle estático si falla */ }
         }
 
         if (['booking_request', 'booking_confirmed', 'booking_active', 'booking_cancelled',
@@ -135,18 +142,18 @@ export default function NotificationsScreen({ navigation }) {
         setActiveNotif(notif);
     };
 
-    // ── ACCEPT BOOKING (Caregiver) ─────────────────
+    // Acepta una solicitud de reserva (solo cuidadores).
     const handleAcceptBooking = async (notif) => {
         const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data) : (notif.data || {});
         const bookingId = notifData.bookingId;
         if (!bookingId) { Alert.alert(t('common.error'), t('notifications.bookingNotFound')); return; }
         try {
-            // Fetch reservation to get real data
+            // Recupera la reserva para comprobar datos reales.
             const { data: reservation } = await supabase
                 .from('reservations').select('*').eq('id', bookingId).single();
             if (!reservation) { Alert.alert(t('common.error'), t('notifications.reservationNotFound')); return; }
 
-            // Capacity check
+            // Comprueba la capacidad máxima según el tipo de servicio.
             const serviceType = reservation.serviceType || 'walking';
             const MAX = serviceType === 'walking' ? 5 : 3;
             
@@ -183,13 +190,13 @@ export default function NotificationsScreen({ navigation }) {
         }
     };
 
-    // ── REJECT BOOKING (Caregiver) ─────────────────
+    // Rechaza una solicitud de reserva (solo cuidadores).
     const handleRejectBooking = async (notif) => {
         const notifData = typeof notif.data === 'string' ? JSON.parse(notif.data) : (notif.data || {});
         const bookingId = notifData.bookingId;
         if (!bookingId) { Alert.alert(t('common.error'), t('notifications.bookingNotFound')); return; }
         try {
-            // Fetch reservation to get ownerId
+            // Obtiene el ownerId para enviarle la notificación de rechazo.
             const { data: reservation } = await supabase
                 .from('reservations').select('ownerId, startDate').eq('id', bookingId).single();
 
@@ -213,9 +220,9 @@ export default function NotificationsScreen({ navigation }) {
         }
     };
 
-    // ── FRIEND REQUESTS ────────────────────────────
+    // Solicitudes de amistad: funcionalidad no implementada, solo marca como leída.
     const handleAcceptFriend = async (notif) => {
-        // Friend requests not currently supported
+        // Solicitudes de amistad no soportadas actualmente.
         await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
         if (activeNotif?.id === notif.id) setActiveNotif(null);
     };

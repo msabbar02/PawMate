@@ -4,25 +4,19 @@
 
 > Proyecto Final DAM · Desarrollado por **Mohamed Sabbar**
 
----
-
 ## Descripción
 
 PawMate es un ecosistema digital completo para el cuidado y gestión de mascotas en España. Conecta a dueños de animales con cuidadores verificados, ofrece seguimiento GPS en tiempo real, historial médico completo, chat integrado, pagos seguros con Stripe.
-
----
 
 ## Estructura del Proyecto
 
 ```
 PawMate/
 ├── mobile/           App móvil (React Native 0.81 + Expo 54)
-├── pawmate-web/      Landing Page (Vite 8 + React 19 + Three.js)
+├── web/              Landing Page (Vite 8 + React 19 + Three.js)
 ├── admin/            Panel de administración (Vite 5 + React 18)
-└── server/           Backend API REST (Node.js + Express)
+└── server/           Backend API REST (Node.js + Express + helmet)
 ```
-
----
 
 ## Tech Stack Completo
 
@@ -48,9 +42,7 @@ PawMate/
 | **Persistencia**         | AsyncStorage                                                | 2.x        |
 | **i18n**                 | i18next + react-i18next (ES / EN)                           | —         |
 | **Multimedia**           | expo-av · expo-contacts · expo-crypto · expo-file-system | —         |
-| **Clima en tiempo real** | Open-Meteo API (REST, sin API key)                        | —         |
-
----
+| **Clima en tiempo real** | Open-Meteo API (REST, sin API key)                          | —         |
 
 ### Landing Page — `pawmate-web/`
 
@@ -68,8 +60,6 @@ PawMate/
 | **Auth pages**     | Supabase JS (confirm & reset password)            | 2.x                |
 | **Deploy**         | Vercel                                            | —                 |
 
----
-
 ### Panel de Administración — `admin/`
 
 
@@ -83,8 +73,6 @@ PawMate/
 | **i18n**                 | i18next + react-i18next (ES / EN) | —       |
 | **Deploy**               | Vercel                            | —       |
 
----
-
 ### Backend API — `server/`
 
 
@@ -94,28 +82,26 @@ PawMate/
 | **Framework**           | Express                       | 4.18.2   |
 | **Base de datos**       | Supabase JS (PostgreSQL)      | 2.x      |
 | **Pagos**               | Stripe                        | 20.4.0   |
-| **Email transaccional** | Resend SDK                    | 4.x      |
+| **Email transaccional** | Resend SDK (singleton)        | 6.x      |
 | **Autenticación**      | jsonwebtoken (JWT middleware) | 9.x      |
+| **Cabeceras seguridad** | helmet                        | 8.x      |
+| **Rate limiting**       | express-rate-limit            | 8.x      |
 | **CORS & variables**    | cors + dotenv                 | —       |
 | **Dev**                 | Nodemon                       | 3.x      |
 | **Deploy**              | Vercel (serverless functions) | —       |
 
----
-
 ### Infraestructura & Servicios
 
 
-| Servicio        | Uso                                                                 |
-| --------------- | ------------------------------------------------------------------- |
-| **Supabase**    | PostgreSQL · Auth · Realtime · Storage (base de datos principal) |
-| **Stripe**      | Procesamiento de pagos (PaymentIntent + reembolsos)                 |
-| **Resend**      | Servicio de email transaccional (API cloud)                         |
-| **Vercel**      | Despliegue: landing web, admin y backend (serverless)               |
-| **Expo Push**   | Notificaciones push en tiempo real a dispositivos                   |
-| **Google Maps** | Mapas nativos y seguimiento GPS de paseos                           |
-| **Open-Meteo** | Datos meteorológicos en tiempo real para el widget del clima (sin API key) |
-
----
+| Servicio        | Uso                                                                         |
+| --------------- | --------------------------------------------------------------------------- |
+| **Supabase**    | PostgreSQL · Auth · Realtime · Storage (base de datos principal)         |
+| **Stripe**      | Procesamiento de pagos (PaymentIntent + reembolsos)                         |
+| **Resend**      | Servicio de email transaccional (API cloud)                                 |
+| **Vercel**      | Despliegue: landing web, admin y backend (serverless)                       |
+| **Expo Push**   | Notificaciones push en tiempo real a dispositivos                           |
+| **Google Maps** | Mapas nativos y seguimiento GPS de paseos                                   |
+| **Open-Meteo**  | Datos meteorológicos en tiempo real para el widget del clima (sin API key) |
 
 ## Funcionalidades Principales
 
@@ -184,14 +170,12 @@ PawMate/
 - Handlers globales de error y 404
 - Serverless-ready para Vercel
 
----
-
 ## Ejecutar en Local
 
 ### Landing Web
 
 ```bash
-cd pawmate-web
+cd web
 npm install
 npm run dev
 ```
@@ -216,7 +200,7 @@ npm install
 npx expo start --clear --tunnel
 ```
 
-> Requiere `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+> Requiere `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_API_BASE_URL` y opcionalmente `EXPO_PUBLIC_WEATHER_API_KEY`.
 
 ### Backend
 
@@ -226,9 +210,18 @@ npm install
 npm run dev
 ```
 
-> Requiere `.env` con `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`, `RESEND_API_KEY`, `JWT_SECRET`
+> Requiere `.env` con `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (obligatorio en producción), `RESEND_API_KEY` y `SUPABASE_AUTH_HOOK_SECRET`.
 
----
+## Seguridad
+
+- **Helmet** activo en el backend con CSP mínima, HSTS y `X-Frame-Options`.
+- **Rate-limit** segmentado: 200 req/15 min global + 20 req/5 min en `/api/auth/*` + 10 req/1 min en `/api/payments/*`.
+- **Webhook Stripe** con verificación de firma obligatoria en producción; nunca marca reservas como aceptadas automáticamente y reintenta si falla la BD.
+- **Borrado de cuenta** que limpia primero Supabase Auth (CASCADE limpia `public.users`), evitando cuentas zombie.
+- **errorHandler** que en producción sólo expone mensajes genéricos por código HTTP, sin filtrar `err.message` ni stack.
+- **RLS reales** en todas las tablas (`supabase_schema.sql`): políticas owner-based + helper `public.is_admin()` `SECURITY DEFINER`. La service key del backend hace bypass solo para tareas administrativas.
+- **Resend** instanciado como singleton lazy.
+- **Sin claves hardcodeadas**: WeatherAPI key, URL del backend, etc. provienen del entorno (`EXPO_PUBLIC_*`).
 
 ## Desarrollador
 
@@ -237,8 +230,6 @@ npm run dev
 - msabbar02@yahoo.com
 - DAM — Desarrollo de Aplicaciones Multiplataforma
 - [GitHub](https://github.com/msabbar02)
-
----
 
 ## Licencia
 

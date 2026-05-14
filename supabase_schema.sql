@@ -99,6 +99,10 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS "withdrawPhone" text,
   ADD COLUMN IF NOT EXISTS "petsCaredIds" uuid[] DEFAULT '{}';
 
+-- Migración suave: añade columna totalWalks a pets si falta
+ALTER TABLE public.pets
+  ADD COLUMN IF NOT EXISTS "totalWalks" integer DEFAULT 0;
+
 -- ── PETS ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.pets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,6 +132,7 @@ CREATE TABLE IF NOT EXISTS public.pets (
   activity jsonb DEFAULT '{}'::jsonb,
   vaccines jsonb DEFAULT '[]'::jsonb,
   reminders jsonb DEFAULT '[]'::jsonb,
+  "totalWalks" integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -480,8 +485,12 @@ WHERE u.id = sub.cg_id
        OR COALESCE(array_length(u."petsCaredIds",1),0) < COALESCE(array_length(sub.pet_ids,1),0));
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 5. RLS — POLÍTICAS PERMISIVAS (panel admin con anon key)
+-- 5. RLS — POLÍTICAS REALES (owner-based + is_admin())
 -- ═══════════════════════════════════════════════════════════════════════════
+-- El backend usa SERVICE_ROLE (bypass de RLS) para operaciones administrativas.
+-- Las apps (mobile/web/admin) usan ANON KEY con sesión de usuario y deben
+-- respetar estas políticas. El panel admin solo funciona con usuarios cuyo
+-- `users.role = 'admin'`, gracias al helper is_admin() de abajo.
 ALTER TABLE public.users           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pets            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.walks           ENABLE ROW LEVEL SECURITY;
@@ -496,10 +505,27 @@ ALTER TABLE public.system_logs     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.preferences     ENABLE ROW LEVEL SECURITY;
 
+-- Helper SECURITY DEFINER para evitar recursión cuando una política de `users`
+-- necesita comprobar el rol del propio usuario.
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;
+
+-- Limpia políticas previas (idempotente).
 DO $$
 DECLARE
   tbl text;
-  pol text;
+  pol_rec record;
 BEGIN
   FOR tbl IN SELECT unnest(ARRAY[
     'users','pets','walks','reservations','conversations','messages',
@@ -507,11 +533,147 @@ BEGIN
     'posts','preferences'
   ])
   LOOP
-    pol := tbl || '_all';
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol, tbl);
-    EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (true) WITH CHECK (true)', pol, tbl);
+    FOR pol_rec IN
+      SELECT policyname FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = tbl
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol_rec.policyname, tbl);
+    END LOOP;
   END LOOP;
 END $$;
+
+-- ── users ──────────────────────────────────────────────────────────────────
+-- Cualquier usuario autenticado puede leer perfiles públicos básicos
+-- (la app lista cuidadores). Solo el dueño o un admin puede modificar/borrar.
+CREATE POLICY users_select ON public.users
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY users_insert ON public.users
+  FOR INSERT TO authenticated WITH CHECK (id = auth.uid() OR public.is_admin());
+CREATE POLICY users_update ON public.users
+  FOR UPDATE TO authenticated USING (id = auth.uid() OR public.is_admin())
+  WITH CHECK (id = auth.uid() OR public.is_admin());
+CREATE POLICY users_delete ON public.users
+  FOR DELETE TO authenticated USING (id = auth.uid() OR public.is_admin());
+
+-- ── pets ───────────────────────────────────────────────────────────────────
+CREATE POLICY pets_all ON public.pets
+  FOR ALL TO authenticated
+  USING ("ownerId" = auth.uid() OR public.is_admin())
+  WITH CHECK ("ownerId" = auth.uid() OR public.is_admin());
+
+-- ── walks ──────────────────────────────────────────────────────────────────
+CREATE POLICY walks_all ON public.walks
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.pets p WHERE p.id = walks."petId" AND p."ownerId" = auth.uid())
+    OR public.is_admin()
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.pets p WHERE p.id = walks."petId" AND p."ownerId" = auth.uid())
+    OR public.is_admin()
+  );
+
+-- ── reservations ───────────────────────────────────────────────────────────
+CREATE POLICY reservations_all ON public.reservations
+  FOR ALL TO authenticated
+  USING ("ownerId" = auth.uid() OR "caregiverId" = auth.uid() OR public.is_admin())
+  WITH CHECK ("ownerId" = auth.uid() OR "caregiverId" = auth.uid() OR public.is_admin());
+
+-- ── conversations ──────────────────────────────────────────────────────────
+CREATE POLICY conversations_all ON public.conversations
+  FOR ALL TO authenticated
+  USING (
+    auth.uid() IN ("ownerId","caregiverId","user1Id","user2Id")
+    OR public.is_admin()
+  )
+  WITH CHECK (
+    auth.uid() IN ("ownerId","caregiverId","user1Id","user2Id")
+    OR public.is_admin()
+  );
+
+-- ── messages ───────────────────────────────────────────────────────────────
+CREATE POLICY messages_select ON public.messages
+  FOR SELECT TO authenticated USING (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages."conversationId"
+        AND auth.uid() IN (c."ownerId", c."caregiverId", c."user1Id", c."user2Id")
+    )
+    OR public.is_admin()
+  );
+CREATE POLICY messages_insert ON public.messages
+  FOR INSERT TO authenticated WITH CHECK (
+    "senderId" = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages."conversationId"
+        AND auth.uid() IN (c."ownerId", c."caregiverId", c."user1Id", c."user2Id")
+    )
+  );
+CREATE POLICY messages_update ON public.messages
+  FOR UPDATE TO authenticated USING (
+    "senderId" = auth.uid() OR public.is_admin()
+  );
+CREATE POLICY messages_delete ON public.messages
+  FOR DELETE TO authenticated USING (
+    "senderId" = auth.uid() OR public.is_admin()
+  );
+
+-- ── notifications ──────────────────────────────────────────────────────────
+CREATE POLICY notifications_all ON public.notifications
+  FOR ALL TO authenticated
+  USING ("userId" = auth.uid() OR public.is_admin())
+  WITH CHECK ("userId" = auth.uid() OR public.is_admin());
+
+-- ── reviews ────────────────────────────────────────────────────────────────
+CREATE POLICY reviews_select ON public.reviews
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY reviews_insert ON public.reviews
+  FOR INSERT TO authenticated WITH CHECK ("reviewerId" = auth.uid());
+CREATE POLICY reviews_update ON public.reviews
+  FOR UPDATE TO authenticated USING ("reviewerId" = auth.uid() OR public.is_admin());
+CREATE POLICY reviews_delete ON public.reviews
+  FOR DELETE TO authenticated USING ("reviewerId" = auth.uid() OR public.is_admin());
+
+-- ── reports ────────────────────────────────────────────────────────────────
+CREATE POLICY reports_select ON public.reports
+  FOR SELECT TO authenticated USING (
+    "reporterUserId" = auth.uid() OR public.is_admin()
+  );
+CREATE POLICY reports_insert ON public.reports
+  FOR INSERT TO authenticated WITH CHECK ("reporterUserId" = auth.uid());
+CREATE POLICY reports_update ON public.reports
+  FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY reports_delete ON public.reports
+  FOR DELETE TO authenticated USING (public.is_admin());
+
+-- ── recent_activity ────────────────────────────────────────────────────────
+CREATE POLICY recent_activity_all ON public.recent_activity
+  FOR ALL TO authenticated
+  USING ("userId" = auth.uid() OR public.is_admin())
+  WITH CHECK ("userId" = auth.uid() OR public.is_admin());
+
+-- ── system_logs ────────────────────────────────────────────────────────────
+CREATE POLICY system_logs_all ON public.system_logs
+  FOR ALL TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- ── posts ──────────────────────────────────────────────────────────────────
+CREATE POLICY posts_select ON public.posts
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY posts_insert ON public.posts
+  FOR INSERT TO authenticated WITH CHECK ("authorUid" = auth.uid());
+CREATE POLICY posts_update ON public.posts
+  FOR UPDATE TO authenticated USING ("authorUid" = auth.uid() OR public.is_admin());
+CREATE POLICY posts_delete ON public.posts
+  FOR DELETE TO authenticated USING ("authorUid" = auth.uid() OR public.is_admin());
+
+-- ── preferences ────────────────────────────────────────────────────────────
+CREATE POLICY preferences_all ON public.preferences
+  FOR ALL TO authenticated
+  USING ("userId" = auth.uid())
+  WITH CHECK ("userId" = auth.uid());
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 6. STORAGE — BUCKETS USADOS POR LA APP
@@ -522,7 +684,9 @@ VALUES
   ('pets',          'pets',          true),
   ('verifications', 'verifications', false),
   ('posts',         'posts',         true),
-  ('chat',          'chat',          true)
+  ('chat',          'chat',          true),
+  ('reports',       'reports',       false),
+  ('gallery',       'gallery',       true)
 ON CONFLICT (id) DO NOTHING;
 
 DO $$
@@ -558,10 +722,74 @@ BEGIN
   CREATE POLICY "chat_public_read" ON storage.objects FOR SELECT USING (bucket_id = 'chat');
   DROP POLICY IF EXISTS "chat_auth_all" ON storage.objects;
   CREATE POLICY "chat_auth_all" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'chat') WITH CHECK (bucket_id = 'chat');
+
+  -- Reports (privado: solo administradores y el usuario que reportó)
+  DROP POLICY IF EXISTS "reports_auth_all" ON storage.objects;
+  CREATE POLICY "reports_auth_all" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'reports') WITH CHECK (bucket_id = 'reports');
+
+  -- Gallery (galerías públicas de cuidadores)
+  DROP POLICY IF EXISTS "gallery_public_read" ON storage.objects;
+  CREATE POLICY "gallery_public_read" ON storage.objects FOR SELECT USING (bucket_id = 'gallery');
+  DROP POLICY IF EXISTS "gallery_auth_all" ON storage.objects;
+  CREATE POLICY "gallery_auth_all" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'gallery') WITH CHECK (bucket_id = 'gallery');
 END $$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 7. LIMPIEZA: tablas obsoletas
+-- 7. TRIGGERS DE AGREGADOS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ── Actualizar totalDistance y totalMinutes del dueño cuando se guarda un walk ──
+-- La app guarda walks vía supabase.from('walks').insert({petId, totalKm, durationSeconds, ...})
+-- pero nunca actualiza users.totalDistance / users.totalMinutes.
+-- Este trigger lo hace automáticamente desde el servidor de BD.
+
+CREATE OR REPLACE FUNCTION public.update_user_walk_stats()
+RETURNS trigger AS $$
+DECLARE
+  owner_id uuid;
+BEGIN
+  -- Look up the owner of the pet
+  SELECT "ownerId" INTO owner_id FROM public.pets WHERE id = NEW."petId";
+  IF owner_id IS NULL THEN RETURN NEW; END IF;
+
+  UPDATE public.users SET
+    "totalDistance" = COALESCE("totalDistance", 0) + COALESCE(NEW."totalKm", 0),
+    "totalMinutes"  = COALESCE("totalMinutes",  0) + COALESCE(CEIL(NEW."durationSeconds"::numeric / 60)::integer, 0)
+  WHERE id = owner_id;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'update_user_walk_stats failed: %', SQLERRM;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_walk_inserted ON public.walks;
+CREATE TRIGGER on_walk_inserted
+  AFTER INSERT ON public.walks
+  FOR EACH ROW EXECUTE PROCEDURE public.update_user_walk_stats();
+
+-- ── Backfill: recalcular totalDistance y totalMinutes desde walks existentes ──
+-- Ejecutar una sola vez sobre BDs que ya tienen datos.
+UPDATE public.users u
+SET
+  "totalDistance" = COALESCE(agg.total_km, 0),
+  "totalMinutes"  = COALESCE(agg.total_min, 0)
+FROM (
+  SELECT
+    p."ownerId" AS uid,
+    SUM(w."totalKm") AS total_km,
+    SUM(CEIL(w."durationSeconds"::numeric / 60))::integer AS total_min
+  FROM public.walks w
+  JOIN public.pets p ON p.id = w."petId"
+  WHERE p."ownerId" IS NOT NULL
+  GROUP BY p."ownerId"
+) agg
+WHERE u.id = agg.uid
+  AND (COALESCE(u."totalDistance", 0) = 0 OR COALESCE(u."totalMinutes", 0) = 0);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 8. LIMPIEZA: tablas obsoletas
 -- ═══════════════════════════════════════════════════════════════════════════
 DROP TABLE IF EXISTS public.friends CASCADE;
 DROP TABLE IF EXISTS public."friendRequests" CASCADE;

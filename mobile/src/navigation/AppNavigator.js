@@ -29,9 +29,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// ─────────────────────────────────────────────────────────────────
-// SHARED TAB BAR CONFIG
-// ─────────────────────────────────────────────────────────────────
+// Estilo fijo de la barra de pestañas (flotante, con bordes redondeados).
 const TAB_BAR_STYLE = {
     backgroundColor: '#1A1A2E',
     height: Platform.OS === 'ios' ? 88 : 68,
@@ -50,6 +48,16 @@ const TAB_BAR_STYLE = {
     paddingTop: 6,
 };
 
+/**
+ * Ícono de una pestaña. Cuando está activo muestra un pill de color primario;
+ * cuando está inactivo muestra solo el icono en gris.
+ *
+ * @param {object}  props
+ * @param {string}  props.iconName Nombre del icono de Ionicons.
+ * @param {string}  props.label   Etiqueta debajo del icono.
+ * @param {boolean} props.focused Indica si la pestaña está activa.
+ * @param {boolean} [props.badge] Muestra un candado rojo (pestaña bloqueada).
+ */
 function TabIcon({ iconName, label, focused, badge }) {
     const ACTIVE = '#F5A623';
     if (focused) {
@@ -81,9 +89,7 @@ function TabIcon({ iconName, label, focused, badge }) {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// LOCKED RESERVATIONS SCREEN (normal users)
-// ─────────────────────────────────────────────────────────────────
+// Pantalla para usuarios sin rol verificado: invita a completar la verificación.
 function LockedReservationsScreen() {
     const { theme } = useContext(ThemeContext);
     const navigation = useNavigation();
@@ -106,9 +112,7 @@ function LockedReservationsScreen() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// PROFILE INCOMPLETE BANNER
-// ─────────────────────────────────────────────────────────────────
+// Banner que recuerda al usuario rellenar los campos mínimos del perfil.
 function ProfileIncompleteBanner() {
     const { userData } = useContext(AuthContext);
     const { theme } = useContext(ThemeContext);
@@ -137,9 +141,7 @@ function ProfileIncompleteBanner() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// TABS: NORMAL USER — Home · Mascotas · Reservas(locked) · Ajustes
-// ─────────────────────────────────────────────────────────────────
+// Pestañas para usuarios sin rol verificado (solo Home, Mascotas, Reservas bloqueadas, Ajustes).
 function NormalTabs() {
     return (
         <Tab.Navigator screenOptions={{ headerShown: false, tabBarShowLabel: false, tabBarStyle: TAB_BAR_STYLE }}>
@@ -155,9 +157,7 @@ function NormalTabs() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// TABS: OWNER — Home · Mascotas · Reservas · Cuidadores · Ajustes
-// ─────────────────────────────────────────────────────────────────
+// Pestañas para dueños verificados (añade Reservas y Cuidadores).
 function OwnerTabs() {
     return (
         <Tab.Navigator screenOptions={{ headerShown: false, tabBarShowLabel: false, tabBarStyle: TAB_BAR_STYLE }}>
@@ -175,9 +175,7 @@ function OwnerTabs() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// TABS: CAREGIVER — Home · Mascotas · Reservas · Mi Panel · Ajustes
-// ─────────────────────────────────────────────────────────────────
+// Pestañas para cuidadores (añade Mi Panel en lugar de Cuidadores).
 function CaregiverTabs() {
     return (
         <Tab.Navigator screenOptions={{ headerShown: false, tabBarShowLabel: false, tabBarStyle: TAB_BAR_STYLE }}>
@@ -195,16 +193,14 @@ function CaregiverTabs() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// ROLE ROUTER — picks the right tab set
-// ─────────────────────────────────────────────────────────────────
+// Enruta al conjunto de pestañas correcto según el rol del usuario.
 function RoleTabNavigator() {
     const { userData } = useContext(AuthContext);
     const role = userData?.role;
 
     if (role === 'owner') return <OwnerTabs />;
     if (role === 'caregiver') return <CaregiverTabs />;
-    return <NormalTabs />;  // 'normal' or any unrecognized role
+    return <NormalTabs />;  // 'normal' o rol no reconocido
 }
 
 function MainTabsWithBanner() {

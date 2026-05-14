@@ -1,3 +1,10 @@
+/**
+ * Configuración de internacionalización (i18next) para la web pública.
+ *
+ * Persiste el idioma seleccionado en `localStorage` con la clave
+ * `@pawmate_web_lang` y usa español como fallback. Los recursos se cargan
+ * de forma síncrona desde `es.json` e `en.json`.
+ */
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import es from './es.json';

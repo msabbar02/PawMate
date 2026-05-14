@@ -7,6 +7,10 @@ import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
 
+/**
+ * Lista de conversaciones del usuario. Abre `ChatScreen` al pulsar una fila
+ * y escucha cambios en tiempo real vía Supabase Realtime.
+ */
 export default function MessagesScreen({ navigation }) {
     const { theme } = useContext(ThemeContext);
     const { user, userData } = useContext(AuthContext);
@@ -17,6 +21,10 @@ export default function MessagesScreen({ navigation }) {
 
     const isCaregiver = userData?.role === 'caregiver';
 
+    /**
+     * Descarga las conversaciones del usuario ordenadas por fecha del último
+     * mensaje.
+     */
     const fetchConversations = useCallback(async () => {
         if (!user?.id) return;
         try {

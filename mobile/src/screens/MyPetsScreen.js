@@ -42,9 +42,7 @@ Notifications.setNotificationHandler({
     }),
 });
 
-// ─────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────
+// Helpers de utilidad para especies y géneros.
 const getSpeciesIcon = (species) => {
     const sp = SPECIES_OPTIONS.find(s => s.value === species);
     return sp ? sp.icon : 'paw';
@@ -99,9 +97,7 @@ const haversineKm = (lat1, lon1, lat2, lon2) => {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-// ─────────────────────────────────────────────────
-// EMPTY FORM STATE
-// ─────────────────────────────────────────────────
+// Estado inicial del formulario de mascota.
 const EMPTY_FORM = {
     name: '', species: 'dog', breed: '', weight: '',
     gender: 'male', birthdate: '', color: '', sterilized: false,
@@ -109,31 +105,29 @@ const EMPTY_FORM = {
     insurance: '', vetName: '', vetPhone: '', image: null, images: [],
 };
 
-// ═══════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════
+// Componente principal del centro de mascotas.
 export default function PawMatePetsCenter() {
     const { user, userData } = useContext(AuthContext);
     const { theme, isDarkMode, isLeftHanded } = useContext(ThemeContext);
 
-    // ── Core State ──────────────────────────────────
+    // Estado principal.
     const [pets, setPets] = useState([]);
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
     const [selectedPet, setSelectedPet] = useState(null);
     const [isLoadingSync, setIsLoadingSync] = useState(true);
     const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'walks' | 'health'
 
-    // ── Modal Flags ──────────────────────────────────
+    // Flags de modales.
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isPassportVisible, setIsPassportVisible] = useState(false);
     const [isReminderModalVisible, setIsReminderModalVisible] = useState(false);
     const [isHealthModalVisible, setIsHealthModalVisible] = useState(false);
 
-    // ── Form State (Extended) ────────────────────────
+    // Estado del formulario extendido.
     const [formParams, setFormParams] = useState({ ...EMPTY_FORM });
 
-    // ── Reminder State ───────────────────────────────
+    // Estado de los recordatorios.
     const [editingReminder, setEditingReminder] = useState(null);
     const [reminderForm, setReminderForm] = useState({
         title: '', description: '', eventTime: new Date(), notificationAdvance: 15,
@@ -142,14 +136,14 @@ export default function PawMatePetsCenter() {
     const [showBirthdatePicker, setShowBirthdatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
 
-    // ── Health Record State ──────────────────────────
+    // Estado del historial de salud.
     const [editingHealthRecord, setEditingHealthRecord] = useState(null);
     const [healthRecordForm, setHealthRecordForm] = useState({
         type: 'vacuna', name: '', date: new Date(), notes: '',
     });
     const [showHealthDatePicker, setShowHealthDatePicker] = useState(false);
 
-    // ── Walk Tracking ────────────────────────────────
+    // Estado del seguimiento de paseos.
     const [isWalking, setIsWalking] = useState(false);
     const [walkRoute, setWalkRoute] = useState([]);
     const [walkDistance, setWalkDistance] = useState(0);
@@ -160,9 +154,7 @@ export default function PawMatePetsCenter() {
     const timerRef = useRef(null);
     const fadeAnim = useRef(new Animated.Value(1)).current;
 
-    // ─────────────────────────────────────────────────
-    // SUPABASE: Pets Collection
-    // ─────────────────────────────────────────────────
+    // Carga y sincroniza en tiempo real la colección de mascotas del usuario.
     useEffect(() => {
         if (!user?.id) { setIsLoadingSync(false); return; }
         
@@ -189,9 +181,7 @@ export default function PawMatePetsCenter() {
         return () => { supabase.removeChannel(channel); };
     }, [selectedPet?.id, user?.id]);
 
-    // ─────────────────────────────────────────────────
-    // SUPABASE: All Walks for Selected Pet
-    // ─────────────────────────────────────────────────
+    // Carga todos los paseos de la mascota seleccionada.
     useEffect(() => {
         if (!selectedPet || viewMode !== 'detail') { setWalks([]); return; }
         
@@ -215,16 +205,12 @@ export default function PawMatePetsCenter() {
         return () => { supabase.removeChannel(channel); };
     }, [selectedPet?.id, viewMode]);
 
-    // ─────────────────────────────────────────────────
-    // NOTIFICATION PERMISSIONS
-    // ─────────────────────────────────────────────────
+    // Solicita permisos de notificaciones.
     useEffect(() => {
         Notifications.requestPermissionsAsync();
     }, []);
 
-    // ─────────────────────────────────────────────────
-    // TOTAL STATS (computed from all walks)
-    // ─────────────────────────────────────────────────
+    // Estadísticas totales calculadas a partir de todos los paseos.
     const totalStats = useMemo(() => {
         const km = walks.reduce((s, w) => s + (w.totalKm || 0), 0);
         const kcal = walks.reduce((s, w) => s + (w.calories || 0), 0);
@@ -235,9 +221,7 @@ export default function PawMatePetsCenter() {
         return { km: km.toFixed(2), kcal, count: walks.length, avgPace };
     }, [walks]);
 
-    // ─────────────────────────────────────────────────
-    // QR PAYLOAD (rich biometric data)
-    // ─────────────────────────────────────────────────
+    // Payload QR con los datos biométricos de la mascota.
     const qrPayload = useMemo(() => {
         if (!selectedPet) return '{}';
         return JSON.stringify({
@@ -371,9 +355,7 @@ export default function PawMatePetsCenter() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // NAVIGATION with fade transition
-    // ─────────────────────────────────────────────────
+    // Navega entre la lista y el detalle con transición de fundido.
     const navigateTo = (mode, pet = null) => {
         fadeAnim.setValue(0);
         setSelectedPet(pet);
@@ -382,9 +364,7 @@ export default function PawMatePetsCenter() {
         Animated.timing(fadeAnim, { toValue: 1, duration: 380, useNativeDriver: true }).start();
     };
 
-    // ─────────────────────────────────────────────────
-    // WALK CONTROL
-    // ─────────────────────────────────────────────────
+    // Control del paseo GPS (iniciar y detener).
     const startWalk = async () => {
         if (userData?.isWalking) {
             Alert.alert('Paseo activo', 'Ya tienes un paseo en curso. Termínalo antes de iniciar otro.');
@@ -445,9 +425,7 @@ export default function PawMatePetsCenter() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // SHARE WALK
-    // ─────────────────────────────────────────────────
+    // Comparte el resumen de un paseo.
     const shareWalk = async (walk) => {
         const mins = Math.round((walk.durationSeconds || 0) / 60);
         const date = walk.endTime
@@ -467,9 +445,7 @@ export default function PawMatePetsCenter() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // NOTIFICATIONS
-    // ─────────────────────────────────────────────────
+    // Programa una notificación local para un recordatorio.
     const scheduleReminder = async (title, body, triggerDate) => {
         try {
             await Notifications.scheduleNotificationAsync({
@@ -480,13 +456,11 @@ export default function PawMatePetsCenter() {
         } catch (e) { console.error(e); }
     };
 
-    // ─────────────────────────────────────────────────
-    // PET CRUD
-    // ─────────────────────────────────────────────────
+    // Operaciones CRUD de mascotas (guardar, eliminar, fotos).
     const handleSavePet = async () => {
         if (!formParams.name.trim()) return Alert.alert('Error', 'El nombre es obligatorio');
         try {
-            // Upload all images
+            // Sube todas las imágenes al bucket de Supabase Storage.
             const uploadedImages = [];
             const allImages = formParams.images || (formParams.image ? [formParams.image] : []);
             for (const img of allImages) {
@@ -503,7 +477,7 @@ export default function PawMatePetsCenter() {
             }
             const mainImage = uploadedImages[0] || formParams.image;
 
-            // Build data object with only valid schema columns
+            // Construye el objeto con solo las columnas válidas del esquema.
             const dataToSave = {
                 name: formParams.name.trim(),
                 species: formParams.species,
@@ -594,7 +568,7 @@ export default function PawMatePetsCenter() {
         ]);
     };
 
-    // ── Wizard Step State ─────────────────────────
+    // Estado del asistente de creación de mascota.
     const [wizardStep, setWizardStep] = useState(0);
     const WIZARD_STEPS = isEditing
         ? ['photo', 'name', 'species', 'breed', 'gender', 'details', 'medical', 'vet']
@@ -658,9 +632,7 @@ export default function PawMatePetsCenter() {
         });
     };
 
-    // ─────────────────────────────────────────────────
-    // REMINDER CRUD
-    // ─────────────────────────────────────────────────
+    // Operaciones CRUD de recordatorios.
     const openReminderForm = (reminder = null) => {
         if (reminder) {
             setEditingReminder(reminder);
@@ -709,9 +681,7 @@ export default function PawMatePetsCenter() {
         } catch { Alert.alert('Error', 'No se pudo eliminar'); }
     };
 
-    // ─────────────────────────────────────────────────
-    // HEALTH RECORD CRUD
-    // ─────────────────────────────────────────────────
+    // Operaciones CRUD del historial de salud.
     const HEALTH_TYPES = [
         { key: 'vacuna', label: 'Vacuna' },
         { key: 'visita_vet', label: 'Visita veterinaria' },
@@ -762,9 +732,7 @@ export default function PawMatePetsCenter() {
         } catch { Alert.alert('Error', 'No se pudo eliminar'); }
     };
 
-    // ═══════════════════════════════════════════════════
-    // RENDER: LIST VIEW
-    // ═══════════════════════════════════════════════════
+    // Vista en lista de mascotas.
     const renderListView = () => (
         <Animated.ScrollView
             style={{ opacity: fadeAnim }}
@@ -856,9 +824,7 @@ export default function PawMatePetsCenter() {
         </Animated.ScrollView>
     );
 
-    // ═══════════════════════════════════════════════════
-    // RENDER: PROFILE TAB
-    // ═══════════════════════════════════════════════════
+    // Pestaña de perfil de la mascota.
     const renderProfileTab = () => {
         const age = getAge(selectedPet?.birthdate);
         return (
@@ -957,9 +923,7 @@ export default function PawMatePetsCenter() {
         );
     };
 
-    // ═══════════════════════════════════════════════════
-    // RENDER: WALKS TAB (Strava-style)
-    // ═══════════════════════════════════════════════════
+    // Pestaña de paseos al estilo Strava.
     const renderWalksTab = () => {
         const isDog = selectedPet?.species === 'dog';
 
@@ -1129,9 +1093,7 @@ export default function PawMatePetsCenter() {
         );
     };
 
-    // ═══════════════════════════════════════════════════
-    // RENDER: HEALTH TAB
-    // ═══════════════════════════════════════════════════
+    // Pestaña de historial de salud.
     const renderHealthTab = () => (
         <View>
             {/* ── SECTION: RECORDATORIOS ── */}
@@ -1238,9 +1200,7 @@ export default function PawMatePetsCenter() {
         </View>
     );
 
-    // ═══════════════════════════════════════════════════
-    // RENDER: DETAIL VIEW
-    // ═══════════════════════════════════════════════════
+    // Vista de detalle de la mascota.
     const renderDetailView = () => {
         if (!selectedPet) return null;
         const age = getAge(selectedPet?.birthdate);
@@ -1329,9 +1289,7 @@ export default function PawMatePetsCenter() {
         );
     };
 
-    // ═══════════════════════════════════════════════════
-    // LOADING
-    // ═══════════════════════════════════════════════════
+    // Pantalla de carga inicial.
     if (isLoadingSync) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }]}>
@@ -1343,9 +1301,7 @@ export default function PawMatePetsCenter() {
         );
     }
 
-    // ═══════════════════════════════════════════════════
-    // MAIN RETURN
-    // ═══════════════════════════════════════════════════
+    // Renderizado principal del componente.
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -2006,9 +1962,7 @@ export default function PawMatePetsCenter() {
     );
 }
 
-// ─────────────────────────────────────────────────
-// MINI COMPONENTS
-// ─────────────────────────────────────────────────
+// Mini-componentes auxiliares de presentación.
 const InfoItem = ({ label, value }) => (
     <View style={styles.infoItem}>
         <Text style={styles.infoLabel}>{label}</Text>
@@ -2069,12 +2023,11 @@ const FormLabel = ({ text }) => (
 );
 
 // ���────────────────────────────────────────────────
-// STYLESHEET
-// ─────────────────────────────────────────────────
+// Estilos del componente principal.
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
 
-    // ── List View ──────────────────────────────────
+    // Vista en lista.
     scrollList: { padding: 20, paddingTop: Platform.OS === 'ios' ? 70 : 40 },
     listHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
     screenTitle: { fontSize: 34, fontWeight: '900', color: COLORS.text, letterSpacing: -0.8 },
@@ -2135,10 +2088,10 @@ const styles = StyleSheet.create({
     emptyTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text, marginTop: 12 },
     emptyDesc: { fontSize: 14, color: COLORS.textLight, textAlign: 'center', marginTop: 8, lineHeight: 20 },
 
-    // ── Detail View ────────────────────────────────
+    // Vista de detalle.
     scrollDetail: { paddingBottom: 30 },
 
-    // HERO
+    // Hero.
     heroSection: {
         backgroundColor: COLORS.surface,
         paddingTop: Platform.OS === 'ios' ? 64 : 40,
@@ -2209,7 +2162,7 @@ const styles = StyleSheet.create({
     tabLabelActive: { color: '#FFF' },
     tabContent: { paddingHorizontal: 18 },
 
-    // INFO CARDS (PROFILE TAB)
+    // Tarjetas de información (pestaña perfil).
     infoCard: {
         backgroundColor: COLORS.surface, borderRadius: 20,
         padding: 20, marginBottom: 14,
@@ -2227,7 +2180,7 @@ const styles = StyleSheet.create({
     vetRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     vetText: { fontSize: 15, fontWeight: '600', color: COLORS.text, marginLeft: 10 },
 
-    // PASSPORT BANNER
+    // Banner del pasaporte.
     passportBanner: {
         flexDirection: 'row', backgroundColor: COLORS.surface,
         borderRadius: 20, padding: 18, alignItems: 'center',
@@ -2254,7 +2207,7 @@ const styles = StyleSheet.create({
     },
     fullEditBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
 
-    // WALKS TAB
+    // Pestaña de paseos.
     walkBanner: {
         backgroundColor: COLORS.surface, borderRadius: 20,
         padding: 18, flexDirection: 'row', alignItems: 'center',
@@ -2305,7 +2258,7 @@ const styles = StyleSheet.create({
     },
     shareBtnText: { color: COLORS.secondary, fontWeight: '700', fontSize: 13 },
 
-    // HEALTH TAB
+    // Pestaña de salud.
     sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
     agendaCard: {
         backgroundColor: COLORS.surface, borderRadius: 20,
@@ -2325,7 +2278,7 @@ const styles = StyleSheet.create({
     agendaDate: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
     agendaDesc: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
 
-    // FORM MODAL
+    // Modal de formulario.
     formHeader: {
         flexDirection: 'row', justifyContent: 'space-between',
         padding: 24, paddingTop: Platform.OS === 'ios' ? 58 : 24,
@@ -2430,9 +2383,7 @@ const styles = StyleSheet.create({
     },
 });
 
-// ─────────────────────────────────────────────────
-// WIZARD STYLES (Petazy-inspired dark theme)
-// ─────────────────────────────────────────────────
+// Estilos del asistente de creación de mascota.
 const wizStyles = StyleSheet.create({
     header: {
         flexDirection: 'row',
@@ -2470,7 +2421,7 @@ const wizStyles = StyleSheet.create({
         fontSize: 15, color: 'rgba(255,255,255,0.5)',
         textAlign: 'center', marginBottom: 30, lineHeight: 22,
     },
-    // Photo step
+    // Paso de foto.
     photoCircle: {
         width: 180, height: 180, borderRadius: 90,
         backgroundColor: 'rgba(255,255,255,0.08)',
@@ -2482,7 +2433,7 @@ const wizStyles = StyleSheet.create({
     photoCircleImg: { width: 180, height: 180, borderRadius: 90 },
     photoPlaceholder: { alignItems: 'center', gap: 8 },
     photoPlaceholderText: { color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 13 },
-    // Input
+    // Campo de texto.
     wizardInput: {
         width: '100%',
         backgroundColor: 'rgba(255,255,255,0.08)',
@@ -2496,7 +2447,7 @@ const wizStyles = StyleSheet.create({
         textTransform: 'uppercase', letterSpacing: 0.6,
         marginTop: 18, marginBottom: 8,
     },
-    // Species
+    // Especie.
     speciesGrid: {
         flexDirection: 'row', flexWrap: 'wrap',
         justifyContent: 'center', gap: 20,
@@ -2513,7 +2464,7 @@ const wizStyles = StyleSheet.create({
     speciesLabel: {
         fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.6)',
     },
-    // Gender
+    // Género.
     genderRow: {
         flexDirection: 'row', gap: 24, marginBottom: 20,
     },
@@ -2530,7 +2481,7 @@ const wizStyles = StyleSheet.create({
         fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.4)',
         textDecorationLine: 'underline',
     },
-    // Switch row
+    // Fila de switch.
     switchRow: {
         flexDirection: 'row', alignItems: 'center',
         justifyContent: 'space-between', width: '100%', marginTop: 18,
@@ -2539,7 +2490,7 @@ const wizStyles = StyleSheet.create({
         paddingHorizontal: 18, paddingVertical: 10,
         borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)',
     },
-    // Bottom bar
+    // Barra inferior.
     bottomBar: {
         paddingHorizontal: 28, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
         paddingTop: 12,

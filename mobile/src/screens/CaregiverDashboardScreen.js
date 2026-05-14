@@ -15,7 +15,7 @@ import { createNotification } from '../utils/notificationHelpers';
 import { uploadGalleryPhoto } from '../utils/storageHelpers';
 import { COLORS } from '../constants/colors';
 
-// ── Badge tiers ──────────────────────────────────────────────
+// Niveles de insignia según servicios completados.
 const BADGE_TIERS = [
     { min: 0,  label: 'Bronce',   emoji: '', color: '#CD7F32', bg: '#FDF2E9' },
     { min: 5,  label: 'Plata',    emoji: '', color: '#9CA3AF', bg: '#F3F4F6' },
@@ -78,8 +78,8 @@ export default function CaregiverDashboardScreen({ navigation }) {
             ]);
 
             const earnings = (completedData || []).reduce((sum, r) => sum + (r.totalPrice || 0), 0);
-            // Fallback: take the max between live query and counter on users row,
-            // so if the trigger missed an increment we still display correctly.
+            // Fallback: se toma el máximo entre la consulta en vivo y el contador en la
+            // fila de `users`, por si el trigger no incrementó correctamente.
             const completedCount = Math.max(completed || 0, userData?.completedServices || 0);
             setStats({ completed: completedCount, active: active || 0, pending: pending || 0, earnings });
             setReviews(reviewsData || []);
@@ -93,7 +93,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // Realtime updates
+    // Actualizaciones en tiempo real de reservas.
     useEffect(() => {
         if (!user?.id) return;
         const channel = supabase.channel(`cg_dashboard_${Date.now()}`)
@@ -106,7 +106,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
     const nextBadge = getNextBadge(stats.completed);
     const progressToNext = nextBadge ? ((stats.completed - (badge.min)) / (nextBadge.min - badge.min)) * 100 : 100;
 
-    // Photo gallery sync
+    // Sincroniza las fotos de galería con userData.
     useEffect(() => {
         if (userData?.galleryPhotos) setPhotos(userData.galleryPhotos);
     }, [userData?.galleryPhotos]);
@@ -123,7 +123,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
             setUploadingPhoto(true);
             const asset = result.assets[0];
             const photoUrl = await uploadGalleryPhoto(asset.uri, user.id);
-            const updatedPhotos = [...photos, photoUrl].slice(0, 6); // max 6 photos
+            const updatedPhotos = [...photos, photoUrl].slice(0, 6); // máx. 6 fotos
             await supabase.from('users').update({ galleryPhotos: updatedPhotos }).eq('id', user.id);
             setPhotos(updatedPhotos);
             if (refreshUserData) refreshUserData();
@@ -150,7 +150,7 @@ export default function CaregiverDashboardScreen({ navigation }) {
     const handleToggleOnline = async () => {
         const newVal = !userData?.isOnline;
         try {
-            // Optimistic UI update — change locally immediately
+            // Actualiza localmente de forma optimista.
             updateUserOptimistic({ isOnline: newVal });
             const update = { isOnline: newVal };
             if (newVal) {
@@ -164,13 +164,13 @@ export default function CaregiverDashboardScreen({ navigation }) {
             const { error } = await supabase.from('users').update(update).eq('id', user.id);
             if (error) throw error;
         } catch (e) {
-            // Revert on error
+            // Revierte si falla la actualización en BD.
             updateUserOptimistic({ isOnline: !newVal });
             Alert.alert('Error', 'No se pudo cambiar el estado online.');
         }
     };
 
-    // Emergency: send location to all active booking owners
+    // Emergencia: envía la ubicación del cuidador a todos los dueños con reserva activa.
     const handleEmergency = async () => {
         Alert.alert(
             'Emergencia',
@@ -185,10 +185,10 @@ export default function CaregiverDashboardScreen({ navigation }) {
                             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
                             const { latitude, longitude } = loc.coords;
 
-                            // Update caregiver location
+                            // Actualiza la ubicación del cuidador en la BD.
                             await supabase.from('users').update({ latitude, longitude }).eq('id', user.id);
 
-                            // Notify all active reservation owners
+                            // Notifica a todos los dueños con reserva activa.
                             for (const res of activeReservations) {
                                 if (res.ownerId) {
                                     await createNotification(res.ownerId, {

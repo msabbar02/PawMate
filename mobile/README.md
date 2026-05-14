@@ -2,8 +2,6 @@
 
 Aplicación móvil para Android e iOS desarrollada con React Native y Expo.
 
----
-
 ## Tecnologías
 
 ### Core
@@ -27,10 +25,10 @@ Aplicación móvil para Android e iOS desarrollada con React Native y Expo.
 ### Clima
 
 
-| Servicio       | Usado en        | Notas                                 |
-| -------------- | --------------- | ------------------------------------- |
-| WeatherAPI.com | `TopBar.js`     | Widget de clima con API key           |
-| Open-Meteo API | `HomeScreen.js` | Clima en panel de inicio, sin API key |
+| Servicio       | Usado en        | Notas                                                                                   |
+| -------------- | --------------- | --------------------------------------------------------------------------------------- |
+| WeatherAPI.com | `TopBar.js`     | Widget con API key vía`EXPO_PUBLIC_WEATHER_API_KEY`. Sin clave — fallback silencioso. |
+| Open-Meteo API | `HomeScreen.js` | Clima en panel de inicio, sin API key                                                   |
 
 ### Multimedia y archivos
 
@@ -87,8 +85,6 @@ Aplicación móvil para Android e iOS desarrollada con React Native y Expo.
 ### Internacionalización
 
 Sistema propio de traducción ES/EN via `LanguageContext.js` (sin librerías externas). Archivos en `src/i18n/es.js` y `src/i18n/en.js`.
-
----
 
 ## Estructura
 
@@ -148,8 +144,6 @@ mobile/
 │       └── colors.js                   # Objetos lightTheme / darkTheme
 └── assets/                             # Imágenes, fuentes, iconos
 ```
-
----
 
 ## Funcionalidades
 
@@ -225,8 +219,6 @@ mobile/
 - Botón SOS de emergencias con animación de pulso
 - Obtiene GPS de alta precisión y pasa coordenadas al padre para disparar alerta
 
----
-
 ## Instalación
 
 ```bash
@@ -253,5 +245,11 @@ npx expo run:ios
 EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-EXPO_PUBLIC_API_URL=https://api.apppawmate.com
+
+# URL del backend Express. Si no se define usa https://api.apppawmate.com.
+EXPO_PUBLIC_API_BASE_URL=https://api.apppawmate.com
+
+# Clave de WeatherAPI.com para el widget del TopBar. Opcional: si falta,
+# el widget muestra el fallback de carga sin llamar al servicio.
+EXPO_PUBLIC_WEATHER_API_KEY=
 ```

@@ -1,7 +1,7 @@
-﻿// ═══════════════════════════════════════════════
-// PawMate — Design System / Color Tokens
-// Paleta: Naranja Cálido + Negro + Blanco + Gris
-// ═══════════════════════════════════════════════
+﻿// ===================================================
+// PawMate — Design System / Tokens de color
+// Paleta: Naranja cálido + Negro + Blanco + Gris
+// ===================================================
 
 export const BRAND = {
     orange:      '#F5A623',

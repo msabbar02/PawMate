@@ -69,7 +69,7 @@ export default function ChatScreen({ route, navigation }) {
                 read: false,
             });
 
-            // Update conversation last message
+            // Actualiza el último mensaje de la conversación.
             await supabase.from('conversations').update({
                 lastMessage: text,
                 lastMessageAt: new Date().toISOString(),

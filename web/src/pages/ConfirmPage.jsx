@@ -1,4 +1,12 @@
-﻿import { useState, useEffect } from 'react';
+﻿/**
+ * Página de confirmación de email.
+ *
+ * Es la URL de aterrizaje a la que Supabase Auth redirige tras pulsar el
+ * enlace de verificación. Solo muestra un mensaje de éxito y los pasos
+ * para volver a la app móvil; no realiza ninguna llamada a la API porque
+ * el token ya fue procesado por Supabase antes del redirect.
+ */
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleCheck, faArrowRight, faMobileScreenButton } from '@fortawesome/free-solid-svg-icons';

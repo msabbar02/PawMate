@@ -1,3 +1,10 @@
+﻿/**
+ * Página de perfil del administrador autenticado.
+ *
+ * Permite editar nombre, teléfono, ubicación y bio, subir foto de perfil
+ * (límite 2 MB, almacenada en el bucket `pawmate` de Storage con cache-bust
+ * por timestamp) y borrar campos individuales.
+ */
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
@@ -26,10 +33,15 @@ export default function ProfilePage() {
         country: adminUser?.country || '',
     });
 
+    /** Actualiza un campo del formulario en estado local. */
     const handleChange = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
+    /**
+     * Sube una nueva foto de perfil al bucket `pawmate` (máximo 2 MB),
+     * actualiza la columna `photoURL` con cache-bust y refresca el perfil.
+     */
     const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -54,7 +66,8 @@ export default function ProfilePage() {
                 .from('pawmate')
                 .getPublicUrl(path);
 
-            // Cache-bust: storage URL is stable when upserting same path, so append a version
+            // Cache-bust: la URL de Storage es estable al sobre-escribir el mismo path,
+            // así que añadimos un parámetro de versión para forzar la recarga del navegador.
             const versionedUrl = `${publicUrl}?v=${Date.now()}`;
             await supabase.from('users').update({ photoURL: versionedUrl }).eq('id', adminUser.id);
             await refreshProfile();
@@ -65,6 +78,7 @@ export default function ProfilePage() {
         setUploading(false);
     };
 
+    /** Guarda los cambios del formulario en la fila del usuario admin. */
     const handleSave = async () => {
         setSaving(true);
         setMessage({ text: '', type: '' });
@@ -91,6 +105,7 @@ export default function ProfilePage() {
         setSaving(false);
     };
 
+    /** Borra (pone a NULL) un campo individual del perfil tras confirmar. */
     const handleDeleteField = async (field) => {
         if (!window.confirm(t('profile.confirmDeleteField', { field }))) return;
         try {

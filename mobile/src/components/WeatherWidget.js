@@ -4,12 +4,16 @@ import Icon from './Icon';
 import { AuthContext } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 
+/**
+ * Tarjeta flotante con saludo al usuario y meteorología actual (placeholder
+ * con datos estáticos a la espera de conectar la API real).
+ */
 const WeatherWidget = () => {
     const { userData } = useContext(AuthContext);
     const { t } = useTranslation();
     const userName = userData?.name || 'User';
 
-    // Simulated weather data
+    // Datos meteorológicos simulados; sustituir por la integración real cuando esté lista.
     const weather = {
         temp: 22,
         condition: t('components.greatWeather'),

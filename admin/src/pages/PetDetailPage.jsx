@@ -1,10 +1,17 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿/**
+ * Página de detalle de una mascota.
+ *
+ * Carga la mascota, su dueño (si existe) y todas las reservas en las que
+ * aparece (`petIds` contiene su id). Permite eliminarla.
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faPaw, faTrash, faUser, faCalendarCheck, faEye } from '@fortawesome/free-solid-svg-icons';
 import './DetailPage.css';
 
+/** Formatea una fecha ISO al formato corto en castellano. */
 function formatDate(d) { return d ? new Date(d).toLocaleString('es-ES') : '-'; }
 
 export default function PetDetailPage() {
@@ -15,6 +22,7 @@ export default function PetDetailPage() {
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    /** Carga mascota + dueño + reservas asociadas. */
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
@@ -35,6 +43,7 @@ export default function PetDetailPage() {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
+    /** Borra la mascota tras confirmar y vuelve al listado. */
     const handleDelete = async () => {
         if (!window.confirm('¿Eliminar esta mascota? Esta acción es irreversible.')) return;
         const { error } = await supabase.from('pets').delete().eq('id', id);

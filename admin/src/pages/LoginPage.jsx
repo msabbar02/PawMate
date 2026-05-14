@@ -1,3 +1,10 @@
+/**
+ * Página de inicio de sesión del panel de administración.
+ *
+ * Renderiza un formulario controlado (email + contraseña) y delega la
+ * autenticación en `AuthContext.login`. Muestra errores y redirige a la
+ * raíz al autenticarse correctamente.
+ */
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +23,10 @@ export default function LoginPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
 
+    /**
+     * Envía credenciales al backend de autenticación y navega al dashboard
+     * en caso de éxito; en caso contrario muestra el mensaje de error.
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');

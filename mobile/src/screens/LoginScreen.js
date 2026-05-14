@@ -30,6 +30,10 @@ WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
+/**
+ * Campo de texto reutilizable con icono, soporte de contraseña y mensaje de
+ * error inline.
+ */
 const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error, inputRef }) => (
     <View style={styles.inputWrapper}>
         <View style={[styles.inputContainer, error && styles.inputError]}>
@@ -76,7 +80,7 @@ export default function LoginScreen({ navigation }) {
 
     const [errors, setErrors] = useState({});
 
-    // ── Load saved accounts ──
+    // Carga las cuentas guardadas al montar la pantalla.
     useEffect(() => {
         (async () => {
             try {
@@ -86,6 +90,11 @@ export default function LoginScreen({ navigation }) {
         })();
     }, []);
 
+    /**
+     * Guarda el email en la lista de cuentas recientes (máx. 5).
+     *
+     * @param {string} email Email a persistir.
+     */
     const persistAccount = async (email) => {
         try {
             const raw = await AsyncStorage.getItem(SAVED_ACCOUNTS_KEY);
@@ -96,6 +105,11 @@ export default function LoginScreen({ navigation }) {
         } catch { /* ignore */ }
     };
 
+    /**
+     * Elimina un email de la lista de cuentas guardadas.
+     *
+     * @param {string} email Email a eliminar.
+     */
     const removeAccount = async (email) => {
         try {
             const next = savedAccounts.filter(e => e !== email);
@@ -104,12 +118,24 @@ export default function LoginScreen({ navigation }) {
         } catch { /* ignore */ }
     };
 
+    /**
+     * Precarga el email seleccionado en el formulario y mueve el foco a la
+     * contraseña.
+     *
+     * @param {string} email Email elegido.
+     */
     const pickAccount = (email) => {
         setFormData({ email, password: '' });
         setErrors({});
         setTimeout(() => passwordInputRef.current?.focus(), 150);
     };
 
+    /**
+     * Valida email y contraseña antes de enviar. Rellena `errors` con los
+     * mensajes correspondientes.
+     *
+     * @returns {boolean} `true` si todos los campos son válidos.
+     */
     const validateForm = () => {
         let isValid = true;
         let newErrors = {};
@@ -132,6 +158,11 @@ export default function LoginScreen({ navigation }) {
         return isValid;
     };
 
+    /**
+     * Inicia sesión con email y contraseña. Si tiene éxito guarda el email en
+     * la lista de cuentas recientes; el `AuthContext` se encarga de la
+     * redirección al verificar el cambio de sesión.
+     */
     const handleLogin = async () => {
         Keyboard.dismiss();
 
@@ -148,7 +179,7 @@ export default function LoginScreen({ navigation }) {
             });
             if (error) throw error;
             await persistAccount(cleanEmail);
-            // El onAuthStateChanged general se encargará de la redirección
+            // AuthContext detecta el cambio de sesión y redirige automáticamente.
         } catch (error) {
             console.error("Supabase Login Error:", error.message);
             let errorMsg = t('login.genericError');
@@ -163,15 +194,21 @@ export default function LoginScreen({ navigation }) {
         }
     };
 
+    /**
+     * Abre la página web de recuperación de contraseña.
+     */
     const handleResetPassword = () => {
         Linking.openURL('https://apppawmate.com/reset-password');
     };
 
+    /**
+     * Inicia el flujo OAuth de Google con PKCE.
+     */
     const handleGoogleLogin = async () => {
         try {
             setLoading(true);
             const redirectTo = 'pawmate://login';
-            console.log('Google OAuth redirect URI:', redirectTo);
+            if (__DEV__) console.log('Google OAuth redirect URI:', redirectTo);
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -184,13 +221,13 @@ export default function LoginScreen({ navigation }) {
                 },
             });
             if (error) throw error;
-            console.log('OAuth URL:', data.url);
+            if (__DEV__) console.log('OAuth URL:', data.url);
 
             const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, {
                 showInRecents: true,
                 preferEphemeralSession: false,
             });
-            console.log('Auth result:', result.type, result.url);
+            if (__DEV__) console.log('Auth result:', result.type, result.url);
             if (result.type !== 'success' || !result.url) {
                 if (result.type === 'cancel' || result.type === 'dismiss') {
                     return;
@@ -198,15 +235,15 @@ export default function LoginScreen({ navigation }) {
                 throw new Error('No se pudo completar la autenticación con Google.');
             }
             const url = result.url;
-            // PKCE: extract code from query params
+            // Flujo PKCE: extraer el código de los query params.
             const codeMatch = url.match(/[?&]code=([^&#]+)/);
             if (codeMatch) {
                 const code = decodeURIComponent(codeMatch[1]);
-                console.log('Got auth code, exchanging for session...');
+                if (__DEV__) console.log('Got auth code, exchanging for session...');
                 const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
                 if (sessionError) throw sessionError;
             } else {
-                // Fallback: try fragment tokens (implicit flow)
+                // Flujo implícito como fallback: tokens en el fragmento de la URL.
                 let params = {};
                 const hashIndex = url.indexOf('#');
                 if (hashIndex !== -1) {

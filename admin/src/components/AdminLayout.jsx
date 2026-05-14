@@ -1,4 +1,13 @@
-﻿import React, { useState, useContext, useEffect } from 'react';
+﻿/**
+ * Layout principal del panel de administración.
+ *
+ * Renderiza la barra lateral con navegación, el topbar con saludo y
+ * estado de Realtime, y el `<Outlet />` para la página activa.
+ * Mantiene un canal `admin:heartbeat` para mostrar el indicador de
+ * conexión y emite `pawmate:wake` al volver al foco para que las páginas
+ * recarguen datos tras periodos de inactividad.
+ */
+import React, { useState, useContext, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext';
@@ -16,13 +25,14 @@ export default function AdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [realtimeConnected, setRealtimeConnected] = useState(false);
 
+    /** Alterna el idioma entre castellano e inglés y persiste la elección. */
     const toggleLang = () => {
         const newLang = i18n.language === 'es' ? 'en' : 'es';
         i18n.changeLanguage(newLang);
         localStorage.setItem('@pawmate_admin_lang', newLang);
     };
 
-    // ── Realtime connection heartbeat ──
+    // Heartbeat de Realtime: mantiene un canal activo para detectar pérdidas de conexión.
     useEffect(() => {
         const channel = supabase
             .channel('admin:heartbeat')
@@ -35,7 +45,7 @@ export default function AdminLayout() {
                 }
             });
 
-        // Fallback: check connection state periodically
+        // Sondeo de respaldo cada 10 s por si el callback de subscribe se queda colgado.
         const interval = setInterval(() => {
             const channels = supabase.getChannels();
             const heartbeat = channels.find(c => c.topic === 'realtime:admin:heartbeat');
@@ -48,8 +58,8 @@ export default function AdminLayout() {
         };
     }, []);
 
-    // Dispatch wake event when tab becomes visible again so pages re-fetch
-    // (prevents the "stuck loading" issue after the browser throttles background tabs)
+    // Despierta a las páginas tras un focus/visibilidad para que vuelvan a pedir datos.
+    // Evita el clásico "loading infinito" cuando el navegador estrangula los tabs ocultos.
     useEffect(() => {
         const onVisible = () => {
             if (document.visibilityState === 'visible') {
@@ -64,12 +74,15 @@ export default function AdminLayout() {
         };
     }, []);
 
+    /** Cierra sesión y vuelve al login. */
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
+    /** Alterna la apertura del sidebar en móvil. */
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+    /** Cierra el sidebar (al pulsar overlay o un enlace). */
     const closeSidebar = () => setSidebarOpen(false);
 
     const displayName = adminUser?.fullName || adminUser?.firstName || adminUser?.email?.split('@')[0] || 'Admin';

@@ -1,21 +1,21 @@
-﻿const express = require('express');
+﻿/**
+ * Rutas de usuarios (todas requieren autenticación).
+ *
+ * - GET    /        Lista paginada (solo admin).
+ * - GET    /:id     Obtiene un usuario (visibilidad según rol).
+ * - PUT    /:id     Actualiza el perfil (propio o admin).
+ * - DELETE /:id     Borra una cuenta (propio o admin; el controlador valida).
+ */
+const express = require('express');
 const router = express.Router();
 const { getAllUsers, getUserById, updateUser, deleteUser } = require('../controllers/users.controller');
 const { verifyToken, isAdmin } = require('../middleware/auth.middleware');
 
-// All routes require authentication
 router.use(verifyToken);
 
-// Get all users (admin only)
 router.get('/', isAdmin, getAllUsers);
-
-// Get user by ID
 router.get('/:id', getUserById);
-
-// Update user
 router.put('/:id', updateUser);
-
-// Delete user (self or admin — controller enforces the check)
 router.delete('/:id', deleteUser);
 
 module.exports = router;

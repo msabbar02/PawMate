@@ -69,7 +69,7 @@ export default function SettingsScreen({ navigation }) {
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [photoUri, setPhotoUri]             = useState(userData?.photoURL || null);
 
-    // Password modal
+    // Modal de cambio de contraseña.
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [oldPass, setOldPass]       = useState('');
     const [newPass, setNewPass]       = useState('');
@@ -79,33 +79,33 @@ export default function SettingsScreen({ navigation }) {
     const [showNew, setShowNew]       = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    // Report modal
+    // Modal de reporte de problemas.
     const [showReportModal, setShowReportModal] = useState(false);
     const [reportReason, setReportReason]       = useState('');
     const [reportText, setReportText]           = useState('');
     const [reportImages, setReportImages]       = useState([]);
     const [sendingReport, setSendingReport]     = useState(false);
 
-    // Emergency contacts
+    // Contactos de emergencia.
     const [emergencyContacts, setEmergencyContacts]         = useState(userData?.emergencyContacts || []);
     const [showContactModal, setShowContactModal]           = useState(false);
-    const [editingContact, setEditingContact]               = useState(null); // null = new
+    const [editingContact, setEditingContact]               = useState(null); // null = nuevo contacto
     const [contactName, setContactName]                     = useState('');
     const [contactPhone, setContactPhone]                   = useState('');
     const [savingContact, setSavingContact]                 = useState(false);
     
-    // Phone contacts picker
+    // Selector de contactos del dispositivo.
     const [showPhonePicker, setShowPhonePicker]             = useState(false);
     const [deviceContacts, setDeviceContacts]               = useState([]);
     const [loadingDeviceContacts, setLoadingDeviceContacts] = useState(false);
 
-    // Policy modal
+    // Modal de política de privacidad.
     const [showPolicy, setShowPolicy] = useState(false);
 
-    // Notification local state
+    // Estado local de notificaciones.
     const [notifsEnabled, setNotifsEnabled] = useState(userData?.notificationsEnabled !== false);
 
-    // Stats
+    // Estadísticas.
     const [petCount, setPetCount]   = useState(0);
 
 
@@ -134,7 +134,7 @@ export default function SettingsScreen({ navigation }) {
         };
         fetchStats();
 
-        // Real-time listener for pets changes
+        // Suscripción Realtime para refrescar el conteo de mascotas.
         const channel = supabase
             .channel(`settings_pets_sync_${Date.now()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'pets', filter: `ownerId=eq.${user.id}` }, () => {
@@ -145,7 +145,7 @@ export default function SettingsScreen({ navigation }) {
         return () => { supabase.removeChannel(channel); };
     }, [user?.id]);
 
-    // Also re-fetch on screen focus (e.g. coming back from MyPetsScreen)
+    // Refresca el conteo de mascotas cada vez que la pantalla recupera el foco.
     useFocusEffect(
         useCallback(() => {
             if (!user?.id) return;
@@ -158,7 +158,9 @@ export default function SettingsScreen({ navigation }) {
         }, [user?.id])
     );
 
-    // ── Photo ──
+    /**
+     * Abre la galería, sube la foto y actualiza el perfil.
+     */
     const handleChangePhoto = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
@@ -178,7 +180,9 @@ export default function SettingsScreen({ navigation }) {
         }
     };
 
-    // ── Change password ──
+    /**
+     * Cambia la contraseña del usuario previa verificación de la actual.
+     */
     const handleChangePassword = async () => {
         if (!oldPass) return Alert.alert('Error', 'Introduce tu contraseña actual.');
         if (newPass.length < 6) return Alert.alert('Error', 'La nueva contraseña debe tener al menos 6 caracteres.');
@@ -200,7 +204,9 @@ export default function SettingsScreen({ navigation }) {
         } finally { setChangingPass(false); }
     };
 
-    // ── Send report ──
+    /**
+     * Gestiona el envío de reportes de problema al equipo de soporte.
+     */
     const handleAddReportImage = async () => {
         if (reportImages.length >= 4) return Alert.alert('Límite', 'Máximo 4 imágenes por reporte.');
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -218,7 +224,7 @@ export default function SettingsScreen({ navigation }) {
         if (!reportText.trim()) return Alert.alert('Error', 'Describe el problema antes de enviar.');
         setSendingReport(true);
         try {
-            // Upload images if any
+            // Sube las imágenes adjuntas al reporte.
             const imageUrls = [];
             for (let i = 0; i < reportImages.length; i++) {
                 const uri = reportImages[i];
@@ -253,7 +259,10 @@ export default function SettingsScreen({ navigation }) {
         }
     };
 
-    // ── Emergency contacts ──
+    /**
+     * Gestiona los contactos de emergencia: crear, editar, eliminar e
+     * importar desde los contactos del dispositivo.
+     */
     const handleAddContactOption = () => {
         Alert.alert('Añadir Contacto', '¿Cómo deseas añadir un contacto de emergencia?', [
             { text: 'Añadir Manualmente', onPress: openAddContact },
@@ -334,7 +343,9 @@ export default function SettingsScreen({ navigation }) {
         ]);
     };
 
-    // ── Sign out / Delete account ──
+    /**
+     * Cierra la sesión del usuario tras confirmación.
+     */
     const handleSignOut = () => {
         Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
             { text: 'Cancelar', style: 'cancel' },
@@ -359,9 +370,7 @@ export default function SettingsScreen({ navigation }) {
         ]);
     };
 
-    // ─────────────────────────────────────────────────
-    // HELPERS
-    // ─────────────────────────────────────────────────
+    // Componentes auxiliares del render.
     const SectionTitle = ({ children, danger }) => (
         <Text style={[s.sectionTitle, { color: danger ? '#EF4444' : theme.textSecondary }]}>
             {children}
@@ -395,9 +404,7 @@ export default function SettingsScreen({ navigation }) {
         <View style={[s.settingGroup, { borderColor: theme.border }]}>{children}</View>
     );
 
-    // ─────────────────────────────────────────────────
-    // MAIN RENDER
-    // ─────────────────────────────────────────────────
+    // Render principal.
     return (
         <View style={[s.container, { backgroundColor: theme.background }]}>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />

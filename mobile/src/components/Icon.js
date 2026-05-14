@@ -1,7 +1,7 @@
 /**
- * Drop-in replacement for Ionicons that uses FontAwesome.
- * Usage: <Icon name="home" size={24} color="#000" />
- * Same API as Ionicons so migration is just changing the import.
+ * Sustituto directo de Ionicons que dibuja con FontAwesome.
+ * Mantiene la misma API (`name`, `size`, `color`, `style`) para que migrar
+ * solo requiera cambiar el import en cada pantalla.
  */
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';

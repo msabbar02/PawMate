@@ -7,6 +7,13 @@ const FILTERS = [
     { label: '5km', delta: 0.05 },
 ];
 
+/**
+ * Chips de filtro de radio en el mapa (500m / 2km / 5km).
+ *
+ * @param {object} props
+ * @param {string} props.activeFilter   Etiqueta del filtro actualmente activo.
+ * @param {Function} props.onFilterChange Callback `(filtro) => void`.
+ */
 const RadarChips = ({ activeFilter, onFilterChange }) => {
     return (
         <View style={styles.container}>

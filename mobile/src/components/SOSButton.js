@@ -4,6 +4,15 @@ import Icon from './Icon';
 import * as Location from 'expo-location';
 import { useTranslation } from '../context/LanguageContext';
 
+/**
+ * Botón flotante de emergencia. Cuando está activo latíe para llamar la
+ * atención; al pulsarlo solicita permiso de ubicación y entrega las
+ * coordenadas al callback `onPress` para que el padre dispare el SOS real.
+ *
+ * @param {object}   props
+ * @param {boolean}  props.isActive Si es `false` no se renderiza nada.
+ * @param {Function} props.onPress  Callback `({latitude, longitude}) => void`.
+ */
 const SOSButton = ({ isActive, onPress }) => {
     const { t } = useTranslation();
     // Animación de latido (pulse) que usa el driver nativo por rendimiento

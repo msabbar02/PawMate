@@ -25,6 +25,10 @@ WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
+/**
+ * Campo de texto reutilizable con icono, soporte de contraseña y mensaje de
+ * error inline (sin ref controlada, para el formulario de registro).
+ */
 const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPassword, onChangeText, onTogglePassword, error }) => (
     <View style={styles.inputWrapper}>
         <View style={[styles.inputContainer, error && styles.inputError]}>
@@ -68,6 +72,11 @@ export default function SignupScreen({ navigation }) {
 
     const [errors, setErrors] = useState({});
 
+    /**
+     * Valida todos los campos del formulario de registro.
+     *
+     * @returns {boolean} `true` si todos los campos son válidos.
+     */
     const validateForm = () => {
         let isValid = true;
         let newErrors = {};
@@ -108,6 +117,12 @@ export default function SignupScreen({ navigation }) {
         return isValid;
     };
 
+    /**
+     * Comprueba si el email ya está registrado en la tabla de usuarios.
+     *
+     * @param {string} email Email a verificar.
+     * @returns {Promise<boolean>} `true` si el email ya existe.
+     */
     const checkEmailExists = async (email) => {
         try {
             const { data, error } = await supabase
@@ -122,6 +137,12 @@ export default function SignupScreen({ navigation }) {
         }
     };
 
+    /**
+     * Registra al usuario en Supabase Auth. Si el envío del email de
+     * confirmación falla pero el usuario se creó igualmente, navega a
+     * `Confirm`. Si el registro es sin email de confirmación, el
+     * `AuthContext` redirige automáticamente.
+     */
     const handleSignup = async () => {
         Keyboard.dismiss();
 
@@ -131,7 +152,7 @@ export default function SignupScreen({ navigation }) {
         setErrors({});
 
         try {
-            // Check email already registered
+            // Verifica si el email ya está registrado antes de llamar a signUp.
             const emailTaken = await checkEmailExists(formData.email);
             if (emailTaken) {
                 setErrors({ email: t('signup.emailExists') });
@@ -193,6 +214,10 @@ export default function SignupScreen({ navigation }) {
         }
     };
 
+    /**
+     * Registra al usuario mediante OAuth de Google (mismo flujo PKCE que
+     * el login).
+     */
     const handleGoogleSignup = async () => {
         try {
             setLoading(true);

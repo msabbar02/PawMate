@@ -18,9 +18,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { API_BASE_URL, notifyRatingRequest } from '../config/api';
 import { useNavigation } from '@react-navigation/native';
 
-// ─────────────────────────────────────────────────
-// STATUS CONFIG
-// ─────────────────────────────────────────────────
+// Configuración visual de cada estado de reserva.
 const STATUS = {
     pendiente:    { labelKey: 'bookings.pending',    bg: '#FEF3C7', color: '#D97706', icon: 'time-outline' },
     aceptada:     { labelKey: 'bookings.accepted',   bg: '#DCFCE7', color: '#16A34A', icon: 'checkmark-circle-outline' },
@@ -55,26 +53,24 @@ export default function BookingScreen() {
     const [messageInput, setMessageInput]     = useState('');
     const flatListRef = useRef(null);
 
-    // Detail modal
+    // Modal de detalle de reserva.
     const [detailRes, setDetailRes]   = useState(null);
 
-    // QR state
+    // Estado del código QR.
     const [isQrModalVisible, setIsQrModalVisible] = useState(false);
     const [qrBooking, setQrBooking]               = useState(null);
     const [isScannerVisible, setIsScannerVisible] = useState(false);
     const [cameraScanned, setCameraScanned]       = useState(false);
     const [permission, requestPermission]         = useCameraPermissions();
 
-    // Review state
+    // Estado de las valoraciones.
     const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
     const [reviewTarget, setReviewTarget]   = useState(null);
     const [reviewRating, setReviewRating]   = useState(5);
     const [reviewText, setReviewText]       = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
 
-    // ─────────────────────────────────────────────────
-    // FETCH RESERVATIONS
-    // ─────────────────────────────────────────────────
+    // Carga de reservas y suscripción Realtime.
     useEffect(() => {
         if (!user?.id) { setLoading(false); return; }
         const isCaregiver = userData?.role === 'caregiver';
@@ -83,7 +79,7 @@ export default function BookingScreen() {
         const fetchReservations = async () => {
             const { data } = await supabase.from('reservations').select('*').eq(field, user.id).order('created_at', { ascending: false });
             if (data) {
-                // Enrich with latest avatars from users table
+                // Enriquece con los últimos avatares de la tabla users.
                 const otherIds = [...new Set(data.map(r => isCaregiver ? r.ownerId : r.caregiverId).filter(Boolean))];
                 let avatarMap = {};
                 if (otherIds.length > 0) {
@@ -92,7 +88,7 @@ export default function BookingScreen() {
                         users.forEach(u => { avatarMap[u.id] = u.avatar || u.photoURL || null; });
                     }
                 }
-                // Enrich with latest pet names (so renames propagate)
+                // Enriquece con los nombres actuales de las mascotas.
                 const allPetIds = [...new Set(data.flatMap(r => Array.isArray(r.petIds) ? r.petIds : (r.petId ? [r.petId] : [])).filter(Boolean))];
                 let petNameMap = {};
                 if (allPetIds.length > 0) {
@@ -126,15 +122,13 @@ export default function BookingScreen() {
         return () => { supabase.removeChannel(channel); };
     }, [userData?.role, user?.id]);
 
-    // ─────────────────────────────────────────────────
-    // FETCH MESSAGES
-    // ─────────────────────────────────────────────────
+    // Carga de mensajes del chat activo.
     useEffect(() => {
         if (!activeConversation) return;
         const fetchMessages = async () => {
              const { data } = await supabase.from('messages').select('*').eq('conversationId', activeConversation.id).order('created_at', { ascending: true });
              if (data) setMessages(data);
-             // Mark unread messages as read
+             // Marca como leídos los mensajes dirigidos al usuario.
              await supabase.from('messages')
                  .update({ read: true })
                  .eq('conversationId', activeConversation.id)
@@ -151,9 +145,7 @@ export default function BookingScreen() {
         return () => { supabase.removeChannel(channel); };
     }, [activeConversation]);
 
-    // ─────────────────────────────────────────────────
-    // CAPACITY CHECK
-    // ─────────────────────────────────────────────────
+    // Comprueba si el cuidador tiene capacidad para aceptar más reservas del mismo tipo.
     const checkCapacity = async (caregiverId, serviceType) => {
         const maxLimit = serviceType === 'walking' ? MAX_WALK : MAX_HOTEL;
         const { count } = await supabase.from('reservations')
@@ -164,9 +156,7 @@ export default function BookingScreen() {
         return (count || 0) < maxLimit;
     };
 
-    // ─────────────────────────────────────────────────
-    // ACCEPT RESERVATION
-    // ─────────────────────────────────────────────────
+    // Acepta una reserva (solo cuidadores).
     const handleAcceptReservation = async (reservation) => {
         if (!user?.id) return;
         try {
@@ -191,18 +181,16 @@ export default function BookingScreen() {
         } catch { Alert.alert(t('common.error'), t('bookings.acceptError')); }
     };
 
-    // ─────────────────────────────────────────────────
-    // PAYMENT
-    // ─────────────────────────────────────────────────
+    // Gestiona el cobro mediante Stripe (Google Pay / Apple Pay con fallback simulado).
     const handlePayment = async (reservation) => {
         const price = reservation.totalPrice ?? 0;
         if (price <= 0) { Alert.alert(t('common.error'), t('bookings.invalidPrice')); return; }
 
         try {
-            // Check if Google Pay / Apple Pay is available
+            // Comprueba si el dispositivo tiene Google Pay / Apple Pay.
             const platformPayAvailable = await isPlatformPaySupported();
 
-            // Get payment intent from server
+            // Obtiene el payment intent desde el servidor.
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
             const response = await fetch(`${API_BASE_URL}/api/payments/payment-intent`, {
@@ -224,7 +212,7 @@ export default function BookingScreen() {
             }
 
             if (platformPayAvailable) {
-                // Use Google Pay / Apple Pay
+                // Usa Google Pay / Apple Pay.
                 const { error } = await confirmPlatformPayPayment(clientSecret, {
                     googlePay: {
                         testEnv: true,
@@ -254,7 +242,7 @@ export default function BookingScreen() {
                 }
                 await confirmPayment(reservation);
             } else {
-                // Fallback: device doesn't support Google Pay / Apple Pay
+                // Fallback: el dispositivo no tiene Google Pay ni Apple Pay.
                 Alert.alert(
                     t('bookings.payFailed'),
                     t('bookings.payUnavailableMsg').replace('{method}', Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay').replace('{price}', price.toFixed(2)),
@@ -292,9 +280,7 @@ export default function BookingScreen() {
         } catch { Alert.alert(t('common.error'), t('bookings.activateError')); }
     };
 
-    // ─────────────────────────────────────────────────
-    // COMPLETE SERVICE
-    // ─────────────────────────────────────────────────
+    // Marca el servicio como completado (rol cuidador).
     const handleComplete = async (reservation) => {
         Alert.alert(t('bookings.completeConfirm'), t('bookings.completeMsg'), [
             { text: t('common.no'), style: 'cancel' },
@@ -321,14 +307,12 @@ export default function BookingScreen() {
         ]);
     };
 
-    // ─────────────────────────────────────────────────
-    // QR SCANNER
-    // ─────────────────────────────────────────────────
+    // Procesa el código QR escaneado para realizar check-in o check-out.
     const handleQrScanned = async ({ data: qrData }) => {
         if (cameraScanned || !user?.id) return;
         setCameraScanned(true);
         try {
-            // Try to find an 'activa' reservation first (check-in → in_progress)
+            // Busca primero una reserva 'activa' (check-in → in_progress).
             let { data } = await supabase.from('reservations')
                 .select('*')
                 .eq('caregiverId', user.id)
@@ -352,7 +336,7 @@ export default function BookingScreen() {
                 return;
             }
 
-            // Try to find an 'in_progress' reservation (check-out → completed)
+            // Busca una reserva 'in_progress' (check-out → completada).
             ({ data } = await supabase.from('reservations')
                 .select('*')
                 .eq('caregiverId', user.id)
@@ -364,21 +348,21 @@ export default function BookingScreen() {
                 const res = data[0];
                 await supabase.from('reservations').update({ status: 'completada', completedAt: new Date().toISOString() }).eq('id', res.id);
 
-                // Refetch caregiver row to ensure latest counters
+                // Recarga la fila del cuidador para asegurar los contadores más recientes.
                 const { data: cgRow } = await supabase.from('users').select('completedServices, totalWalks, petsCaredIds').eq('id', user.id).maybeSingle();
                 const newCompleted = (cgRow?.completedServices || 0) + 1;
                 const cgPatch = { completedServices: newCompleted };
                 if (res.serviceType === 'walking') {
                     cgPatch.totalWalks = (cgRow?.totalWalks || 0) + 1;
                 }
-                // Track unique pets cared by caregiver
+                // Registra las mascotas atendidas por el cuidador (sin duplicados).
                 if (Array.isArray(res.petIds) && res.petIds.length > 0) {
                     const existing = Array.isArray(cgRow?.petsCaredIds) ? cgRow.petsCaredIds : [];
                     cgPatch.petsCaredIds = [...new Set([...existing, ...res.petIds])];
                 }
                 await supabase.from('users').update(cgPatch).eq('id', user.id);
 
-                // Increment owner totalWalks (only for walking service)
+                // Incrementa el contador de paseos del dueño (solo servicio walking).
                 if (res.serviceType === 'walking' && res.ownerId) {
                     const { data: ownerRow } = await supabase.from('users').select('totalWalks, saveWalks').eq('id', res.ownerId).maybeSingle();
                     if (ownerRow?.saveWalks !== false) {
@@ -386,7 +370,7 @@ export default function BookingScreen() {
                             totalWalks: (ownerRow?.totalWalks || 0) + 1,
                         }).eq('id', res.ownerId);
                     }
-                    // Increment per-pet walk count
+                    // Incrementa el contador de paseos por mascota.
                     if (Array.isArray(res.petIds) && res.petIds.length > 0) {
                         for (const pid of res.petIds) {
                             const { data: petRow } = await supabase.from('pets').select('totalWalks').eq('id', pid).maybeSingle();
@@ -394,7 +378,7 @@ export default function BookingScreen() {
                         }
                     }
                 }
-                // Release payment: mark as paymentReleased for backend processing
+                // Libera el pago: marca como paymentReleased para que el backend lo procese.
                 await supabase.from('reservations').update({ paymentReleased: true, paymentReleasedAt: new Date().toISOString() }).eq('id', res.id).catch(() => {});
                 await createNotification(res.ownerId, {
                     type: 'booking_completed',
@@ -420,9 +404,7 @@ export default function BookingScreen() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // CANCEL / DELETE
-    // ─────────────────────────────────────────────────
+    // Cancela o elimina una reserva (con regla de penalización 24h).
     const handleCancelReservation = (reservation) => {
         // 24h cancellation rule: if less than 24h before start, 50% penalty
         const resObj = typeof reservation === 'object' ? reservation : reservations.find(r => r.id === reservation);
@@ -448,7 +430,7 @@ export default function BookingScreen() {
                             status: 'cancelada',
                             ...(hasPenalty ? { penaltyAmount: Number(penaltyAmount) } : {}),
                         }).eq('id', resId);
-                        // Notify the other party
+                        // Notifica a la otra parte.
                         const notifyId = userData?.role === 'caregiver' ? resObj?.ownerId : resObj?.caregiverId;
                         if (notifyId) {
                             await createNotification(notifyId, {
@@ -482,9 +464,7 @@ export default function BookingScreen() {
         ]);
     };
 
-    // ─────────────────────────────────────────────────
-    // TRACK PET (Owner → see caregiver's location)
-    // ─────────────────────────────────────────────────
+    // Muestra la ubicación del cuidador en un mapa (dueño sigue a su mascota).
     const handleTrackPet = async (reservation) => {
         try {
             const { data: caregiver } = await supabase
@@ -522,9 +502,7 @@ export default function BookingScreen() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // TOGGLE WALK (Caregiver activates/deactivates walk tracking)
-    // ─────────────────────────────────────────────────
+    // Activa o desactiva el seguimiento GPS del paseo (rol cuidador).
     const handleToggleWalk = async (reservation) => {
         try {
             const newVal = !reservation.walkActive;
@@ -537,7 +515,7 @@ export default function BookingScreen() {
                     return;
                 }
                 const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-                // Also update caregiver location in users table
+                // Actualiza también la ubicación del cuidador en la tabla users.
                 await supabase.from('users').update({
                     latitude: loc.coords.latitude,
                     longitude: loc.coords.longitude,
@@ -547,7 +525,7 @@ export default function BookingScreen() {
 
             await supabase.from('reservations').update(update).eq('id', reservation.id);
 
-            // Notify owner
+            // Notifica al dueño.
             if (reservation.ownerId) {
                 const petNames = reservation.petNames?.join(', ') || 'tu mascota';
                 await createNotification(reservation.ownerId, {
@@ -567,9 +545,7 @@ export default function BookingScreen() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // SUBMIT REVIEW
-    // ─────────────────────────────────────────────────
+    // Envía la valoración al finalizar el servicio.
     const handleSubmitReview = async () => {
         if (!reviewTarget || !user?.id) return;
         setSubmittingReview(true);
@@ -601,9 +577,7 @@ export default function BookingScreen() {
         finally { setSubmittingReview(false); }
     };
 
-    // ─────────────────────────────────────────────────
-    // OPEN CHAT (find or create conversation)
-    // ─────────────────────────────────────────────────
+    // Abre el chat de una reserva, creando la conversación si no existe.
     const openChat = async (reservation) => {
         const ownId = reservation.ownerId;
         const cgId = reservation.caregiverId;
@@ -632,7 +606,7 @@ export default function BookingScreen() {
                 convo = newConvo;
             }
             if (convo) {
-                // Attach reservation info for display
+                // Añade la info de la reserva para mostrarla en el chat.
                 convo._serviceType = reservation.serviceType;
                 convo._startDate = reservation.startDate;
                 setActiveConversation(convo);
@@ -644,9 +618,7 @@ export default function BookingScreen() {
         }
     };
 
-    // ─────────────────────────────────────────────────
-    // SEND MESSAGE
-    // ─────────────────────────────────────────────────
+    // Envía un mensaje en el chat de la reserva activa.
     const sendMessage = async () => {
         if (!messageInput.trim() || !activeConversation || !user?.id) return;
         const text = messageInput.trim();
@@ -662,13 +634,13 @@ export default function BookingScreen() {
                 text,
                 read: false,
             });
-            // Update conversation's lastMessage
+            // Actualiza el lastMessage de la conversación.
             await supabase.from('conversations').update({
                 lastMessage: text,
                 lastMessageAt: new Date().toISOString(),
             }).eq('id', activeConversation.id);
 
-            // Notify the receiver about the new message
+            // Notifica al receptor del nuevo mensaje.
             await createNotification(receiverId, {
                 type: 'new_message',
                 title: ' Nuevo mensaje',
@@ -684,9 +656,7 @@ export default function BookingScreen() {
         } catch { Alert.alert(t('common.error'), t('bookings.messageError')); }
     };
 
-    // ─────────────────────────────────────────────────
-    // RENDER HELPERS
-    // ─────────────────────────────────────────────────
+    // Helpers de renderizado.
     const DetailRow = ({ icon, label, value }) => (
         <View style={s.detailRow}>
             <View style={[s.detailIconWrap, { backgroundColor: theme.primaryBg }]}>
@@ -699,9 +669,7 @@ export default function BookingScreen() {
         </View>
     );
 
-    // ─────────────────────────────────────────────────
-    // RENDER: Reservation Card (compact, tappable)
-    // ─────────────────────────────────────────────────
+    // Tarjeta compacta de reserva (tappable).
     const renderReservationCard = ({ item: res }) => {
         const st = STATUS[res.status] || STATUS.pendiente;
         const isCaregiver = userData?.role === 'caregiver';
@@ -809,9 +777,7 @@ export default function BookingScreen() {
         );
     };
 
-    // ─────────────────────────────────────────────────
-    // RENDER: Chat Message
-    // ─────────────────────────────────────────────────
+    // Burbuja de mensaje de chat.
     const renderMessage = ({ item }) => {
         const isMe = item.senderId === user?.id;
         return (
@@ -837,9 +803,7 @@ export default function BookingScreen() {
         );
     };
 
-    // ─────────────────────────────────────────────────
-    // LOADING
-    // ─────────────────────────────────────────────────
+    // Pantalla de carga inicial.
     if (loading) {
         return (
             <View style={[s.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }]}>
@@ -848,9 +812,7 @@ export default function BookingScreen() {
         );
     }
 
-    // ─────────────────────────────────────────────────
-    // MAIN RENDER
-    // ─────────────────────────────────────────────────
+    // Renderizado principal del componente.
     return (
         <View style={[s.container, { backgroundColor: theme.background }]}>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -988,7 +950,7 @@ export default function BookingScreen() {
                                         disabled={isCaregiver}
                                         onPress={async () => {
                                             if (isCaregiver) return;
-                                            // Navigate to caregiver's profile
+                                            // Navega al perfil del cuidadorver's profile
                                             const cgId = detailRes.caregiverId;
                                             if (!cgId) return;
                                             const { data: cg } = await supabase
@@ -1404,9 +1366,7 @@ export default function BookingScreen() {
     );
 }
 
-// ─────────────────────────────────────────────────
-// STYLES
-// ─────────────────────────────────────────────────
+    // Estilos del componente.
 const s = StyleSheet.create({
     container: { flex: 1 },
 
@@ -1431,7 +1391,7 @@ const s = StyleSheet.create({
 
     listContent: { padding: 16, paddingBottom: 100 },
 
-    // Reservation Card
+    // Tarjeta de reserva.
     resCard: {
         borderRadius: 20, padding: 18, marginBottom: 14,
         shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
@@ -1449,7 +1409,7 @@ const s = StyleSheet.create({
     quickBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12 },
     quickBtnText:   { fontSize: 13, fontWeight: '700' },
 
-    // Detail modal
+    // Modal de detalle.
     modalHeader: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         padding: 18, paddingTop: Platform.OS === 'ios' ? 56 : 18,
@@ -1470,19 +1430,19 @@ const s = StyleSheet.create({
     },
     actionBtnText: { fontSize: 15, fontWeight: '800' },
 
-    // Conversations
+    // Lista de conversaciones.
     convoRow:    { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 18, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
     convoAvatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
     convoAvatarImg: { width: 48, height: 48, borderRadius: 24 },
     convoName:   { fontSize: 16, fontWeight: '700' },
     convoService:{ fontSize: 12, marginTop: 2 },
 
-    // Empty
+    // Estado vacío.
     emptyState: { alignItems: 'center', marginTop: 60, paddingHorizontal: 30 },
     emptyTitle: { fontSize: 20, fontWeight: '800', marginTop: 14 },
     emptyDesc:  { fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
 
-    // QR Modal
+    // Modal QR.
     qrOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
     qrSheet:   { borderRadius: 28, padding: 28, alignItems: 'center', width: '85%', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
     qrTitle:   { fontSize: 22, fontWeight: '900', marginBottom: 6 },
@@ -1492,7 +1452,7 @@ const s = StyleSheet.create({
     closeQrBtn:      { marginTop: 22, paddingHorizontal: 36, paddingVertical: 13, borderRadius: 16 },
     closeQrBtnText:  { color: '#FFF', fontWeight: '800', fontSize: 15 },
 
-    // Scanner
+    // Escáner QR.
     scannerHeader: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 30, paddingBottom: 16,
@@ -1504,10 +1464,10 @@ const s = StyleSheet.create({
     permissionBtn:  { paddingHorizontal: 28, paddingVertical: 13, borderRadius: 16 },
     permissionBtnText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
 
-    // Review
+    // Valoración.
     reviewInput: { borderWidth: 1.5, borderRadius: 16, padding: 14, fontSize: 15, minHeight: 100, textAlignVertical: 'top' },
 
-    // Chat
+    // Chat.
     chatHeader: {
         flexDirection: 'row', alignItems: 'center',
         padding: 18, paddingTop: Platform.OS === 'ios' ? 56 : 18,

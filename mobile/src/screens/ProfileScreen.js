@@ -16,7 +16,7 @@ import { uploadImageToStorage, saveAvatar } from '../utils/storageHelpers';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
 
-// ─── helpers ─────────────────────────────────────────────────
+// Funciones auxiliares compartidas en este módulo.
 const formatDate = (d, lang = 'es') => {
     if (!d) return '';
     if (typeof d === 'string') return d;
@@ -28,7 +28,9 @@ const sectionLabel = (text, theme) => (
     <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>{text}</Text>
 );
 
-// ─── Field Row ────────────────────────────────────────────────
+/**
+ * Fila de campo editable con etiqueta y `TextInput` o texto estático.
+ */
 const Field = ({ label, value, onChangeText, placeholder, keyboardType, editable = true, theme, multiline }) => (
     <View style={[styles.fieldRow, { backgroundColor: theme.cardBackground }]}>
         <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{label}</Text>
@@ -48,14 +50,17 @@ const Field = ({ label, value, onChangeText, placeholder, keyboardType, editable
     </View>
 );
 
-// ─── Main Component ───────────────────────────────────────────
+/**
+ * Pantalla de perfil del usuario: datos personales, foto, ubicación,
+ * preferencias, estadísticas y acciones de cuenta.
+ */
 export default function ProfileScreen({ navigation }) {
     const { userData, user, refreshUserData } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { t, lang } = useTranslation();
 
-    // ── Editable fields state (initialized from userData)
-    // NOTE: 'avatar' field stores the photo, 'address' sub-object stores location
+    // Campos editables del perfil (inicializados desde userData).
+    // Nota: 'avatar' guarda la foto; 'address' es el sub-objeto de ubicación.
     const [firstName,    setFirstName]    = useState(userData?.firstName    || userData?.fullName?.split(' ')[0] || '');
     const [lastName,     setLastName]     = useState(userData?.lastName     || userData?.fullName?.split(' ').slice(1).join(' ') || '');
     const [phone,        setPhone]        = useState(userData?.phone        || '');
@@ -63,13 +68,13 @@ export default function ProfileScreen({ navigation }) {
     const [postalCode,   setPostalCode]   = useState(userData?.address?.postalCode || userData?.postalCode || '');
     const [province,     setProvince]     = useState(userData?.address?.province  || userData?.province  || '');
     const [country,      setCountry]      = useState(userData?.address?.country   || userData?.country   || 'España');
-    // Photo: 'avatar' field, accept both base64 data URLs and https URLs
+    // Foto: acepta URLs https:// y data URIs base64.
     const rawAvatar = userData?.avatar || userData?.photoURL || null;
     const [photoUri, setPhotoUri] = useState(
         rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null
     );
 
-    // Keep photo in sync with userData (covers caregiver mode refresh)
+    // Mantiene la foto sincronizada con userData (necesario al refrescar en modo cuidador).
     useEffect(() => {
         const fresh = userData?.avatar || userData?.photoURL || null;
         if (fresh && (fresh.startsWith('https://') || fresh.startsWith('data:'))) {
@@ -77,29 +82,29 @@ export default function ProfileScreen({ navigation }) {
         }
     }, [userData?.avatar, userData?.photoURL]);
 
-    // Birth date
+    // Fecha de nacimiento.
     const [birthDate,    setBirthDate]    = useState(
         userData?.birthDate ? new Date(userData.birthDate?.seconds ? userData.birthDate.seconds * 1000 : userData.birthDate) : new Date(1990, 0, 1)
     );
     const [showDatePicker, setShowDatePicker] = useState(false);
 
-    // Preferences
+    // Preferencias del usuario.
     const [saveWalks,    setSaveWalks]    = useState(userData?.saveWalks    ?? true);
     const [saveLocation, setSaveLocation] = useState(userData?.saveLocation ?? true);
 
-    // Stats (read-only)
+    // Estadísticas (solo lectura).
     const totalWalks    = userData?.totalWalks    ?? 0;
     const totalDistance = userData?.totalDistance ?? 0;
     const totalMinutes  = userData?.totalMinutes  ?? 0;
     const distanceLabel = totalDistance >= 1 ? `${totalDistance.toFixed(1)} km` : `${Math.round(totalDistance * 1000)} m`;
     const timeLabel     = totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes} min`;
 
-    // UI state
+    // Estado de la UI.
     const [saving,         setSaving]         = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [fetchingCity,   setFetchingCity]   = useState(false);
 
-    // ── Sync from userData when it updates ────────────────
+    // Sincroniza los campos cuando userData cambia.
     useEffect(() => {
         if (userData) {
             setFirstName(   userData.firstName    || userData.fullName?.split(' ')[0] || '');
@@ -111,7 +116,7 @@ export default function ProfileScreen({ navigation }) {
             setCountry(     userData.address?.country   || userData.country   || 'España');
             setSaveWalks(   userData.saveWalks    ?? true);
             setSaveLocation(userData.saveLocation ?? true);
-            // Only use avatar if it's a real Storage URL or base64
+            // Solo usa el avatar si es una URL real de Storage o un data URI.
             const av = userData.avatar || userData.photoURL || null;
             if (av && (av.startsWith('https://') || av.startsWith('data:'))) setPhotoUri(av);
             if (userData.birthDate) {
@@ -163,20 +168,20 @@ export default function ProfileScreen({ navigation }) {
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.25,     // low quality to keep base64 small
+            quality: 0.25,     // calidad baja para que el data URI no sea excesivo
         });
         if (result.canceled) return;
 
         const localUri = result.assets[0].uri;
-        setPhotoUri(localUri); // optimistic UI
+        setPhotoUri(localUri); // UI optimista
         setUploadingPhoto(true);
         try {
-            // Save avatar (base64 or uploaded) to Supabase storage
+            // Sube el avatar a Supabase Storage.
             const base64Url = await saveAvatar(localUri, user.id);
             setPhotoUri(base64Url);
             await refreshUserData();
         } catch (e) {
-            // Revert to previous photo on failure
+            // Revierte a la foto anterior si falla la subida.
             const prev = rawAvatar && (rawAvatar.startsWith('https://') || rawAvatar.startsWith('data:')) ? rawAvatar : null;
             setPhotoUri(prev);
             Alert.alert(t('profile.photoUploadError'), e?.message || t('common.unknownError'));
@@ -185,8 +190,7 @@ export default function ProfileScreen({ navigation }) {
         }
     };
 
-    // ── Profile Completion ──────────────────────────────────
-    // Same 4 visual steps as in the completion card to keep bar+counter in sync
+    // Los mismos 4 campos que usa la tarjeta de progreso, para mantener la barra sincronizada.
     const completionFields = [
         !!photoUri,
         !!phone.trim(),
@@ -195,7 +199,10 @@ export default function ProfileScreen({ navigation }) {
     ];
     const completionPercent = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
 
-    // ── Save All Profile Data ──────────────────────────────
+    /**
+     * Guarda todos los campos del perfil en la tabla `users` de Supabase y
+     * recarga `userData` desde `AuthContext`.
+     */
     const handleSave = async () => {
         if (!firstName.trim()) return Alert.alert(t('common.error'), t('profile.nameRequired'));
         setSaving(true);
@@ -234,7 +241,9 @@ export default function ProfileScreen({ navigation }) {
         }
     };
 
-    // ── Sign Out ───────────────────────────────────────────
+    /**
+     * Muestra un diálogo de confirmación y cierra la sesión del usuario.
+     */
     const handleSignOut = () => {
         Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
             { text: t('common.cancel'), style: 'cancel' },

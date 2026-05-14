@@ -1,10 +1,18 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿/**
+ * Página de gestión de mascotas.
+ *
+ * Lista hasta 500 mascotas, resuelve los nombres de los dueños con una
+ * única consulta `IN`, permite filtrar por especie y buscar por nombre
+ * de mascota o dueño, y abre modales de visualización y edición con
+ * persistencia directa a Supabase.
+ */
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faDog, faFileLines, faEye, faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
-import './UsersPage.css'; // Inheriting shared table styles
+import './UsersPage.css'; // Hereda los estilos de tabla compartidos.
 
 export default function PetsPage() {
     const { t } = useTranslation();
@@ -14,7 +22,7 @@ export default function PetsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [speciesFilter, setSpeciesFilter] = useState('all');
     
-    // Modal state
+    // Estado del modal.
     const [selectedPet, setSelectedPet] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -25,13 +33,17 @@ export default function PetsPage() {
         fetchPets();
     }, []);
 
+    /**
+     * Carga las mascotas y resuelve el nombre de cada dueño en una
+     * única consulta `IN` para evitar N+1.
+     */
     const fetchPets = async () => {
         setLoading(true);
         try {
             const { data: petsList } = await supabase.from('pets').select('*').limit(500);
             
             if (petsList && petsList.length > 0) {
-                // Batch-fetch all unique owner names in a single query
+                // Carga en lote los nombres de dueños únicos en una sola consulta.
                 const ownerIds = [...new Set(petsList.map(p => p.ownerId).filter(Boolean))];
                 let ownerMap = {};
                 if (ownerIds.length > 0) {
@@ -58,6 +70,7 @@ export default function PetsPage() {
         }
     };
 
+    /** Borra una mascota previa confirmación del usuario. */
     const handleDeletePet = async (petId) => {
         if (window.confirm(t('pets.confirmDelete'))) {
             try {
@@ -70,6 +83,7 @@ export default function PetsPage() {
         }
     };
 
+    /** Abre el modal de edición con los valores actuales de la mascota. */
     const openEditModal = (pet) => {
         setSelectedPet(pet);
         setOwnerName(pet.ownerName);
@@ -82,17 +96,20 @@ export default function PetsPage() {
         setIsEditModalOpen(true);
     };
 
+    /** Abre el modal de visualización. */
     const openViewModal = (pet) => {
         setSelectedPet(pet);
         setOwnerName(pet.ownerName);
         setIsViewModalOpen(true);
     };
 
+    /** Cierra el modal de visualización y limpia la selección. */
     const closeViewModal = () => {
         setIsViewModalOpen(false);
         setSelectedPet(null);
     };
 
+    /** Persiste los cambios del modal de edición contra Supabase. */
     const handleSaveEdit = async () => {
         try {
             const { error } = await supabase.from('pets').update(editForm).eq('id', selectedPet.id);

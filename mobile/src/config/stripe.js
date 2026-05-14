@@ -1,20 +1,28 @@
 import React from 'react';
 
-// Safe wrapper for StripeProvider that won't crash in Expo Go
-// When running in Expo Go, native Stripe modules aren't available.
-// This wrapper catches the error and renders children without Stripe.
+/**
+ * Envuelve `StripeProvider` de forma segura para que la app no casque en
+ * Expo Go, donde los módulos nativos de Stripe no están disponibles. Si el
+ * módulo no se puede importar renderiza los hijos sin proveedor.
+ */
 
 let StripeProviderReal = null;
 
 try {
-    // Attempt to import the real StripeProvider
     const stripe = require('@stripe/stripe-react-native');
     StripeProviderReal = stripe.StripeProvider;
 } catch (e) {
-    // Module not available (e.g. Expo Go environment)
     console.warn('Stripe native module not available. Payments will be disabled.');
 }
 
+/**
+ * Proveedor de Stripe con fallback. Si Stripe no está disponible renderiza
+ * los hijos directamente para no bloquear la navegación.
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.children      Componentes hijos.
+ * @param {string}          props.publishableKey Clave pública de Stripe.
+ */
 export const SafeStripeProvider = ({ children, publishableKey }) => {
     if (StripeProviderReal) {
         return (
@@ -23,18 +31,21 @@ export const SafeStripeProvider = ({ children, publishableKey }) => {
             </StripeProviderReal>
         );
     }
-
-    // Fallback: render without Stripe when native module isn't available
     return <>{children}</>;
 };
 
-// Safe hook wrapper for useStripe
+/**
+ * Hook de Stripe con fallback. Devuelve funciones mock cuando el módulo
+ * nativo no está presente, de forma que los flujos de pago fallen con un
+ * mensaje legible en lugar de lanzar una excepción.
+ *
+ * @returns {object} Interfaz de `useStripe` o equivalente mock.
+ */
 export const useSafeStripe = () => {
     try {
         const stripe = require('@stripe/stripe-react-native');
         return stripe.useStripe();
     } catch (e) {
-        // Return mock functions when Stripe is not available
         return {
             initPaymentSheet: async () => ({ error: { message: 'Stripe no disponible en Expo Go.' } }),
             presentPaymentSheet: async () => ({ error: { code: 'Canceled', message: 'Stripe no disponible en Expo Go.' } }),
@@ -44,7 +55,7 @@ export const useSafeStripe = () => {
     }
 };
 
-// Safe PlatformPay export
+// Exportación segura de PlatformPay con constantes de fallback.
 export let SafePlatformPay = {};
 try {
     const stripe = require('@stripe/stripe-react-native');

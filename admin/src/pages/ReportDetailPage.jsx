@@ -1,4 +1,11 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿/**
+ * Página de detalle de un reporte.
+ *
+ * Carga el reporte y los perfiles de reportante y reportado. Permite
+ * cambiar el estado (resuelto/pendiente/rechazado), banear al usuario
+ * reportado (con email) y eliminar el reporte.
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendBanEmail } from '../config/api';
@@ -6,8 +13,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faTriangleExclamation, faUser, faEye, faCheck, faTrash, faBan } from '@fortawesome/free-solid-svg-icons';
 import './DetailPage.css';
 
+/** Formatea una fecha ISO al formato corto en castellano. */
 function formatDate(d) { return d ? new Date(d).toLocaleString('es-ES') : '-'; }
 
+/** Etiqueta de estado coloreada (pendiente/resuelto/rechazado). */
 function Badge({ status }) {
     const map = {
         pending:  { cls: 'amber', label: 'Pendiente' },
@@ -26,6 +35,7 @@ export default function ReportDetailPage() {
     const [reported, setReported] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    /** Carga reporte + reportante + reportado. */
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
@@ -44,12 +54,14 @@ export default function ReportDetailPage() {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
+    /** Cambia el estado del reporte. */
     const updateStatus = async (status) => {
         const { error } = await supabase.from('reports').update({ status }).eq('id', id);
         if (error) return alert('Error: ' + error.message);
         setReport({ ...report, status });
     };
 
+    /** Banea al usuario reportado y le envía el email de aviso. */
     const handleBanReported = async () => {
         if (!reported) return;
         if (!window.confirm(`¿Banear a ${reported.fullName || reported.email}?`)) return;
@@ -59,6 +71,7 @@ export default function ReportDetailPage() {
         setReported({ ...reported, is_banned: true });
     };
 
+    /** Elimina el reporte tras confirmar y vuelve al listado. */
     const handleDelete = async () => {
         if (!window.confirm('¿Eliminar este reporte?')) return;
         const { error } = await supabase.from('reports').delete().eq('id', id);

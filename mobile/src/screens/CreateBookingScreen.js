@@ -38,7 +38,7 @@ export default function CreateBookingScreen({ route, navigation }) {
     const [loadingPets, setLoadingPets] = useState(true);
     const [walkHours, setWalkHours] = useState(1);
 
-    // Only show services that the caregiver offers
+    // Muestra solo los servicios que ofrece el cuidador.
     const availableServices = caregiver?.serviceTypes?.length > 0
         ? SERVICE_TYPES.filter(s => caregiver.serviceTypes.includes(s.value))
         : SERVICE_TYPES;
@@ -96,7 +96,7 @@ export default function CreateBookingScreen({ route, navigation }) {
             const petNames = myPets.filter(p => selectedPets.includes(p.id)).map(p => p.name);
             const totalPrice = calculatePrice();
 
-            // For walks: end = start + walkHours
+            // Para paseos: la hora de fin = inicio + duración del paseo.
             const effectiveEndDate = serviceType === 'walking'
                 ? new Date(startDate.getTime() + walkHours * 60 * 60 * 1000)
                 : endDate;
@@ -125,7 +125,7 @@ export default function CreateBookingScreen({ route, navigation }) {
 
             if (error) throw error;
 
-            // Create conversation between owner & caregiver if it doesn't exist
+            // Crea la conversación entre dueño y cuidador si no existe.
             await supabase.from('conversations').upsert({
                 ownerId: user.id,
                 caregiverId: caregiver.id,
@@ -135,7 +135,7 @@ export default function CreateBookingScreen({ route, navigation }) {
                 caregiverAvatar: caregiver.photoURL || caregiver.avatar || null,
             }, { onConflict: 'ownerId,caregiverId' });
 
-            // Notify the caregiver (bookingId goes into data jsonb)
+            // Notifica al cuidador (bookingId va en el campo data jsonb).
             await createNotification(caregiver.id, {
                 type: 'booking_request',
                 bookingId: insertedRes?.id,

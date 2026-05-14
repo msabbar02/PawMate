@@ -1,4 +1,13 @@
-﻿import { useState, useEffect } from 'react';
+﻿/**
+ * Página de restablecimiento de contraseña.
+ *
+ * Aterrizaje del enlace `PASSWORD_RECOVERY` que envía Supabase Auth.
+ * Espera a que el SDK reciba el token del hash de la URL (con timeout de
+ * 5 s para mostrar error si el enlace es inválido), valida la nueva
+ * contraseña (mín. 8, mayúscula, número, coincidencia) y la actualiza
+ * vía `supabase.auth.updateUser`.
+ */
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faEye, faEyeSlash, faCircleCheck, faCircleExclamation, faArrowRight, faMobileScreenButton } from '@fortawesome/free-solid-svg-icons';
@@ -28,7 +37,7 @@ export default function ResetPasswordPage() {
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState(false);
 
-  // Supabase sends the user here with a token in the URL hash
+  // Supabase envía al usuario aquí con un token en el hash de la URL.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -36,12 +45,12 @@ export default function ResetPasswordPage() {
       }
     });
 
-    // Check if we already have a session (token in URL)
+    // Comprueba si ya hay una sesión activa (token en la URL).
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setSessionReady(true);
     });
 
-    // Timeout: if no session after 5s, show error
+    // Timeout: si no hay sesión tras 5 s, muestra error.
     const timeout = setTimeout(() => {
       setSessionReady(prev => {
         if (!prev) setSessionError(true);
@@ -55,6 +64,7 @@ export default function ResetPasswordPage() {
     };
   }, []);
 
+  /** Valida la política de contraseña y devuelve el mensaje de error o `null`. */
   const validate = () => {
     if (!password) return t('reset.errEmpty');
     if (password.length < 8) return t('reset.errMin8');
@@ -64,6 +74,10 @@ export default function ResetPasswordPage() {
     return null;
   };
 
+  /**
+   * Envía la nueva contraseña a Supabase. Detecta el caso específico
+   * "misma contraseña anterior" para mostrar un mensaje localizado.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -97,7 +111,7 @@ export default function ResetPasswordPage() {
     }
   };
 
-  // Success state
+  // Estado de éxito.
   if (success) {
     return (
       <div className="confirm-page">
@@ -131,7 +145,7 @@ export default function ResetPasswordPage() {
     );
   }
 
-  // Session error
+  // Error de sesión.
   if (sessionError && !sessionReady) {
     return (
       <div className="confirm-page">
@@ -152,7 +166,7 @@ export default function ResetPasswordPage() {
     );
   }
 
-  // Loading session
+  // Cargando sesión.
   if (!sessionReady) {
     return (
       <div className="confirm-page">
@@ -164,7 +178,7 @@ export default function ResetPasswordPage() {
     );
   }
 
-  // Reset form
+  // Formulario de restablecimiento.
   return (
     <div className="confirm-page">
       <div className="confirm-card">

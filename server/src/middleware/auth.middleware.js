@@ -1,8 +1,20 @@
+/**
+ * Middlewares de autenticación basados en JWT de Supabase.
+ *
+ * `verifyToken` valida el Bearer token contra Supabase Auth y rellena
+ * `req.user` con los datos básicos del usuario.
+ * `isAdmin` exige que el usuario autenticado tenga rol 'admin' en la tabla users.
+ */
 const { supabase } = require('../config/supabase');
 const { sendError } = require('../utils/response');
 
 /**
- * Middleware to verify Supabase JWT token
+ * Verifica el token JWT de Supabase enviado en la cabecera Authorization.
+ * Si es válido inyecta `req.user` y continúa, en caso contrario responde 401.
+ *
+ * @param {import('express').Request}  req  Petición entrante.
+ * @param {import('express').Response} res  Respuesta saliente.
+ * @param {Function}                   next Siguiente middleware en la cadena.
  */
 const verifyToken = async (req, res, next) => {
     try {
@@ -34,7 +46,12 @@ const verifyToken = async (req, res, next) => {
 };
 
 /**
- * Middleware to check if user is admin
+ * Comprueba que el usuario autenticado tiene rol 'admin'.
+ * Debe usarse SIEMPRE después de `verifyToken`.
+ *
+ * @param {import('express').Request}  req  Petición con `req.user` ya poblado.
+ * @param {import('express').Response} res  Respuesta saliente.
+ * @param {Function}                   next Siguiente middleware en la cadena.
  */
 const isAdmin = async (req, res, next) => {
     try {

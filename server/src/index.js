@@ -1,32 +1,75 @@
-﻿require('dotenv').config();
+﻿/**
+ * Punto de entrada del servidor PawMate API.
+ *
+ * Configura Express con CORS, limitador de tasa, parsers de cuerpo,
+ * el webhook raw de Stripe y los manejadores globales de error/404.
+ * Se ejecuta como servidor HTTP en local y como función serverless en Vercel.
+ */
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 
-// Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Rate limiting ──────────────────────────────────────────────────────────
-// Protect all API routes from brute-force and abuse
+/**
+ * Cabeceras de seguridad HTTP (CSP mínima, HSTS, X-Frame-Options, etc.).
+ * Si el paquete `helmet` no está instalado el servidor sigue arrancando.
+ */
+try {
+    const helmet = require('helmet');
+    app.use(helmet({
+        // Desactivamos COEP para no romper recursos cross-origin de Supabase/Stripe.
+        crossOriginEmbedderPolicy: false,
+    }));
+    console.log('Helmet enabled');
+} catch {
+    console.warn(' helmet no instalado — cabeceras de seguridad desactivadas (npm i helmet)');
+}
+
+/**
+ * Limitador de tasa global para mitigar fuerza bruta y abuso.
+ * Si el paquete `express-rate-limit` no está instalado se desactiva sin romper el arranque.
+ */
 let apiLimiter = null;
+let authLimiter = null;
+let paymentLimiter = null;
 try {
     const rateLimit = require('express-rate-limit');
     apiLimiter = rateLimit({
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 200,                  // max 200 requests per window per IP
+        windowMs: 15 * 60 * 1000,
+        max: 200,
         standardHeaders: true,
         legacyHeaders: false,
         message: { success: false, message: 'Too many requests, please try again later.' },
-        skip: (req) => req.path === '/api/health', // health check is unlimited
+        skip: (req) => req.path === '/api/health',
+    });
+    // Limitador estricto para endpoints sensibles a fuerza bruta.
+    authLimiter = rateLimit({
+        windowMs: 5 * 60 * 1000,
+        max: 20,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { success: false, message: 'Too many authentication attempts, please try again later.' },
+    });
+    paymentLimiter = rateLimit({
+        windowMs: 1 * 60 * 1000,
+        max: 10,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { success: false, message: 'Too many payment attempts, please slow down.' },
     });
     console.log('Rate limiting enabled');
 } catch {
-    console.warn(' express-rate-limit not installed — rate limiting disabled');
+    console.warn(' express-rate-limit no instalado — limitador de tasa desactivado');
 }
 
-// ── CORS ───────────────────────────────────────────────────────────────────
+/**
+ * Lista blanca de orígenes permitidos por CORS.
+ * En desarrollo se añaden los puertos típicos de Vite y CRA.
+ */
 const allowedOrigins = [
     'https://apppawmate.com',
     'https://www.apppawmate.com',
@@ -38,33 +81,32 @@ if (process.env.NODE_ENV !== 'production') {
 }
 app.use(cors({
     origin: (origin, cb) => {
-        // Allow requests with no origin (mobile apps, curl, server-to-server)
+        // Permite peticiones sin origen (apps móviles, curl, server-to-server).
         if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
         cb(null, false);
     },
 }));
 
-// ── Body parsers ───────────────────────────────────────────────────────────
-// Raw body for Stripe webhook signature verification (must come before express.json)
+// El webhook de Stripe necesita el cuerpo raw para verificar la firma; debe registrarse antes del parser JSON.
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
-// JSON body parser for all other routes
+// Parser JSON con límite estricto para evitar abuso de memoria.
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── Apply rate limiter ─────────────────────────────────────────────────────
 if (apiLimiter) app.use('/api', apiLimiter);
+if (authLimiter) app.use('/api/auth', authLimiter);
+if (paymentLimiter) {
+    app.use('/api/payments/payment-intent', paymentLimiter);
+    app.use('/api/payments/refund', paymentLimiter);
+}
 
-// ── API Routes ─────────────────────────────────────────────────────────────
 app.use('/api', routes);
 
-// 404 Handler
 app.use(notFoundHandler);
-
-// Global Error Handler
 app.use(errorHandler);
 
-// Start server (only in non-serverless environments)
+// Solo arranca el servidor HTTP fuera de entornos serverless (Vercel).
 if (process.env.VERCEL !== '1') {
     app.listen(PORT, () => {
         console.log(`PawMate API server running on port ${PORT}`);
@@ -72,5 +114,4 @@ if (process.env.VERCEL !== '1') {
     });
 }
 
-// Export for Vercel serverless
 module.exports = app;

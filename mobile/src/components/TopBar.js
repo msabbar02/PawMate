@@ -5,43 +5,56 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useTranslation } from '../context/LanguageContext';
 
-const API_KEY = "6ebcc59234e348b8af6172715260403";
+// Clave WeatherAPI. Debe definirse `EXPO_PUBLIC_WEATHER_API_KEY` en el entorno o en eas.json.
+// Si no está configurada el widget muestra el fallback de carga sin llamar al servicio.
+const API_KEY = process.env.EXPO_PUBLIC_WEATHER_API_KEY || '';
 
+/**
+ * Barra superior del mapa con buscador y mini widget de clima en directo.
+ *
+ * @param {object}   props
+ * @param {Function} props.onSearchFocus Callback al pulsar el campo de búsqueda.
+ */
 const TopBar = ({ onSearchFocus }) => {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const [weatherData, setWeatherData] = useState({
         temp: null,
         icon: 'partly-sunny',
-        color: '#F59E0B' // Colors by default
+        color: '#F59E0B'
     });
     const [isLoading, setIsLoading] = useState(true);
 
-    // WeatherAPI code mapping to Ionicons
+    /**
+     * Traduce un código de WeatherAPI a un par {icono Ionicons, color}.
+     *
+     * @param {number}  code  Código de condición meteorológica.
+     * @param {boolean} isDay Indica si es de día en la ubicación consultada.
+     */
     const getIconInfo = (code, isDay) => {
         if (!code) return { icon: 'partly-sunny', color: '#F59E0B' };
 
         switch (code) {
-            case 1000: // Sunny / Clear
+            case 1000: // Despejado / soleado
                 return { icon: isDay ? 'sunny' : 'moon', color: isDay ? '#F59E0B' : '#9CA3AF' };
-            case 1003: // Partly cloudy
+            case 1003: // Parcialmente nublado
                 return { icon: isDay ? 'partly-sunny' : 'cloudy-night', color: '#6B7280' };
-            case 1006: // Cloudy
-            case 1009: // Overcast
-            case 1030: // Mist
-            case 1135: // Fog
+            case 1006:
+            case 1009:
+            case 1030:
+            case 1135: // Nublado / niebla
                 return { icon: 'cloud', color: '#6B7280' };
-            case 1063: // Patchy rain possible
-            case 1180: case 1183: case 1186: case 1189: case 1192: case 1195: // Rain
-            case 1198: case 1201: case 1240: case 1243: case 1246: // Freezing rain, showers
+            case 1063:
+            case 1180: case 1183: case 1186: case 1189: case 1192: case 1195:
+            case 1198: case 1201: case 1240: case 1243: case 1246: // Lluvia y chubascos
                 return { icon: 'rainy', color: '#3B82F6' };
-            case 1087: // Thundery outbreaks
-            case 1273: case 1276: case 1279: case 1282: // Thunderstorms
+            case 1087:
+            case 1273: case 1276: case 1279: case 1282: // Tormentas
                 return { icon: 'thunderstorm', color: '#6B7280' };
-            case 1066: case 1069: case 1072: // Snow/Sleet possible
+            case 1066: case 1069: case 1072:
             case 1114: case 1117: case 1148: case 1150: case 1153: case 1168: case 1171:
             case 1204: case 1207: case 1210: case 1213: case 1216: case 1219: case 1222: case 1225:
-            case 1237: case 1249: case 1252: case 1255: case 1258: case 1261: case 1264: // Snow, ice pellets
+            case 1237: case 1249: case 1252: case 1255: case 1258: case 1261: case 1264: // Nieve y granizo
                 return { icon: 'snow', color: '#9CA3AF' };
             default:
                 return { icon: 'partly-sunny', color: '#F59E0B' };
@@ -51,7 +64,7 @@ const TopBar = ({ onSearchFocus }) => {
     useEffect(() => {
         const fetchWeather = async () => {
             try {
-                // Get high-accuracy location or fallback to last known
+                // Intentamos ubicación cacheada y, si no hay, una de baja precisión.
                 const location = await Location.getLastKnownPositionAsync({})
                     || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
 
@@ -60,7 +73,6 @@ const TopBar = ({ onSearchFocus }) => {
                     return;
                 }
 
-                // WeatherAPI current.json endpoint
                 const res = await fetch(
                     `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${location.coords.latitude},${location.coords.longitude}&aqi=no`
                 );
@@ -72,7 +84,6 @@ const TopBar = ({ onSearchFocus }) => {
                 const data = await res.json();
 
                 if (data && data.current) {
-                    // WeatherAPI specific structure
                     const temp = Math.round(data.current.temp_c);
                     const code = data.current.condition?.code;
                     const isDay = data.current.is_day === 1;

@@ -1,13 +1,16 @@
 ﻿import { supabase } from './supabase';
 
-// Base URL del backend PawMate.
-// En Expo Go (iPhone/Android físico) cambia localhost por la IP de tu PC, ej: http://192.168.1.X:3000
-// En Android emulador usa http://10.0.2.2:3000
-export const API_BASE_URL = typeof __DEV__ !== 'undefined' && __DEV__
-    ? 'https://api.apppawmate.com'   // ← usa producción en dev para Expo Go, o pon tu IP local
-    : 'https://api.apppawmate.com';
+// URL base del backend PawMate. Para apuntar a un backend local en dev,
+// define EXPO_PUBLIC_API_BASE_URL en .env o eas.json (p. ej. http://192.168.1.10:3000).
+export const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.apppawmate.com';
 
-/** Helper: get current Supabase JWT to authenticate server calls */
+/**
+ * Obtiene el JWT de la sesión activa de Supabase para autenticar las
+ * peticiones al backend propio.
+ *
+ * @returns {Promise<string|null>} Token de acceso o `null` si no hay sesión.
+ */
 async function getAuthToken() {
     try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -17,15 +20,24 @@ async function getAuthToken() {
     }
 }
 
-/** Helper: build auth headers (returns empty object if no token) */
+/**
+ * Construye la cabecera `Authorization` con el JWT actual. Si no hay sesión
+ * devuelve un objeto vacío para que las llamadas aún funcionen (endpoints
+ * públicos).
+ *
+ * @returns {Promise<object>} Objeto con `Authorization` o `{}`.
+ */
 async function authHeaders() {
     const token = await getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 /**
- * Notify owner/caregiver by email when a reservation status changes.
- * Requires auth — called by participants of the reservation.
+ * Notifica al dueño o al cuidador por email cuando el estado de una reserva
+ * cambia. Solo usuarios participantes en la reserva pueden llamarlo.
+ *
+ * @param {string} reservationId Identificador de la reserva.
+ * @returns {Promise<boolean>} `true` si el servidor confirmó el envío.
  */
 export const notifyReservationStatus = async (reservationId) => {
     try {
@@ -43,8 +55,11 @@ export const notifyReservationStatus = async (reservationId) => {
 };
 
 /**
- * Delete the current user's account (profile row + auth user).
- * The server handles both deletions using the service key.
+ * Elimina la cuenta del usuario actual (fila en users + usuario auth).
+ * El backend usa la service key para borrar ambos registros de forma segura.
+ *
+ * @param {string} userId Identificador del usuario.
+ * @returns {Promise<true>} Lanza error si el servidor responde con un error.
  */
 export const deleteAccount = async (userId) => {
     const headers = await authHeaders();
@@ -60,8 +75,11 @@ export const deleteAccount = async (userId) => {
 };
 
 /**
- * Send welcome email after user signs up.
- * Requires auth — user session must exist.
+ * Envía el email de bienvenida al usuario recién registrado.
+ *
+ * @param {string} email    Dirección de correo del nuevo usuario.
+ * @param {string} fullName Nombre completo para personalizar el asunto.
+ * @returns {Promise<boolean>} `true` si el servidor confirmó el envío.
  */
 export const sendWelcomeEmail = async (email, fullName) => {
     try {
@@ -79,7 +97,11 @@ export const sendWelcomeEmail = async (email, fullName) => {
 };
 
 /**
- * Notify owner by email to rate the caregiver after a reservation is completed.
+ * Notifica al dueño por email para que valore al cuidador una vez
+ * completada la reserva.
+ *
+ * @param {string} reservationId Identificador de la reserva.
+ * @returns {Promise<boolean>} `true` si el servidor confirmó el envío.
  */
 export const notifyRatingRequest = async (reservationId) => {
     try {

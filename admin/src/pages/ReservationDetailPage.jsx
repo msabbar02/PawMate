@@ -1,4 +1,12 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿/**
+ * Página de detalle de una reserva.
+ *
+ * Carga la reserva, dueño, cuidador y mascotas asociadas (`petIds`).
+ * Permite cambiar el estado (aceptada/rechazada/cancelada/completada)
+ * y eliminarla. Al marcar como completada envía el email solicitando
+ * valoración.
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendRatingRequestEmail } from '../config/api';
@@ -6,8 +14,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faCalendarCheck, faUser, faPaw, faEye, faCheck, faXmark, faTrash, faMoneyBill } from '@fortawesome/free-solid-svg-icons';
 import './DetailPage.css';
 
+/** Formatea una fecha ISO al formato corto en castellano. */
 function formatDate(d) { return d ? new Date(d).toLocaleString('es-ES') : '-'; }
 
+/** Etiqueta de estado coloreada para reservas y pagos. */
 function Badge({ status }) {
     const map = {
         accepted: { cls: 'green', label: 'Aceptada' }, aceptada: { cls: 'green', label: 'Aceptada' },
@@ -30,6 +40,7 @@ export default function ReservationDetailPage() {
     const [pets, setPets] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    /** Carga reserva + dueño + cuidador + mascotas asociadas. */
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
@@ -50,6 +61,10 @@ export default function ReservationDetailPage() {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
+    /**
+     * Cambia el estado de la reserva. Si pasa a `completada`,
+     * dispara el email de petición de valoración.
+     */
     const updateStatus = async (status) => {
         const { error } = await supabase.from('reservations').update({ status }).eq('id', id);
         if (error) return alert('Error: ' + error.message);
@@ -57,6 +72,7 @@ export default function ReservationDetailPage() {
         setRes({ ...res, status });
     };
 
+    /** Elimina la reserva tras confirmar y vuelve al listado. */
     const handleDelete = async () => {
         if (!window.confirm('¿Eliminar esta reserva? Acción irreversible.')) return;
         const { error } = await supabase.from('reservations').delete().eq('id', id);

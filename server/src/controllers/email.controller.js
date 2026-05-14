@@ -1,21 +1,47 @@
-﻿const { Resend } = require('resend');
+﻿/**
+ * Controlador de envío de emails transaccionales (Resend).
+ *
+ * Define las plantillas HTML reutilizables (layout, botón, nota de expiración)
+ * y los handlers HTTP para los emails de bienvenida, hooks de Supabase Auth
+ * (signup, recovery, cambio de email) y aviso de baneo.
+ */
+const { Resend } = require('resend');
 const { sendSuccess, sendError } = require('../utils/response');
 
-/* --- Shared FROM addresses --- */
+// Direcciones FROM compartidas, configurables por variable de entorno.
 const FROM_DEFAULT = process.env.EMAIL_FROM         || 'PawMate <noreply@apppawmate.com>';
 const FROM_SUPPORT = process.env.EMAIL_FROM_SUPPORT  || 'PawMate Soporte <soporte@apppawmate.com>';
 const FROM_ADMIN   = process.env.EMAIL_FROM_ADMIN    || 'PawMate Admin <admin@apppawmate.com>';
 
 const LOGO_URL = process.env.APP_LOGO_URL || 'https://apppawmate.com/icon.png';
 
-/* --- Resend send helper --- */
-async function sendEmail({ from, to, subject, html, text }) {
+/** Cliente de Resend reutilizado entre envíos (instanciar uno por petición es caro). */
+let resendClient = null;
+function getResend() {
     const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
+    if (!apiKey) return null;
+    if (!resendClient) resendClient = new Resend(apiKey);
+    return resendClient;
+}
+
+/**
+ * Envía un email vía Resend. Lanza error si falta la API key o falla el envío,
+ * para que los handlers superiores puedan capturarlo y responder con coherencia.
+ *
+ * @param {Object} opts          Opciones del email.
+ * @param {string} opts.from     Remitente.
+ * @param {string} opts.to       Destinatario.
+ * @param {string} opts.subject  Asunto.
+ * @param {string} opts.html     Cuerpo HTML.
+ * @param {string} [opts.text]   Cuerpo en texto plano (fallback).
+ * @returns {Promise<Object>}    Respuesta de Resend con el id del envío.
+ */
+async function sendEmail({ from, to, subject, html, text }) {
+    const resend = getResend();
+    if (!resend) {
         console.error('[Email] RESEND_API_KEY not set — email will not be sent');
         throw new Error('RESEND_API_KEY not configured');
     }
-    const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({ from, to, subject, html, text });
     if (error) {
         console.error('[Email] Resend error:', error);
@@ -25,14 +51,25 @@ async function sendEmail({ from, to, subject, html, text }) {
     return data;
 }
 
-/* --- Backward-compat shim for notifications.controller.js --- */
+/**
+ * Shim de compatibilidad para `notifications.controller.js`, que espera
+ * un objeto con método `sendMail` al estilo de Nodemailer.
+ *
+ * @returns {{ sendMail: Function }} Adaptador mínimo sobre `sendEmail`.
+ */
 function createTransporter() {
     return {
         sendMail: (opts) => sendEmail(opts),
     };
 }
 
-/* --- HTML helpers --- */
+/**
+ * Escapa caracteres HTML para evitar inyección cuando se interpolan datos
+ * de usuario en las plantillas de email.
+ *
+ * @param {string} str Texto a sanear.
+ * @returns {string}   Texto seguro para incrustar en HTML.
+ */
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -43,6 +80,18 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
+/**
+ * Construye el layout HTML común a todos los emails (logo, cabecera con
+ * gradiente, cuerpo y pie con copyright).
+ *
+ * @param {Object} opts            Datos de la cabecera y cuerpo del email.
+ * @param {string} opts.icon       Emoji o icono grande de la cabecera.
+ * @param {string} opts.title      Título principal.
+ * @param {string} [opts.subtitle] Subtítulo opcional.
+ * @param {string} opts.gradient   CSS de gradiente para la cabecera.
+ * @param {string} opts.body       HTML del cuerpo principal.
+ * @returns {string}               Documento HTML completo.
+ */
 function emailLayout({ icon, title, subtitle, gradient, body }) {
     return `<!DOCTYPE html>
 <html>
@@ -71,17 +120,39 @@ function emailLayout({ icon, title, subtitle, gradient, body }) {
 </html>`;
 }
 
+/**
+ * Genera un botón CTA estilizado.
+ *
+ * @param {string} url     URL destino del botón.
+ * @param {string} label   Texto del botón.
+ * @param {string} [color] Color de fondo (por defecto morado).
+ * @returns {string}       Snippet HTML del botón.
+ */
 function emailButton(url, label, color = '#6366f1') {
     return `<div style="text-align:center;margin:28px 0;">
       <a href="${url}" style="display:inline-block;background:${color};color:white;font-size:16px;font-weight:600;padding:14px 36px;border-radius:12px;text-decoration:none;">${label}</a>
     </div>`;
 }
 
+/**
+ * Nota legal corta indicando que el enlace expira en 24 h.
+ *
+ * @returns {string} Snippet HTML de la nota.
+ */
 function expiryNote() {
     return `<p style="color:#94a3b8;font-size:12px;text-align:center;margin:16px 0 0;">Este enlace expira en 24 horas. Si no has solicitado esto, puedes ignorar este email.</p>`;
 }
 
-/* --- Route handler: POST /api/notifications/welcome-email --- */
+/**
+ * POST /api/notifications/welcome-email
+ *
+ * Envía el email de bienvenida tras el registro. Nunca falla la respuesta
+ * por errores de envío: devuelve `{ sent: false }` para que el cliente
+ * pueda reintentarlo o ignorarlo según convenga.
+ *
+ * @param {import('express').Request}  req Petición con `{ email, fullName }`.
+ * @param {import('express').Response} res Respuesta JSON estándar.
+ */
 const sendWelcomeEmail = async (req, res) => {
     try {
         const { email, fullName } = req.body;
@@ -141,7 +212,18 @@ const sendWelcomeEmail = async (req, res) => {
     }
 };
 
-/* --- Supabase Auth Hook: POST /api/notifications/auth-email --- */
+/**
+ * POST /api/notifications/auth-email
+ *
+ * Hook de Supabase Auth: recibe los eventos de signup, magiclink, recovery
+ * y email_change y envía emails personalizados con la marca PawMate en lugar
+ * de los emails por defecto de Supabase.
+ *
+ * Verifica la firma JWT del webhook usando `SUPABASE_AUTH_HOOK_SECRET`.
+ *
+ * @param {import('express').Request}  req Petición del webhook de Supabase.
+ * @param {import('express').Response} res Respuesta acorde al contrato del hook.
+ */
 const handleAuthEmail = async (req, res) => {
     try {
         const hookSecret = process.env.SUPABASE_AUTH_HOOK_SECRET;
@@ -322,7 +404,14 @@ const handleAuthEmail = async (req, res) => {
     }
 };
 
-/* --- Route handler: POST /api/notifications/ban-email --- */
+/**
+ * POST /api/notifications/ban-email
+ *
+ * Notifica al usuario que su cuenta ha sido suspendida por el equipo de soporte.
+ *
+ * @param {import('express').Request}  req Petición con `{ email, fullName }`.
+ * @param {import('express').Response} res Respuesta JSON estándar.
+ */
 const sendBanEmail = async (req, res) => {
     try {
         const { email, fullName } = req.body;

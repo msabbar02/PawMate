@@ -1,4 +1,16 @@
-﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
+﻿/**
+ * Página del panel principal del administrador.
+ *
+ * Carga en paralelo usuarios, mascotas, reservas y reportes; permite
+ * filtrar por ventana temporal (1h/24h/7d/30d/all/personalizada) y por
+ * roles, especies, estados, tipos de servicio y verificación. Calcula
+ * KPIs (totales, deltas, tendencia vs período anterior, conversión,
+ * cancelaciones, ticket medio, ingresos), construye series temporales
+ * y un mapa de calor de actividad, y muestra un feed unificado de
+ * eventos. Se suscribe a Realtime para refrescos automáticos con
+ * debounce y se reactiva tras `pawmate:wake`.
+ */
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
@@ -16,7 +28,7 @@ import {
 } from 'recharts';
 import './DashboardPage.css';
 
-// ── Time-window options (in ms) ────────────────────────────────────────────
+// Opciones de ventana temporal (en milisegundos).
 const WINDOWS = [
     { key: '1h',  ms: 60 * 60 * 1000 },
     { key: '24h', ms: 24 * 60 * 60 * 1000 },
@@ -42,6 +54,15 @@ const STATUS_COLORS = {
     rechazada: '#ef4444',
 };
 
+/**
+ * Devuelve `true` si la fecha ISO cae dentro de la ventana definida por
+ * `sinceMs` (timestamp inferior). `Number.POSITIVE_INFINITY` significa
+ * "sin límite" (toda la historia).
+ *
+ * @param {string|null|undefined} iso     Fecha ISO 8601.
+ * @param {number}                sinceMs Marca temporal mínima en ms.
+ * @returns {boolean}
+ */
 const inWindow = (iso, sinceMs) => {
     if (!iso) return false;
     if (!Number.isFinite(sinceMs)) return true;
@@ -49,13 +70,27 @@ const inWindow = (iso, sinceMs) => {
     return Number.isFinite(t) && t >= sinceMs;
 };
 
+/**
+ * Normaliza una fecha al inicio de su día local (00:00:00.000).
+ * @param {Date|string|number} d
+ * @returns {Date}
+ */
 const startOfDay = (d) => {
     const x = new Date(d);
     x.setHours(0, 0, 0, 0);
     return x;
 };
 
-// Build [{date, label, users, reservations, pets}] for the last N days
+/**
+ * Construye buckets diarios de los últimos `days` días con conteos de
+ * usuarios, reservas y mascotas según su `created_at`.
+ *
+ * @param {number}   days         Número de días hacia atrás.
+ * @param {Object[]} users        Usuarios.
+ * @param {Object[]} reservations Reservas.
+ * @param {Object[]} pets         Mascotas.
+ * @returns {Array<{date:string,label:string,users:number,reservations:number,pets:number}>}
+ */
 const buildDailySeries = (days, users, reservations, pets) => {
     const today = startOfDay(new Date());
     const buckets = [];
@@ -81,6 +116,12 @@ const buildDailySeries = (days, users, reservations, pets) => {
     return buckets;
 };
 
+/**
+ * Agrupa una colección por una propiedad y devuelve `{name, value}`.
+ * @param {Object[]} arr
+ * @param {string}   key
+ * @returns {Array<{name:string,value:number}>}
+ */
 const groupBy = (arr, key) => {
     const out = {};
     arr.forEach(it => {
@@ -90,7 +131,12 @@ const groupBy = (arr, key) => {
     return Object.entries(out).map(([name, value]) => ({ name, value }));
 };
 
-// Build a 14-day spark series for a given collection (counting created_at)
+/**
+ * Construye una serie de N días para una sparkline contando creaciones.
+ * @param {Object[]} items
+ * @param {number}   [days=14]
+ * @returns {Array<{v:number,t:number}>}
+ */
 const sparkSeries = (items, days = 14) => {
     const today = startOfDay(new Date());
     const arr = Array.from({ length: days }, (_, i) => {
@@ -107,11 +153,14 @@ const sparkSeries = (items, days = 14) => {
     return arr;
 };
 
-// ── Reusable stat card with window delta + previous period + sparkline ──
+/**
+ * Tarjeta de KPI reutilizable: muestra total, delta en ventana, %
+ * sobre el total, sparkline opcional y tendencia vs período anterior.
+ */
 function StatCard({ icon, color, bg, title, total, inWindowCount, prevWindowCount, windowKey, sparkline, onClick }) {
     const { t } = useTranslation();
     const pct = total > 0 ? Math.round((inWindowCount / total) * 100) : 0;
-    // Trend vs previous period
+    // Tendencia respecto al período anterior.
     let trendPct = null;
     if (prevWindowCount != null) {
         if (prevWindowCount === 0 && inWindowCount > 0) trendPct = 100;
@@ -160,7 +209,10 @@ function StatCard({ icon, color, bg, title, total, inWindowCount, prevWindowCoun
     );
 }
 
-// Multi-select filter group: clicking a non-"all" chip toggles it; "all" clears
+/**
+ * Grupo de chips de filtro multi-selección. Pulsar `all` resetea el
+ * grupo; pulsar otro chip lo añade/quita y desactiva `all`.
+ */
 function FilterGroup({ label, options, selected, onChange }) {
     const toggle = (v) => {
         const next = new Set(selected);
@@ -189,7 +241,9 @@ function FilterGroup({ label, options, selected, onChange }) {
     );
 }
 
-// Top performers card with tabs (Caregivers / Owners) and revenue bars
+/**
+ * Tarjeta con ranking de mejores cuidadores/dueños y barras de ingresos.
+ */
 function TopPerformersCard({ caregivers, owners, onSelect }) {
     const { t } = useTranslation();
     const [tab, setTab] = useState('caregivers');
@@ -264,6 +318,10 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    /**
+     * Carga en paralelo las cuatro colecciones del panel.
+     * @param {{silent?: boolean}} [opts]
+     */
     const fetchAll = useCallback(async (opts = {}) => {
         if (opts.silent) setRefreshing(true);
         try {
@@ -288,7 +346,7 @@ export default function DashboardPage() {
     useEffect(() => {
         fetchAll();
 
-        // ── Realtime auto-refresh (debounced) ──
+        // Recarga automática en tiempo real (con debounce).
         let debounceTimer = null;
         const debouncedFetch = () => {
             clearTimeout(debounceTimer);
@@ -301,7 +359,7 @@ export default function DashboardPage() {
                 .subscribe()
         );
 
-        // Refetch when the tab wakes up after being idle
+        // Recarga al volver al foco tras estar inactivo.
         const onWake = () => fetchAll({ silent: true });
         window.addEventListener('pawmate:wake', onWake);
 
@@ -312,7 +370,7 @@ export default function DashboardPage() {
         };
     }, [fetchAll]);
 
-    // ── Derived data ───────────────────────────────────────────────────────
+    // Datos derivados del estado principal.
     const usingCustomRange = !!(customRange.from && customRange.to);
 
     const sinceMs = useMemo(() => {
@@ -326,7 +384,7 @@ export default function DashboardPage() {
         return Date.now();
     }, [customRange, usingCustomRange]);
 
-    // Updated inWindow that respects [sinceMs, untilMs]
+    /** Filtro de rango temporal cerrado [sinceMs, untilMs]. */
     const inRange = (iso) => {
         if (!iso) return false;
         if (!Number.isFinite(sinceMs)) return true;
@@ -334,7 +392,7 @@ export default function DashboardPage() {
         return Number.isFinite(t) && t >= sinceMs && t <= untilMs;
     };
 
-    // Previous-period boundaries for trend comparison
+    // Límites del período anterior para comparación de tendencias.
     const prevWindow = useMemo(() => {
         if (usingCustomRange) {
             const span = untilMs - sinceMs;
@@ -344,13 +402,14 @@ export default function DashboardPage() {
         if (!Number.isFinite(w.ms)) return null;
         return { from: Date.now() - 2 * w.ms, to: Date.now() - w.ms };
     }, [windowKey, usingCustomRange, sinceMs, untilMs]);
+    /** True si la fecha cae en el período anterior (para tendencias). */
     const inPrev = (iso) => {
         if (!prevWindow || !iso) return false;
         const t = new Date(iso).getTime();
         return t >= prevWindow.from && t < prevWindow.to;
     };
 
-    // Multi-set helpers
+    /** Comprueba si un valor pasa por un Set con semántica `all` = todos. */
     const matchSet = (set, value) => set.has('all') || set.has(value);
 
     const filteredUsers = useMemo(() => (
@@ -381,13 +440,13 @@ export default function DashboardPage() {
     const reportsInWindow = useMemo(() => reports.filter(r => inRange(r.created_at)), [reports, sinceMs, untilMs]); // eslint-disable-line
     const onlineCaregivers = useMemo(() => users.filter(u => u.role === 'caregiver' && u.isOnline).length, [users]);
 
-    // Previous-period counts (for trend % vs previous window)
+    // Conteos del período anterior (para el % de tendencia).
     const prevUsers = useMemo(() => prevWindow ? filteredVerifUsers.filter(u => inPrev(u.created_at)).length : null, [prevWindow, filteredVerifUsers]); // eslint-disable-line
     const prevPets = useMemo(() => prevWindow ? filteredPets.filter(p => inPrev(p.created_at)).length : null, [prevWindow, filteredPets]); // eslint-disable-line
     const prevReservations = useMemo(() => prevWindow ? filteredReservations.filter(r => inPrev(r.created_at)).length : null, [prevWindow, filteredReservations]); // eslint-disable-line
     const prevReports = useMemo(() => prevWindow ? reports.filter(r => inPrev(r.created_at)).length : null, [prevWindow, reports]); // eslint-disable-line
 
-    // Alerts (always-current counters)
+    // Alertas (contadores siempre actuales).
     const pendingVerifications = useMemo(() => users.filter(u => u.verificationStatus === 'pending').length, [users]);
     const pendingReports = useMemo(() => reports.filter(r => (r.status || 'pending') === 'pending').length, [reports]);
     const bannedUsers = useMemo(() => users.filter(u => u.is_banned).length, [users]);
@@ -400,7 +459,7 @@ export default function DashboardPage() {
         return buildDailySeries(days, filteredVerifUsers, filteredReservations, filteredPets);
     }, [windowKey, filteredVerifUsers, filteredReservations, filteredPets]);
 
-    // Daily revenue series (for ComposedChart)
+    // Serie de ingresos diarios para el gráfico compuesto.
     const dailyRevenue = useMemo(() => {
         const map = new Map(dailySeries.map(d => [d.date, 0]));
         filteredReservations.forEach(r => {
@@ -425,7 +484,7 @@ export default function DashboardPage() {
         return filtered.slice(0, 8);
     }, [reservations, activitySearch]);
 
-    // ── Unified activity feed (users + pets + reservations + reports + payments) ──
+    // Feed de actividad unificado (usuarios, mascotas, reservas, reportes, pagos).
     const activityFeed = useMemo(() => {
         const events = [];
         users.forEach(u => events.push({
@@ -448,7 +507,7 @@ export default function DashboardPage() {
                 status: r.status,
                 entityId: r.id,
             });
-            // Payment event when totalPrice > 0 and accepted/completed
+            // Evento de pago cuando totalPrice > 0 y la reserva fue aceptada/completada.
             if ((r.status === 'aceptada' || r.status === 'completada' || r.status === 'completed') && Number(r.totalPrice) > 0) {
                 events.push({
                     id: `pay-${r.id}`, type: 'payment', ts: r.created_at,
@@ -477,7 +536,7 @@ export default function DashboardPage() {
         reservationsInWindow.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0)
     ), [reservationsInWindow]);
 
-    // ── KPIs ─────────────────────────────────────────────────────────────
+    // KPIs principales.
     const completedRes = useMemo(() => reservations.filter(r => r.status === 'completada' || r.status === 'aceptada' || r.status === 'completed'), [reservations]);
     const cancelledRes = useMemo(() => reservations.filter(r => r.status === 'cancelada' || r.status === 'rechazada' || r.status === 'cancelled'), [reservations]);
     const conversionRate = reservations.length > 0
@@ -487,7 +546,7 @@ export default function DashboardPage() {
     const avgTicket = completedRes.length > 0
         ? completedRes.reduce((s, r) => s + (Number(r.totalPrice) || 0), 0) / completedRes.length : 0;
 
-    // ── Top performers (caregivers / owners) ──────────────────────────────────────
+    // Mejores cuidadores y dueños.
     const topCaregivers = useMemo(() => {
         const map = new Map();
         reservations.forEach(r => {
@@ -511,13 +570,13 @@ export default function DashboardPage() {
         return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 5);
     }, [reservations]);
 
-    // ── Activity heatmap: 7 days × 24 hours (booking creation count) ──────
+    // Mapa de calor de actividad: 7 días × 24 horas (conteo de reservas creadas).
     const heatmap = useMemo(() => {
         const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
         reservations.forEach(r => {
             if (!r.created_at) return;
             const d = new Date(r.created_at);
-            const day = (d.getDay() + 6) % 7; // Monday=0
+            const day = (d.getDay() + 6) % 7; // Lunes=0
             const hour = d.getHours();
             grid[day][hour]++;
         });
@@ -525,7 +584,7 @@ export default function DashboardPage() {
         return { grid, max };
     }, [reservations]);
 
-    // ── Export CSV (daily series) ───────────────────────────────────────────────
+    /** Descarga la serie diaria como CSV. */
     const exportCsv = () => {
         const rows = [['date', 'users', 'reservations', 'pets']];
         dailySeries.forEach(d => rows.push([d.date, d.users, d.reservations, d.pets]));
@@ -589,7 +648,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* ── Top stat cards ─────────────────────────────────────────── */}
+            {/* Tarjetas superiores de KPIs */}
             <div className="stats-grid">
                 <StatCard icon={faUsers} color="#3b82f6" bg="rgba(59,130,246,0.18)"
                     title={t('dashboard.totalUsers')} total={filteredVerifUsers.length}
@@ -620,7 +679,7 @@ export default function DashboardPage() {
                     onClick={() => navigate('/reservations')} />
             </div>
 
-            {/* ── 4-quadrant layout ──────────────────────────────────────── */}
+            {/* Distribución en 4 cuadrantes */}
             <div className="quad-grid">
 
                 {/* ─── Q1 · USUARIOS (azul) ────────────────────────────── */}
@@ -808,7 +867,7 @@ export default function DashboardPage() {
 
             </div>
 
-            {/* ── Recent activity ────────────────────────────────────────── */}
+            {/* Actividad reciente */}
             <div className="dashboard-sections">
                 <div className="recent-activity glass-panel">
                     <div className="section-header section-header-row">

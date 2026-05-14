@@ -1,3 +1,11 @@
+﻿/**
+ * Página de gestión de administradores.
+ *
+ * Lista todos los usuarios con `role = 'admin'`, permite crear nuevos
+ * (signup en Supabase Auth + upsert en `users` con rol admin) y
+ * degradar a otros admins a usuario normal. El admin actual no puede
+ * autoeliminarse.
+ */
 import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from '../config/supabase';
 import { AuthContext } from '../context/AuthContext';
@@ -25,6 +33,7 @@ export default function AdminsPage() {
         fetchAdmins();
     }, []);
 
+    /** Carga la lista de administradores desde la tabla `users`. */
     const fetchAdmins = async () => {
         setLoading(true);
         try {
@@ -40,6 +49,13 @@ export default function AdminsPage() {
         setLoading(false);
     };
 
+    /**
+     * Crea un nuevo administrador: signup en Supabase Auth y upsert en
+     * la tabla `users` con `role = 'admin'`. Valida campos requeridos
+     * y longitud mínima de contraseña (6 caracteres).
+     *
+     * @param {React.FormEvent} e
+     */
     const handleCreateAdmin = async (e) => {
         e.preventDefault();
         setCreating(true);
@@ -53,7 +69,7 @@ export default function AdminsPage() {
                 throw new Error(t('admins.passwordMinLength'));
             }
 
-            // Create auth user via Supabase
+            // Crea el usuario en Supabase Auth.
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: newAdmin.email.trim().toLowerCase(),
                 password: newAdmin.password,
@@ -62,7 +78,7 @@ export default function AdminsPage() {
             if (authError) throw authError;
 
             if (authData.user) {
-                // Insert into users table with admin role
+                // Inserta el usuario en la tabla users con rol admin.
                 const { error: insertError } = await supabase.from('users').upsert({
                     id: authData.user.id,
                     email: newAdmin.email.trim().toLowerCase(),
@@ -85,6 +101,12 @@ export default function AdminsPage() {
         setCreating(false);
     };
 
+    /**
+     * Degrada un administrador a usuario normal. Bloquea la auto-eliminación
+     * y pide confirmación antes de aplicar el cambio.
+     *
+     * @param {{id:string, fullName?:string, email?:string}} user
+     */
     const handleRemoveAdmin = async (user) => {
         if (user.id === adminUser?.id) {
             setMessage({ text: t('admins.cannotRemoveSelf'), type: 'error' });

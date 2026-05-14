@@ -1,12 +1,24 @@
+﻿/**
+ * Controlador de autenticación: verificación de token y obtención del perfil propio.
+ *
+ * Limpia siempre los campos sensibles (URLs de documentos KYC, tokens push)
+ * antes de devolver datos del usuario al cliente.
+ */
 const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
-// Verification document URLs and other sensitive fields never sent back to client
+/** Campos que nunca deben enviarse al cliente. */
 const SENSITIVE_FIELDS = [
     'idFrontUrl', 'idBackUrl', 'selfieUrl', 'certDocUrl',
     'fcmToken', 'expoPushToken',
 ];
 
+/**
+ * Devuelve una copia del usuario sin los campos sensibles.
+ *
+ * @param {Object|null} user Registro de usuario tal y como viene de Supabase.
+ * @returns {Object|null}    Mismo objeto sin URLs de documentos ni tokens push.
+ */
 function stripSensitive(user) {
     if (!user) return user;
     const clean = { ...user };
@@ -15,8 +27,13 @@ function stripSensitive(user) {
 }
 
 /**
- * Verify user token
  * POST /api/auth/verify-token
+ *
+ * Comprueba que el JWT recibido en el cuerpo es válido para Supabase Auth.
+ * Útil para validar el token desde clientes que no usan el middleware estándar.
+ *
+ * @param {import('express').Request}  req Petición con `{ token }` en el cuerpo.
+ * @param {import('express').Response} res Respuesta JSON estándar.
  */
 const verifyToken = async (req, res) => {
     try {
@@ -40,8 +57,12 @@ const verifyToken = async (req, res) => {
 };
 
 /**
- * Get user profile (own)
  * GET /api/auth/profile
+ *
+ * Devuelve el perfil del usuario autenticado, sin campos sensibles.
+ *
+ * @param {import('express').Request}  req Petición autenticada (`req.user` poblado).
+ * @param {import('express').Response} res Respuesta JSON estándar.
  */
 const getProfile = async (req, res) => {
     try {

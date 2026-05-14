@@ -1,4 +1,12 @@
-﻿import React, { createContext, useState, useEffect, useRef } from 'react';
+﻿/**
+ * Contexto de autenticación del panel de administración.
+ *
+ * Gestiona la sesión Supabase, restringe el acceso a usuarios con rol
+ * `admin`, mantiene la sesión viva al volver de inactividad refrescando
+ * el JWT y reconectando el websocket de Realtime, y expone helpers para
+ * login/logout/recarga de perfil al resto de la app.
+ */
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 
@@ -11,6 +19,13 @@ export const AuthProvider = ({ children }) => {
     const initDone = useRef(false);
     const { t } = useTranslation();
 
+    /**
+     * Carga el perfil del usuario desde la tabla `users` y solo lo expone
+     * si su rol es `admin`. Devuelve el perfil o `null`.
+     *
+     * @param {{ id: string }} authUser Usuario devuelto por Supabase Auth.
+     * @returns {Promise<Object|null>}  Perfil de admin o null.
+     */
     const fetchAdminProfile = async (authUser) => {
         if (!authUser) { setAdminUser(null); return null; }
         try {
@@ -27,6 +42,7 @@ export const AuthProvider = ({ children }) => {
         } catch { return null; }
     };
 
+    // Inicialización de la sesión + suscripción a cambios de Auth.
     useEffect(() => {
         let timeout;
 
@@ -54,10 +70,10 @@ export const AuthProvider = ({ children }) => {
             }
         };
 
-        // Safety timeout — never stay on blank screen
+        // Salvavidas: si la inicialización tarda más de 5 s, libera la UI igualmente.
         timeout = setTimeout(() => {
             if (!initDone.current) {
-                console.warn('Auth init timeout — forcing load');
+                console.warn('Auth init timeout — forzando carga');
                 setLoading(false);
             }
         }, 5000);
@@ -65,7 +81,7 @@ export const AuthProvider = ({ children }) => {
         initAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            // Skip the initial event — handled by initAuth
+            // Ignora el primer evento, ya cubierto por initAuth.
             if (!initDone.current) return;
 
             if (event === 'SIGNED_OUT') {
@@ -88,8 +104,12 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
-    // ── Wake-up handler: if the tab was hidden for >30s, refresh the session
-    //    and reconnect realtime so navigations don't hang on a stale socket. ──
+    /*
+     * Manejo de reactivación del tab.
+     * Si el navegador estuvo más de 30 s oculto/sin red, refresca el JWT
+     * y reconecta Realtime; emite el evento `pawmate:wake` para que las
+     * páginas vuelvan a pedir datos frescos sin recargar entera la app.
+     */
     useEffect(() => {
         let lastHiddenAt = 0;
         let waking = false;
@@ -98,19 +118,17 @@ export const AuthProvider = ({ children }) => {
             if (waking) return;
             waking = true;
             try {
-                // Refresh JWT in case it expired while the tab was hidden
+                // Refresca el JWT con un tope duro de 4 s para no bloquear la UI.
                 await Promise.race([
                     supabase.auth.refreshSession(),
-                    new Promise((resolve) => setTimeout(resolve, 4000)), // hard cap
+                    new Promise((resolve) => setTimeout(resolve, 4000)),
                 ]);
-                // Tear down and reopen the realtime websocket
                 try {
                     supabase.realtime.disconnect();
                     supabase.realtime.connect();
                 } catch (err) {
                     console.warn('Realtime reconnect failed:', err);
                 }
-                // Tell pages they can refetch fresh data
                 window.dispatchEvent(new Event('pawmate:wake'));
             } catch (err) {
                 console.warn('Wake-up refresh failed:', err);
@@ -142,16 +160,23 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
+    /**
+     * Inicia sesión contra Supabase y verifica que el usuario es admin.
+     * Si no lo es cierra la sesión inmediatamente para no exponer datos.
+     *
+     * @param {string} email    Email del administrador.
+     * @param {string} password Contraseña.
+     * @returns {Promise<{success: boolean, message?: string}>}
+     */
     const login = async (email, password) => {
         try {
             const trimmedEmail = email.trim().toLowerCase();
-            const { data, error } = await supabase.auth.signInWithPassword({ 
-                email: trimmedEmail, 
-                password 
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: trimmedEmail,
+                password
             });
             if (error) return { success: false, message: error.message };
 
-            // Check admin role in users table
             const { data: profile, error: profileError } = await supabase
                 .from('users')
                 .select('*')
@@ -170,12 +195,14 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    /** Cierra la sesión actual y limpia el estado. */
     const logout = async () => {
         await supabase.auth.signOut();
         setAdminUser(null);
         setIsAuthenticated(false);
     };
 
+    /** Vuelve a leer el perfil del admin desde Supabase (tras editarlo). */
     const refreshProfile = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();

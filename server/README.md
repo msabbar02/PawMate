@@ -4,11 +4,12 @@ API REST para la plataforma PawMate.
 
 ## Tecnologías
 
-- **Node.js** + **Express**
-- **Supabase** (Auth JWT + PostgreSQL con service key)
-- **Resend 6.x** (API de email transaccional cloud)
-- **Stripe** (pagos, reembolsos y webhooks)
-- **express-rate-limit** (protección contra abuso de API — 200 req/15 min)
+- **Node.js** + **Express 4**
+- **Supabase** (Auth JWT + PostgreSQL con service key — bypass de RLS para tareas administrativas)
+- **Resend 6.x** (API de email transaccional cloud, cliente singleton)
+- **Stripe 20.x** (PaymentIntent, reembolsos y webhooks con verificación de firma)
+- **helmet 8.x** (cabeceras HTTP de seguridad: CSP, HSTS, X-Frame-Options, etc.)
+- **express-rate-limit 8.x** (rate-limit global + endpoints sensibles)
 - **jsonwebtoken** (verificación del hook de Supabase Auth)
 - **CORS** + **dotenv**
 
@@ -85,11 +86,19 @@ server/
 
 ## Seguridad
 
-- **Rate limiting**: 200 req / 15 min por IP en todas las rutas `/api/*`
-- **Campos sensibles**: `idFrontUrl`, `idBackUrl`, `selfieUrl`, `certDocUrl`, `fcmToken`, `expoPushToken` nunca se exponen a otros usuarios
-- **Pago idempotente**: verifica que la reserva no esté ya pagada antes de crear un PaymentIntent
-- **Doble reembolso**: previene reembolsos duplicados verificando `paymentStatus !== 'refunded'`
-- **Stripe webhook**: verifica firma con `STRIPE_WEBHOOK_SECRET`; raw body parser en `/api/payments/webhook`
+- **Helmet** activo: CSP mínima, HSTS, `X-Frame-Options`, `Referrer-Policy`, etc. Si el paquete no está instalado el servidor sigue arrancando con un warning.
+- **Rate limiting** por familia de endpoints:
+  - `/api/*` — 200 req / 15 min (global, `/api/health` exento).
+  - `/api/auth/*` — 20 req / 5 min (anti fuerza bruta).
+  - `/api/payments/payment-intent` y `/api/payments/refund` — 10 req / 1 min.
+- **Stripe webhook**: verifica la firma con `STRIPE_WEBHOOK_SECRET` y usa raw-body parser. En producción la firma es **obligatoria**: si falta el secret responde `503`. Si la actualización en BD falla devuelve `500` para que Stripe reintente con backoff. **No** marca automáticamente la reserva como `aceptada`; sólo actualiza `paymentStatus = 'paid'` (la aceptación queda en manos del cuidador).
+- **Borrado de cuenta** (`DELETE /api/users/:id`): primero borra en Supabase Auth (el `ON DELETE CASCADE` limpia `public.users` automáticamente), evitando dejar cuentas zombie.
+- **Manejo de errores**: en producción sólo se devuelven mensajes genéricos por familia HTTP (`Internal Server Error`, `Forbidden`, etc.). Nunca se filtra `err.message` interno ni stack al cliente.
+- **Resend** se instancia una sola vez (singleton lazy) en lugar de crear un cliente por envío.
+- **Campos sensibles**: `idFrontUrl`, `idBackUrl`, `selfieUrl`, `certDocUrl`, `fcmToken`, `expoPushToken` nunca se exponen a otros usuarios.
+- **Pago idempotente**: verifica que la reserva no esté ya pagada antes de crear un PaymentIntent.
+- **Doble reembolso**: previene reembolsos duplicados verificando `paymentStatus !== 'refunded'`.
+- **RLS** activa en todas las tablas (ver `supabase_schema.sql`). El servidor usa la service key para operaciones administrativas que exigen bypass.
 
 ## Instalación
 

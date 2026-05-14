@@ -1,13 +1,18 @@
-﻿const express = require('express');
+﻿/**
+ * Rutas de pago (Stripe).
+ *
+ * - POST /webhook         Webhook de Stripe (sin auth, cuerpo raw).
+ * - POST /payment-intent  Crea un PaymentIntent (autenticada).
+ * - POST /refund          Solicita un reembolso (autenticada).
+ */
+const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/payment.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
 
-// Stripe webhook — must use raw body (set in index.js before express.json)
-// No auth middleware: Stripe calls this, not the app user
+// Stripe llama a este endpoint, no el usuario; el cuerpo raw se configura en index.js.
 router.post('/webhook', paymentController.handleStripeWebhook);
 
-// Protected payment routes
 router.post('/payment-intent', verifyToken, paymentController.createPaymentIntent);
 router.post('/refund', verifyToken, paymentController.refundPayment);
 

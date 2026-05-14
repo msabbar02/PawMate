@@ -41,7 +41,7 @@ export default function CaregiverSetupScreen({ navigation }) {
     const [serviceRadius, setServiceRadius] = useState(String(userData?.serviceRadius || '5'));
 
     const [selectedServices, setSelectedServices] = useState(userData?.serviceTypes || []);
-    // Migrate any legacy 'perro'/'gato' to canonical 'dog'/'cat'
+    // Migra las claves antiguas en español ('perro'/'gato') a las canónicas en inglés.
     const normalizeSpecies = (arr) => (arr || []).map(v => v === 'perro' ? 'dog' : v === 'gato' ? 'cat' : v === 'ave' ? 'bird' : v === 'reptil' ? 'other' : v);
     const [acceptedSpecies, setAcceptedSpecies] = useState(normalizeSpecies(userData?.acceptedSpecies));
 

@@ -60,7 +60,7 @@ export default function HomeScreen({ navigation }) {
     const [selectedCaregiver, setSelectedCaregiver] = useState(null);
     const realtimeRefs = useRef([]);
 
-    // Walk from Home state
+    // Estado del paseo iniciado desde Home.
     const [myDogs, setMyDogs] = useState([]);
     const [showDogPicker, setShowDogPicker] = useState(false);
     const [isWalking, setIsWalking] = useState(false);
@@ -106,7 +106,7 @@ export default function HomeScreen({ navigation }) {
         } catch { /* ignore */ }
     };
 
-    // Realtime channels
+    // Canales Realtime: sincroniza el estado de cuidadores en línea.
     useEffect(() => {
         const ts = Date.now();
         const cgChannel = supabase.channel(`caregivers-online-${ts}`)
@@ -190,7 +190,7 @@ export default function HomeScreen({ navigation }) {
             Alert.alert(t('home.activeWalk'), t('home.activeWalkMsg'));
             return;
         }
-        // Fetch dogs and show picker
+        // Carga los perros del usuario y muestra el selector.
         (async () => {
             if (!user?.id) return;
             const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).eq('species', 'dog');

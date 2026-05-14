@@ -1,9 +1,21 @@
+/**
+ * Controlador CRUD de mascotas.
+ *
+ * Todas las operaciones están autenticadas y cada usuario solo puede leer
+ * y modificar sus propias mascotas. Se valida la propiedad antes de cada
+ * lectura/actualización/borrado y se filtran los campos permitidos en el
+ * cuerpo para evitar inyección de columnas arbitrarias.
+ */
 const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
 /**
- * Get all pets for a user
  * GET /api/pets
+ *
+ * Devuelve todas las mascotas del usuario autenticado.
+ *
+ * @param {import('express').Request}  req Petición autenticada.
+ * @param {import('express').Response} res Lista de mascotas.
  */
 const getAllPets = async (req, res) => {
     try {
@@ -22,8 +34,12 @@ const getAllPets = async (req, res) => {
 };
 
 /**
- * Get pet by ID
  * GET /api/pets/:id
+ *
+ * Devuelve una mascota por id, comprobando que pertenece al usuario.
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`.
+ * @param {import('express').Response} res Datos de la mascota.
  */
 const getPetById = async (req, res) => {
     try {
@@ -50,8 +66,8 @@ const getPetById = async (req, res) => {
 };
 
 /**
- * Create new pet
- * POST /api/pets
+ * Lista blanca de campos editables/insertables en la tabla `pets`.
+ * Cualquier campo fuera de esta lista se ignora silenciosamente.
  */
 const ALLOWED_PET_FIELDS = [
     'name', 'species', 'breed', 'birthDate', 'birthdate', 'weight', 'gender', 'sex',
@@ -59,6 +75,14 @@ const ALLOWED_PET_FIELDS = [
     'neutered', 'medicalNotes', 'allergies', 'medications',
 ];
 
+/**
+ * POST /api/pets
+ *
+ * Crea una nueva mascota asociada al usuario autenticado.
+ *
+ * @param {import('express').Request}  req Cuerpo con campos de la mascota (filtrados por whitelist).
+ * @param {import('express').Response} res Mascota creada.
+ */
 const createPet = async (req, res) => {
     try {
         const petData = { ownerId: req.user.uid };
@@ -82,8 +106,13 @@ const createPet = async (req, res) => {
 };
 
 /**
- * Update pet
  * PUT /api/pets/:id
+ *
+ * Actualiza una mascota tras verificar que es del usuario. Si no se envía
+ * ningún campo válido devuelve 400.
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`. Cuerpo: campos a actualizar.
+ * @param {import('express').Response} res Resultado de la actualización.
  */
 const updatePet = async (req, res) => {
     try {
@@ -126,8 +155,12 @@ const updatePet = async (req, res) => {
 };
 
 /**
- * Delete pet
  * DELETE /api/pets/:id
+ *
+ * Elimina una mascota tras verificar que pertenece al usuario.
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`.
+ * @param {import('express').Response} res Resultado del borrado.
  */
 const deletePet = async (req, res) => {
     try {

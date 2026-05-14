@@ -1,3 +1,9 @@
+/**
+ * Inicialización de i18next para el panel de administración.
+ *
+ * Carga los catálogos español/inglés y aplica el idioma guardado en
+ * `localStorage` (`@pawmate_admin_lang`). El fallback es `es`.
+ */
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import es from './es.json';

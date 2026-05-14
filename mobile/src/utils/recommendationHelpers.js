@@ -1,10 +1,12 @@
 import { supabase } from '../config/supabase';
 
 /**
- * Update user species preference after a like/unlike action.
- * @param {string} uid - User ID
- * @param {string} species - Species tag (e.g. 'dog', 'cat')
- * @param {number} delta - +1 for like, -1 for unlike
+ * Actualiza el contador de preferencias de un usuario sobre una especie
+ * concreta. Se usa cuando el usuario da o quita un "like" a una mascota.
+ *
+ * @param {string} uid     Identificador del usuario.
+ * @param {string} species Etiqueta de la especie (dog, cat, etc.).
+ * @param {number} delta   +1 al dar like, -1 al retirarlo.
  */
 export const updatePreference = async (uid, species, delta) => {
     if (!uid || !species) return;
@@ -33,9 +35,11 @@ export const updatePreference = async (uid, species, delta) => {
 };
 
 /**
- * Get top preferred species for a user, sorted by count descending.
- * @param {string} uid - User ID
- * @returns {Array<{species: string, count: number}>}
+ * Devuelve las especies preferidas del usuario ordenadas de mayor a menor
+ * por el contador acumulado.
+ *
+ * @param {string} uid Identificador del usuario.
+ * @returns {Promise<Array<{species: string, count: number}>>}
  */
 export const getTopPreferences = async (uid) => {
     if (!uid) return [];
@@ -46,7 +50,7 @@ export const getTopPreferences = async (uid) => {
             .eq('userId', uid)
             .gt('count', 0)
             .order('count', { ascending: false });
-        
+
         return data || [];
     } catch (e) {
         return [];

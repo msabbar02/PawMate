@@ -1,4 +1,12 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿/**
+ * Página de logs del sistema.
+ *
+ * Suscripción en tiempo real a `system_logs` (canal Realtime de Supabase),
+ * carga inicial de los últimos 300 registros, panel de "usuarios activos
+ * ahora" calculado a partir de los logins/logouts de los últimos 5 minutos
+ * (refresco automático cada 30 s) y filtros por texto y tipo de acción.
+ */
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -25,12 +33,19 @@ const ACTION_META = {
 
 const DETAIL_LABELS = {
     event: 'Evento', platform: 'Plataforma', version: 'Versión',
-    totalkmm: 'Distancia (km)', totalkm: 'Distancia (km)', distance: 'Distancia (km)',
+    totalKm: 'Distancia (km)', totalkmm: 'Distancia (km)', totalkm: 'Distancia (km)', distance: 'Distancia (km)',
     calories: 'Calorías', petName: 'Mascota', duration: 'Duración (s)',
     steps: 'Pasos', reason: 'Motivo', type: 'Tipo',
     serviceType: 'Servicio', status: 'Estado', role: 'Rol', amount: 'Importe',
 };
 
+/**
+ * Convierte el JSON de detalles de un log en una cadena legible
+ * traduciendo claves al español con `DETAIL_LABELS`.
+ *
+ * @param {string|null|undefined} raw
+ * @returns {string|null}
+ */
 function formatDetails(raw) {
     if (!raw) return null;
     try {
@@ -43,10 +58,12 @@ function formatDetails(raw) {
     }
 }
 
+/** Devuelve los metadatos visuales de un tipo de acción (icono/color/etiqueta). */
 function actionMeta(actionType) {
     return ACTION_META[actionType] || { icon: faCircleInfo, color: '#94a3b8', label: actionType };
 }
 
+/** Devuelve un texto relativo ("hace 5m", "hace 2h"...) a partir de una fecha. */
 function timeAgo(date) {
     if (!date) return '';
     const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -73,6 +90,7 @@ export default function LogsPage() {
         return () => clearInterval(id);
     }, []);
 
+    /** Carga los últimos 300 logs ordenados por fecha descendente. */
     const fetchLogs = async () => {
         setLoading(true);
         try {

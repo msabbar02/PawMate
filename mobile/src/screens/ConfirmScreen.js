@@ -59,6 +59,13 @@ export default function ConfirmScreen({ navigation }) {
     );
 }
 
+/**
+ * Fila de paso numerado que se muestra en la tarjeta de confirmación.
+ *
+ * @param {object} props
+ * @param {string} props.number Número de paso.
+ * @param {string} props.text   Descripción del paso.
+ */
 function StepRow({ number, text }) {
     return (
         <View style={styles.stepRow}>

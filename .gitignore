@@ -1,16 +1,16 @@
 # ============================================
-# PawMate - Professional .gitignore
+# PawMate · .gitignore principal
 # ============================================
 
 # ============================================
-# SENSITIVE FILES & KEYS
+# ARCHIVOS SENSIBLES Y CLAVES
 # ============================================
 # Supabase
 **/supabase/.branches/
 **/supabase/.temp/
 **/supabase-service-key*
 
-# Environment Variables 
+# Variables de entorno
 .env
 .env.*
 **/.env
@@ -18,7 +18,7 @@
 !.env.example
 !**/.env.example
 
-# API Keys & Secrets
+# Claves de API y secretos
 **/*secret*
 **/*credentials*
 **/*apikey*
@@ -26,7 +26,7 @@
 **/serviceAccountKey*.json
 
 # ============================================
-# NODE MODULES & DEPENDENCIES
+# DEPENDENCIAS Y NODE_MODULES
 # ============================================
 node_modules/
 npm-debug.log*
@@ -35,13 +35,13 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Package manager files
+# Lockfiles de gestores de paquetes
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
 # ============================================
-# MOBILE APP (React Native / Expo)
+# APP MÓVIL (React Native / Expo)
 # ============================================
 # Expo
 .expo/
@@ -72,34 +72,34 @@ mobile/ios/*.ipa
 mobile/ios/*.dSYM.zip
 mobile/ios/*.dSYM
 
-# Metro bundler
+# Bundler Metro
 .metro-health-check*
 
 # ============================================
-# WEB APPLICATION
+# LANDING WEB
 # ============================================
-# Next.js / React build
+# Builds de Next.js / React / Vite
 web/.next/
 web/out/
 web/build/
 web/dist/
 
-# Static files
+# Caché de assets estáticos
 web/.cache/
 
 # ============================================
-# ADMIN PANEL
+# PANEL DE ADMINISTRACIÓN
 # ============================================
-# Build output
+# Builds
 admin/.next/
 admin/out/
 admin/build/
 admin/dist/
 
 # ============================================
-# SERVER / BACKEND
+# BACKEND / SERVIDOR
 # ============================================
-# Build output
+# Builds
 server/dist/
 server/build/
 
@@ -107,13 +107,13 @@ server/build/
 server/logs/
 *.log
 
-# Database
+# Bases de datos locales
 *.sqlite
 *.sqlite3
 *.db
 
 # ============================================
-# TESTING
+# TESTS Y COBERTURA
 # ============================================
 coverage/
 *.coverage
@@ -121,9 +121,9 @@ coverage/
 .jest/
 
 # ============================================
-# IDE & EDITORS
+# IDEs Y EDITORES
 # ============================================
-# VSCode
+# VS Code
 .vscode/
 *.code-workspace
 
@@ -146,7 +146,7 @@ coverage/
 *~
 
 # ============================================
-# OPERATING SYSTEM
+# SISTEMA OPERATIVO
 # ============================================
 # macOS
 .DS_Store
@@ -168,7 +168,7 @@ $RECYCLE.BIN/
 .Trash-*
 
 # ============================================
-# TEMPORARY FILES
+# ARCHIVOS TEMPORALES
 # ============================================
 *.tmp
 *.temp
@@ -178,26 +178,26 @@ $RECYCLE.BIN/
 *.swo
 
 # ============================================
-# BUILD & DEPLOYMENT
+# BUILD Y DESPLIEGUE
 # ============================================
-# Build artifacts
+# Artefactos de build móvil
 *.apk
 *.aab
 *.ipa
 *.app
 
-# Deployment
+# Despliegue
 .vercel/
 .netlify/
 
 # ============================================
-# DOCUMENTATION (Optional - uncomment if needed)
+# DOCUMENTACIÓN (opcional, descomentar si se usa)
 # ============================================
 # docs/build/
 # docs/.docusaurus/
 
 # ============================================
-# MISC
+# VARIOS
 # ============================================
 .turbo/
 .parcel-cache/

@@ -1,10 +1,18 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿/**
+ * Página de gestión de reservas.
+ *
+ * Lista las últimas 200 reservas, se mantiene sincronizada por
+ * Realtime (insert/update/delete) y al volver al foco (`pawmate:wake`),
+ * permite filtrar por estado, buscar por dueño/cuidador y editar el
+ * estado o eliminarlas desde modales.
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCalendarDays, faEye, faFileLines } from '@fortawesome/free-solid-svg-icons';
-import './UsersPage.css'; // Shared table styles
+import './UsersPage.css'; // Estilos de tabla compartidos.
 
 export default function ReservationsPage() {
     const { t } = useTranslation();
@@ -14,12 +22,13 @@ export default function ReservationsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     
-    // Modal state
+    // Estado del modal.
     const [selectedRes, setSelectedRes] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [editStatus, setEditStatus] = useState('');
 
+    /** Carga las últimas reservas desde Supabase. */
     const fetchReservations = useCallback(async () => {
         try {
             const { data: resData } = await supabase.from('reservations').select('*').order('created_at', { ascending: false }).limit(200);
@@ -34,10 +43,10 @@ export default function ReservationsPage() {
     useEffect(() => {
         fetchReservations();
 
-        // Re-fetch when tab becomes visible again
+        // Recarga cuando el tab vuelve al foco.
         window.addEventListener('pawmate:wake', fetchReservations);
 
-        // ── Realtime: auto-refresh reservations ──
+        // Actualización automática de reservas en tiempo real.
         const channel = supabase
             .channel('admin:reservations')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, (payload) => {
@@ -57,6 +66,7 @@ export default function ReservationsPage() {
         };
     }, [fetchReservations]);
 
+    /** Borra una reserva previa confirmación. */
     const handleDelete = async (resId) => {
         if (window.confirm(t('reservations.confirmDelete'))) {
             try {
@@ -69,17 +79,20 @@ export default function ReservationsPage() {
         }
     };
 
+    /** Abre el modal de edición con el estado actual. */
     const openEditModal = (res) => {
         setSelectedRes(res);
         setEditStatus(res.status || 'pendiente');
         setIsEditModalOpen(true);
     };
 
+    /** Abre el modal de visualización. */
     const openViewModal = (res) => {
         setSelectedRes(res);
         setIsViewModalOpen(true);
     };
 
+    /** Persiste el cambio de estado en Supabase. */
     const handleSaveEdit = async () => {
         try {
             const { error } = await supabase.from('reservations').update({ status: editStatus }).eq('id', selectedRes.id);
@@ -98,10 +111,12 @@ export default function ReservationsPage() {
         return matchesSearch && matchesStatus;
     });
 
+    /** Devuelve la etiqueta del servicio (paseo/hotel) traducida. */
     const getServiceIcon = (type) => {
         return type === 'walking' ? `${t('reservations.walkService')}` : `${t('reservations.hotelService')}`;
     };
 
+    /** Traduce el código de estado de la reserva a su etiqueta visible. */
     const statusLabel = (s) => {
         const labels = { pendiente: t('reservations.statusPending'), aceptada: t('reservations.statusAccepted'), activa: t('reservations.statusActive'), in_progress: t('reservations.statusInProgress'), completada: t('reservations.statusCompleted'), cancelada: t('reservations.statusCancelled') };
         return labels[s] || s || t('reservations.statusPending');

@@ -1,3 +1,10 @@
+/**
+ * Componente raíz del panel de administración.
+ *
+ * Define el árbol de rutas: la página de login es pública y todas
+ * las demás viven dentro de `<AdminLayout />` protegido por el guard
+ * `<ProtectedRoute />`, que redirige a `/login` si no hay sesión de admin.
+ */
 import React, { useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
@@ -18,6 +25,13 @@ import ProfilePage from './pages/ProfilePage';
 import AdminsPage from './pages/AdminsPage';
 import VerificationsPage from './pages/VerificationsPage';
 
+/**
+ * Envoltorio que bloquea el acceso a rutas privadas cuando no hay
+ * un admin autenticado.
+ *
+ * @param {{ children: React.ReactNode }} props
+ * @returns {React.ReactElement}
+ */
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated } = useContext(AuthContext);
     if (!isAuthenticated) return <Navigate to="/login" />;

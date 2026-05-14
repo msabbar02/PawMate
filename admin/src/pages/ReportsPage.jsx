@@ -1,4 +1,11 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿/**
+ * Página de gestión de reportes y reseñas.
+ *
+ * Pestañas alternables (reportes / reseñas), filtros por estado y búsqueda
+ * libre. Permite marcar reportes como resueltos, eliminar reportes y reseñas,
+ * y abrir un modal con todo el detalle (imágenes adjuntas y vista previa).
+ */
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
@@ -22,6 +29,7 @@ export default function ReportsPage() {
 
     useEffect(() => { fetchData(); }, [tab]);
 
+    /** Carga la pestaña actual (reportes o reseñas) desde Supabase. */
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -37,8 +45,10 @@ export default function ReportsPage() {
         } finally { setLoading(false); }
     };
 
+    /** Abre el modal de vista detallada para un reporte o reseña. */
     const openViewModal = (item) => { setSelectedItem(item); setIsViewModalOpen(true); };
 
+    /** Marca un reporte como resuelto. */
     const handleResolveReport = async (reportId) => {
         try {
             await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
@@ -46,6 +56,7 @@ export default function ReportsPage() {
         } catch { alert(t('reports.errorResolve')); }
     };
 
+    /** Elimina un reporte tras confirmar. */
     const handleDeleteReport = async (reportId) => {
         if (!window.confirm(t('reports.confirmDeleteReport'))) return;
         try {
@@ -54,6 +65,7 @@ export default function ReportsPage() {
         } catch { alert(t('reports.errorDeleteReport')); }
     };
 
+    /** Elimina una reseña tras confirmar. */
     const handleDeleteReview = async (reviewId) => {
         if (!window.confirm(t('reports.confirmDeleteReview'))) return;
         try {

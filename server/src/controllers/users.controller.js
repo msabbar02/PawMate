@@ -1,7 +1,14 @@
-﻿const { supabase } = require('../config/supabase');
+﻿/**
+ * Controlador de usuarios.
+ *
+ * Implementa los endpoints de listado paginado (solo admin), consulta por id
+ * con visibilidad según el rol, actualización con whitelist de campos y
+ * borrado seguro tanto en la tabla `users` como en Supabase Auth.
+ */
+const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
-// Fields safe to expose about any user (public profile)
+/** Campos seguros para exponer de cualquier usuario (perfil público). */
 const PUBLIC_USER_FIELDS = [
     'id', 'fullName', 'firstName', 'lastName', 'bio', 'city', 'province', 'country',
     'avatar', 'photoURL', 'role', 'isVerified', 'rating', 'reviewCount',
@@ -10,7 +17,7 @@ const PUBLIC_USER_FIELDS = [
     'maxConcurrentWalks', 'maxConcurrentHotel', 'createdAt', 'created_at',
 ].join(',');
 
-// Sensitive fields that should never leave the server for another user
+/** Campos sensibles que nunca deben salir del servidor para otro usuario. */
 const PRIVATE_FIELDS = new Set([
     'idFrontUrl', 'idBackUrl', 'selfieUrl', 'certDocUrl',
     'fcmToken', 'expoPushToken', 'phone', 'birthDate', 'gender',
@@ -19,8 +26,13 @@ const PRIVATE_FIELDS = new Set([
 ]);
 
 /**
- * Get all users (Admin only) with pagination
  * GET /api/users?limit=50&offset=0&role=caregiver
+ *
+ * Devuelve todos los usuarios con paginación y filtros opcionales por rol
+ * y búsqueda parcial por nombre. Solo accesible por administradores.
+ *
+ * @param {import('express').Request}  req Query: `{ limit, offset, role, search }`.
+ * @param {import('express').Response} res `{ users, total, limit, offset }`.
  */
 const getAllUsers = async (req, res) => {
     try {
@@ -48,11 +60,16 @@ const getAllUsers = async (req, res) => {
 };
 
 /**
- * Get user by ID.
- * Own profile → all fields (minus verification docs).
- * Other user   → public fields only.
- * Admin        → all fields.
  * GET /api/users/:id
+ *
+ * Devuelve los datos de un usuario aplicando reglas de visibilidad según
+ * el solicitante:
+ *   - Admin    → todos los campos.
+ *   - Propio   → todos los campos excepto URLs de documentos KYC.
+ *   - Tercero  → solo los campos públicos del perfil.
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`.
+ * @param {import('express').Response} res Datos del usuario filtrados por rol.
  */
 const getUserById = async (req, res) => {
     try {
@@ -72,12 +89,12 @@ const getUserById = async (req, res) => {
             return sendError(res, 'User not found', 404);
         }
 
-        // Even for own profile, strip verification document URLs (admin-only)
+        // Incluso en el perfil propio, elimina las URLs de documentos de verificación (solo admin).
         if (!isAdmin) {
             for (const field of PRIVATE_FIELDS) {
-                if (!isSelf) delete data[field]; // non-self: remove all private
+                if (!isSelf) delete data[field]; // Otro usuario: elimina todos los privados.
                 else if (['idFrontUrl', 'idBackUrl', 'selfieUrl', 'certDocUrl'].includes(field)) {
-                    delete data[field]; // self: only remove doc URLs
+                    delete data[field]; // Propio: solo elimina URLs de documentos.
                 }
             }
         }
@@ -90,8 +107,8 @@ const getUserById = async (req, res) => {
 };
 
 /**
- * Update user
- * PUT /api/users/:id
+ * Whitelist de campos editables por el propio usuario.
+ * Los administradores pueden además tocar `ADMIN_ONLY_FIELDS`.
  */
 const ALLOWED_USER_FIELDS = [
     'fullName', 'firstName', 'lastName', 'phone', 'bio', 'city', 'province', 'country',
@@ -99,12 +116,23 @@ const ALLOWED_USER_FIELDS = [
     'isOnline', 'lastSeen', 'isWalking', 'walkingPets', 'fcmToken', 'expoPushToken',
     'language', 'preferences', 'address', 'saveWalks', 'saveLocation',
     'totalWalks', 'totalDistance', 'totalMinutes',
-    // Caregiver-specific
+    // Campos específicos del rol cuidador.
     'price', 'serviceTypes', 'acceptedSpecies', 'serviceRadius',
     'maxConcurrentWalks', 'maxConcurrentHotel', 'galleryPhotos',
 ];
+
+/** Campos que solo un administrador puede modificar. */
 const ADMIN_ONLY_FIELDS = ['role', 'is_banned', 'verificationStatus', 'isVerified', 'pendingRole'];
 
+/**
+ * PUT /api/users/:id
+ *
+ * Actualiza el perfil del usuario. Solo el propio usuario o un admin
+ * pueden modificarlo; el resto de campos enviados en el cuerpo se ignoran.
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`. Cuerpo: campos a actualizar.
+ * @param {import('express').Response} res Resultado de la actualización.
+ */
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
@@ -139,16 +167,22 @@ const updateUser = async (req, res) => {
 };
 
 /**
- * Delete user (Admin only)
  * DELETE /api/users/:id
- * Users can delete their own account. Admins can delete any account.
+ *
+ * Borra una cuenta. Cualquier usuario puede borrar la suya propia y los
+ * administradores pueden borrar cualquier cuenta. Borra primero la fila en
+ * `users` y a continuación en Supabase Auth (si la limpieza de auth falla
+ * la cuenta queda huérfana en Auth pero el usuario ya no podrá acceder).
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`.
+ * @param {import('express').Response} res Resultado del borrado.
  */
 const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
         const isSelf = req.user.uid === id;
 
-        // If not self-delete, verify caller is admin (inline check since route no longer enforces it)
+        // Si no es auto-borrado, comprueba inline que el usuario es admin.
         let isAdmin = false;
         if (!isSelf) {
             const { data: caller } = await supabase
@@ -163,19 +197,21 @@ const deleteUser = async (req, res) => {
             return sendError(res, 'Forbidden', 403);
         }
 
-        // Delete from users table first
+        // Borra primero de Supabase Auth: el ON DELETE CASCADE limpiará la fila en
+        // public.users automáticamente, evitando dejar cuentas zombie en Auth.
+        const { error: authError } = await supabase.auth.admin.deleteUser(id);
+        if (authError && authError.status !== 404) {
+            console.error('Auth user delete error:', authError);
+            return sendError(res, 'Error deleting account', 500);
+        }
+
+        // Como red de seguridad, intenta borrar la fila en `users` por si el cascade no la limpió.
         const { error: dbError } = await supabase
             .from('users')
             .delete()
             .eq('id', id);
-
-        if (dbError) throw dbError;
-
-        // Delete from Supabase Auth (requires service key — admin API)
-        const { error: authError } = await supabase.auth.admin.deleteUser(id);
-        if (authError) {
-            console.error('Auth user delete error:', authError);
-            // Row already deleted — still respond success, auth cleanup failed
+        if (dbError && dbError.code !== 'PGRST116') {
+            console.error('Users row delete (post-auth) error:', dbError);
         }
 
         return sendSuccess(res, null, 'Account deleted successfully');

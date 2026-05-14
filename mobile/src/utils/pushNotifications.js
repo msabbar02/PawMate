@@ -4,15 +4,19 @@ import { supabase } from '../config/supabase';
 import Constants from 'expo-constants';
 
 /**
- * Requests notification permissions and registers the device's
- * Expo Push Token in Supabase under users/{userId}.expoPushToken.
- * Silently skips if running in Expo Go (push not supported).
+ * Pide permisos de notificación al sistema, obtiene el token Expo Push del
+ * dispositivo y lo guarda en la fila del usuario en Supabase
+ * (`users.expoPushToken`).
+ *
+ * Si la app se está ejecutando dentro de Expo Go la operación se omite, ya
+ * que las push reales requieren un dev build a partir del SDK 53.
+ *
+ * @returns {Promise<string|undefined>} Token registrado o undefined si no hay.
  */
 export async function registerForPushNotifications() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Skip in Expo Go — push notifications require a dev build since SDK 53
     const isExpoGo = Constants.appOwnership === 'expo';
     if (isExpoGo) {
         console.log('Push notifications skipped (Expo Go)');
@@ -33,7 +37,6 @@ export async function registerForPushNotifications() {
             return;
         }
 
-        // Use EAS project ID from app.json/app.config.js
         const projectId = Constants.expoConfig?.extra?.eas?.projectId;
         if (!projectId) {
             console.warn('No EAS projectId found — skipping push token registration');
@@ -64,7 +67,7 @@ export async function registerForPushNotifications() {
     }
 }
 
-// Configure how notifications are displayed while app is in foreground
+// Comportamiento de las notificaciones cuando la app está en primer plano.
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
