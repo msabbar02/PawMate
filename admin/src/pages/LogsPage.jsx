@@ -23,6 +23,26 @@ const ACTION_META = {
     WALK_COMPLETED:    { icon: faPaw,               color: '#22c55e', label: 'Paseo completado' },
 };
 
+const DETAIL_LABELS = {
+    event: 'Evento', platform: 'Plataforma', version: 'Versión',
+    totalkmm: 'Distancia (km)', totalkm: 'Distancia (km)', distance: 'Distancia (km)',
+    calories: 'Calorías', petName: 'Mascota', duration: 'Duración (s)',
+    steps: 'Pasos', reason: 'Motivo', type: 'Tipo',
+    serviceType: 'Servicio', status: 'Estado', role: 'Rol', amount: 'Importe',
+};
+
+function formatDetails(raw) {
+    if (!raw) return null;
+    try {
+        const obj = JSON.parse(raw);
+        const entries = Object.entries(obj).filter(([, v]) => v != null && v !== '');
+        if (entries.length === 0) return null;
+        return entries.map(([k, v]) => `${DETAIL_LABELS[k] || k}: ${v}`).join(' · ');
+    } catch {
+        return raw;
+    }
+}
+
 function actionMeta(actionType) {
     return ACTION_META[actionType] || { icon: faCircleInfo, color: '#94a3b8', label: actionType };
 }
@@ -72,13 +92,17 @@ export default function LogsPage() {
 
     useEffect(() => {
         fetchLogs();
+        window.addEventListener('pawmate:wake', fetchLogs);
         const channel = supabase
             .channel('admin:system_logs')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'system_logs' }, (payload) => {
                 setLogs(prev => [payload.new, ...prev].slice(0, 300));
             })
             .subscribe();
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            window.removeEventListener('pawmate:wake', fetchLogs);
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const filteredLogs = useMemo(() => {
@@ -235,13 +259,14 @@ export default function LogsPage() {
                                             </td>
                                             <td><span className="text-muted" style={{ fontWeight: 500 }}>{log.entity}</span></td>
                                             <td style={{ maxWidth: 300 }}>
-                                                <p style={{
-                                                    fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace',
-                                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                                    margin: 0,
-                                                }} title={log.details || ''}>
-                                                    {log.details || '-'}
-                                                </p>
+                                                {(() => {
+                                                    const text = formatDetails(log.details);
+                                                    return text ? (
+                                                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }} title={log.details}>
+                                                            {text}
+                                                        </span>
+                                                    ) : <span style={{ color: 'var(--text-muted)', opacity: 0.4 }}>-</span>;
+                                                })()}
                                             </td>
                                         </tr>
                                     );

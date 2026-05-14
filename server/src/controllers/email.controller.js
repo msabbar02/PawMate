@@ -352,13 +352,13 @@ const sendBanEmail = async (req, res) => {
         Si crees que esto es un error o deseas resolverlo, contáctanos. Nuestro equipo revisará tu caso en un plazo de 24–48 horas.
       </p>
       <div style="text-align:center;margin:28px 0;">
-        <a href="mailto:admin@apppawmate.com" style="display:inline-block;background:#ef4444;color:white;font-size:16px;font-weight:600;padding:14px 36px;border-radius:12px;text-decoration:none;">Contactar soporte</a>
+        <a href="mailto:soporte@apppawmate.com" style="display:inline-block;background:#ef4444;color:white;font-size:16px;font-weight:600;padding:14px 36px;border-radius:12px;text-decoration:none;">Contactar soporte</a>
       </div>
       <p style="color:#64748b;font-size:13px;margin:0;text-align:center;">
-        O escríbenos a <a href="mailto:admin@apppawmate.com" style="color:#ef4444;">admin@apppawmate.com</a>
+        O escríbenos a <a href="mailto:soporte@apppawmate.com" style="color:#ef4444;">soporte@apppawmate.com</a>
       </p>`,
                 }),
-                text: `Hola ${name},\n\nTu cuenta en PawMate ha sido suspendida temporalmente por razones de seguridad.\n\nSi crees que es un error, escríbenos a admin@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`,
+                text: `Hola ${name},\n\nTu cuenta en PawMate ha sido suspendida temporalmente por razones de seguridad.\n\nSi crees que es un error, escríbenos a soporte@apppawmate.com\n\n© ${new Date().getFullYear()} PawMate`,
             });
             sent = true;
         } catch (emailErr) {

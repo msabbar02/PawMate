@@ -39,6 +39,9 @@ export default function UsersPage() {
     useEffect(() => {
         fetchUsers();
 
+        // Re-fetch when tab becomes visible again (prevents stuck-loading after browser throttles background tabs)
+        window.addEventListener('pawmate:wake', fetchUsers);
+
         // ── Realtime: auto-refresh users on any change ──
         const channel = supabase
             .channel('admin:users')
@@ -53,7 +56,10 @@ export default function UsersPage() {
             })
             .subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            window.removeEventListener('pawmate:wake', fetchUsers);
+            supabase.removeChannel(channel);
+        };
     }, [fetchUsers]);
 
     const handleBanUser = async (userId, currentlyBanned) => {

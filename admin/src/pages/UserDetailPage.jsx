@@ -11,6 +11,40 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import './DetailPage.css';
 
+const DETAIL_LABELS = {
+    event: 'Evento', platform: 'Plataforma', version: 'Versión',
+    totalkmm: 'Distancia (km)', totalkm: 'Distancia (km)', distance: 'Distancia (km)',
+    calories: 'Calorías', petName: 'Mascota', duration: 'Duración (s)',
+    steps: 'Pasos', reason: 'Motivo', type: 'Tipo',
+    serviceType: 'Servicio', status: 'Estado', role: 'Rol', amount: 'Importe',
+};
+
+function formatDetails(raw) {
+    if (!raw) return null;
+    try {
+        const obj = JSON.parse(raw);
+        const entries = Object.entries(obj).filter(([, v]) => v != null && v !== '');
+        if (entries.length === 0) return null;
+        return entries.map(([k, v]) => `${DETAIL_LABELS[k] || k}: ${v}`).join(' · ');
+    } catch {
+        return raw;
+    }
+}
+
+const ACTION_LABEL = {
+    USER_LOGIN: 'Inicio de sesión', USER_LOGOUT: 'Cierre de sesión',
+    USER_SIGNUP: 'Registro', PET_CREATED: 'Mascota creada',
+    PET_UPDATED: 'Mascota editada', PET_DELETED: 'Mascota eliminada',
+    RESERVATION_CREATED: 'Reserva creada', RESERVATION_UPDATED: 'Reserva actualizada',
+    REPORT_CREATED: 'Reporte creado', WALK_COMPLETED: 'Paseo completado',
+};
+const ACTION_COLOR = {
+    USER_LOGIN: '#22c55e', USER_LOGOUT: '#94a3b8', USER_SIGNUP: '#3b82f6',
+    PET_CREATED: '#22c55e', PET_UPDATED: '#f59e0b', PET_DELETED: '#ef4444',
+    RESERVATION_CREATED: '#22c55e', RESERVATION_UPDATED: '#f59e0b',
+    REPORT_CREATED: '#ef4444', WALK_COMPLETED: '#06b6d4',
+};
+
 function Badge({ status }) {
     const map = {
         approved:   { cls: 'green', label: 'Aprobado' },
@@ -75,7 +109,11 @@ export default function UserDetailPage() {
         }
     }, [id]);
 
-    useEffect(() => { fetchAll(); }, [fetchAll]);
+    useEffect(() => {
+        fetchAll();
+        window.addEventListener('pawmate:wake', fetchAll);
+        return () => window.removeEventListener('pawmate:wake', fetchAll);
+    }, [fetchAll]);
 
     const handleBan = async () => {
         if (!user) return;
@@ -175,8 +213,8 @@ export default function UserDetailPage() {
                             <div className="detail-row"><span className="label">Max paseos simultáneos</span><span className="value">{user.maxConcurrentWalks || '-'}</span></div>
                             <div className="detail-row"><span className="label">Max hotel simultáneos</span><span className="value">{user.maxConcurrentHotel || '-'}</span></div>
                             <div className="detail-row"><span className="label">Rating</span><span className="value">{user.rating ? `${user.rating} (${user.reviewCount || 0})` : '-'}</span></div>
-                            <div className="detail-row"><span className="label">Total paseos</span><span className="value">{user.totalWalks || 0}</span></div>
-                            <div className="detail-row"><span className="label">Distancia total</span><span className="value">{user.totalDistance ? `${user.totalDistance} km` : '-'}</span></div>
+                            <div className="detail-row"><span className="label">Total paseos</span><span className="value">{logs.filter(l => l.actionType === 'WALK_COMPLETED').length}</span></div>
+                            <div className="detail-row"><span className="label">Distancia total</span><span className="value">{(() => { const km = logs.filter(l => l.actionType === 'WALK_COMPLETED').reduce((s, l) => { try { const d = JSON.parse(l.details); return s + parseFloat(d.totalkmm || d.totalkm || d.distance || 0); } catch { return s; } }, 0); return km > 0 ? `${km.toFixed(2)} km` : '-'; })()}</span></div>
                         </div>
                     )}
 
@@ -244,15 +282,20 @@ export default function UserDetailPage() {
                         <h2><FontAwesomeIcon icon={faChartLine} className="icon" /> Actividad reciente ({logs.length})</h2>
                         {logs.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>Sin actividad.</p> : (
                             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                                {logs.map(l => (
-                                    <div key={l.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 13 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span style={{ fontWeight: 500 }}>{l.actionType}</span>
-                                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatDate(l.created_at)}</span>
+                                {logs.map(l => {
+                                    const color = ACTION_COLOR[l.actionType] || '#94a3b8';
+                                    const label = ACTION_LABEL[l.actionType] || l.actionType;
+                                    const detail = formatDetails(l.details);
+                                    return (
+                                        <div key={l.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 13 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontWeight: 600, color, fontSize: 12, background: `${color}18`, padding: '2px 10px', borderRadius: 10 }}>{label}</span>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatDate(l.created_at)}</span>
+                                            </div>
+                                            {detail && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{detail}</div>}
                                         </div>
-                                        {l.details && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 2 }}>{l.details}</div>}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

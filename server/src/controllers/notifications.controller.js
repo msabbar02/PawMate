@@ -225,7 +225,6 @@ const sendRatingRequestEmail = async (req, res) => {
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 24px;">
     Abre la app PawMate y accede a tus reservas completadas para dejar tu valoración. ¡Solo tarda 30 segundos!
   </p>
-  ${emailButton('https://apppawmate.com', 'Abrir PawMate y valorar', '#f59e0b')}
   <p style="color:#64748b;font-size:13px;margin:16px 0 0;text-align:center;">
     ¿Tuviste algún problema? <a href="mailto:soporte@apppawmate.com" style="color:#f59e0b;">soporte@apppawmate.com</a>
   </p>`,

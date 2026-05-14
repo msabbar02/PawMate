@@ -34,6 +34,9 @@ export default function ReservationsPage() {
     useEffect(() => {
         fetchReservations();
 
+        // Re-fetch when tab becomes visible again
+        window.addEventListener('pawmate:wake', fetchReservations);
+
         // ── Realtime: auto-refresh reservations ──
         const channel = supabase
             .channel('admin:reservations')
@@ -48,7 +51,10 @@ export default function ReservationsPage() {
             })
             .subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            window.removeEventListener('pawmate:wake', fetchReservations);
+            supabase.removeChannel(channel);
+        };
     }, [fetchReservations]);
 
     const handleDelete = async (resId) => {

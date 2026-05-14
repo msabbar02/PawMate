@@ -48,6 +48,7 @@ PawMate/
 | **Persistencia**         | AsyncStorage                                                | 2.x        |
 | **i18n**                 | i18next + react-i18next (ES / EN)                           | —         |
 | **Multimedia**           | expo-av · expo-contacts · expo-crypto · expo-file-system | —         |
+| **Clima en tiempo real** | Open-Meteo API (REST, sin API key)                        | —         |
 
 ---
 
@@ -112,6 +113,7 @@ PawMate/
 | **Vercel**      | Despliegue: landing web, admin y backend (serverless)               |
 | **Expo Push**   | Notificaciones push en tiempo real a dispositivos                   |
 | **Google Maps** | Mapas nativos y seguimiento GPS de paseos                           |
+| **Open-Meteo** | Datos meteorológicos en tiempo real para el widget del clima (sin API key) |
 
 ---
 

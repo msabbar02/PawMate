@@ -74,6 +74,7 @@ flowchart TB
         Stripe[Stripe]
         Resend[Resend<br/>API Cloud]
         Expo[Expo Push]
+        OpenMeteo[Open-Meteo<br/>Weather API]
     end
 
     Mobile -.SDK.-> Supabase
@@ -84,6 +85,7 @@ flowchart TB
     Server --> Stripe
     Server --> Resend
     Mobile --> Expo
+    Mobile -->|clima GPS| OpenMeteo
     Supabase -.Auth Hook.-> Server
 ```
 
@@ -111,6 +113,7 @@ graph LR
     B --> E[react-native-maps]
     B --> F[Expo Notifications]
     B --> G[i18next]
+    B --> H[Open-Meteo API]
 ```
 
 ### Web / Admin
@@ -151,6 +154,7 @@ graph LR
 | **Pagos**           | Stripe Connect                                     |
 | **Email**           | Resend (API cloud)                                 |
 | **Push**            | Expo Push API                                      |
+| **Clima**           | Open-Meteo API (gratuita, sin API key)             |
 | **i18n**            | i18next (ES + EN)                                  |
 | **DNS**             | Namecheap                                          |
 | **Hosting**         | Vercel (web/admin/server) + Hetzner (mail)         |

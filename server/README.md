@@ -6,7 +6,7 @@ API REST para la plataforma PawMate.
 
 - **Node.js** + **Express**
 - **Supabase** (Auth JWT + PostgreSQL con service key)
-- **Resend** (API de email transaccional cloud)
+- **Resend 6.x** (API de email transaccional cloud)
 - **Stripe** (pagos, reembolsos y webhooks)
 - **express-rate-limit** (protección contra abuso de API — 200 req/15 min)
 - **jsonwebtoken** (verificación del hook de Supabase Auth)
@@ -22,10 +22,10 @@ server/
 │   │   └── supabase.js             # Cliente Supabase Admin
 │   ├── controllers/
 │   │   ├── auth.controller.js      # Verificar token, obtener perfil (sin campos sensibles)
-│   │   ├── email.controller.js     # Emails HTML de auth (signup, magic link, recovery, cambio email)
+│   │   ├── email.controller.js     # Emails HTML de auth, bienvenida y baneo via Resend
 │   │   ├── users.controller.js     # CRUD usuarios con filtrado de campos por rol y paginación
 │   │   ├── pets.controller.js      # CRUD de mascotas
-│   │   ├── notifications.controller.js # Emails HTML de reserva via Resend
+│   │   ├── notifications.controller.js # Emails de estado de reserva y solicitud de valoración
 │   │   └── payment.controller.js   # Stripe PaymentIntent + reembolsos + webhook
 │   ├── middleware/
 │   │   ├── auth.middleware.js      # Verificar JWT de Supabase + check isAdmin
@@ -46,31 +46,39 @@ server/
 ## Endpoints
 
 ### Health Check
+
 - `GET /api/health` — Estado del servidor
 
 ### Autenticación
+
 - `POST /api/auth/verify-token` — Verificar token JWT de Supabase
 - `GET /api/auth/profile` — Perfil propio (sin URLs de documentos de verificación)
 
 ### Usuarios (requiere auth)
+
 - `GET /api/users?limit=50&offset=0&role=caregiver&search=` — Listar con paginación (admin)
 - `GET /api/users/:id` — Perfil de usuario (campos públicos para otros, todos para uno mismo)
 - `PUT /api/users/:id` — Actualizar usuario
 - `DELETE /api/users/:id` — Eliminar usuario (admin, no puede auto-eliminarse)
 
 ### Mascotas (requiere auth)
+
 - `GET /api/pets` — Listar mascotas del usuario autenticado
 - `POST /api/pets` — Crear mascota
 - `GET /api/pets/:id` — Obtener mascota por ID
 - `PUT /api/pets/:id` — Actualizar mascota
 - `DELETE /api/pets/:id` — Eliminar mascota
 
-### Notificaciones (requiere auth)
+### Notificaciones (requiere auth, salvo auth-email)
+
 - `POST /api/notifications/reservation-status` — Email HTML al dueño y al cuidador sobre el estado de la reserva
 - `POST /api/notifications/welcome-email` — Email de bienvenida al nuevo usuario
-- `POST /api/notifications/auth-email` — Hook de Supabase Auth (usa su propio JWT)
+- `POST /api/notifications/auth-email` — Hook de Supabase Auth: signup, magic link, recovery, cambio de email (usa su propio JWT HMAC)
+- `POST /api/notifications/ban-email` — Email de notificación al usuario cuando un admin lo banea
+- `POST /api/notifications/rating-request` — Email al dueño solicitando valorar al cuidador tras reserva completada
 
 ### Pagos
+
 - `POST /api/payments/payment-intent` *(auth)* — Crear PaymentIntent de Stripe con validación de reserva
 - `POST /api/payments/refund` *(auth)* — Reembolsar pago + actualizar `paymentStatus: 'refunded'` en DB
 - `POST /api/payments/webhook` *(Stripe, sin auth)* — Webhook para `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
@@ -93,6 +101,7 @@ npm install
 ## Configuración
 
 Crear archivo `.env`:
+
 ```env
 PORT=3000
 NODE_ENV=development
@@ -127,7 +136,3 @@ npm run dev
 # Producción
 npm start
 ```
-
----
-
-**Estado**:  Funcional

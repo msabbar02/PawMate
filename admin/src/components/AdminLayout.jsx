@@ -48,6 +48,22 @@ export default function AdminLayout() {
         };
     }, []);
 
+    // Dispatch wake event when tab becomes visible again so pages re-fetch
+    // (prevents the "stuck loading" issue after the browser throttles background tabs)
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') {
+                window.dispatchEvent(new Event('pawmate:wake'));
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        window.addEventListener('focus', onVisible);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            window.removeEventListener('focus', onVisible);
+        };
+    }, []);
+
     const handleLogout = () => {
         logout();
         navigate('/login');

@@ -1,9 +1,10 @@
 ﻿import { supabase } from './supabase';
 
-// Base URL del backend PawMate. En producción usa tu URL real.
-// En Android emulador usa http://10.0.2.2:3000 en lugar de localhost.
+// Base URL del backend PawMate.
+// En Expo Go (iPhone/Android físico) cambia localhost por la IP de tu PC, ej: http://192.168.1.X:3000
+// En Android emulador usa http://10.0.2.2:3000
 export const API_BASE_URL = typeof __DEV__ !== 'undefined' && __DEV__
-    ? 'http://localhost:3000'
+    ? 'https://api.apppawmate.com'   // ← usa producción en dev para Expo Go, o pon tu IP local
     : 'https://api.apppawmate.com';
 
 /** Helper: get current Supabase JWT to authenticate server calls */
