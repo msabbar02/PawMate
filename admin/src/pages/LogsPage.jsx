@@ -16,6 +16,7 @@ import {
     faCircle, faCircleInfo
 } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import './UsersPage.css';
 
 const ACTION_META = {
@@ -123,9 +124,13 @@ export default function LogsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [autoTick]);
 
-    /** Carga los últimos 300 logs ordenados por fecha descendente. */
-    const fetchLogs = async () => {
-        setLoading(true);
+    /**
+     * Carga los últimos 300 logs ordenados por fecha descendente.
+     *
+     * @param {{silent?: boolean}} [opts]
+     */
+    const fetchLogs = async (opts = {}) => {
+        if (!opts.silent) setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('system_logs')
@@ -137,9 +142,12 @@ export default function LogsPage() {
         } catch (error) {
             console.error('Error fetching logs:', error);
         } finally {
-            setLoading(false);
+            if (!opts.silent) setLoading(false);
         }
     };
+
+    // Refresco automático cada 10 s como fallback al Realtime.
+    useAutoRefresh(() => fetchLogs({ silent: true }), 10000);
 
     useEffect(() => {
         fetchLogs();

@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faDog, faFileLines, faEye, faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import './UsersPage.css'; // Hereda los estilos de tabla compartidos.
 
 export default function PetsPage() {
@@ -33,12 +34,17 @@ export default function PetsPage() {
         fetchPets();
     }, []);
 
+    // Refresco automático cada 10 s.
+    useAutoRefresh(() => fetchPets({ silent: true }), 10000);
+
     /**
      * Carga las mascotas y resuelve el nombre de cada dueño en una
      * única consulta `IN` para evitar N+1.
+     *
+     * @param {{silent?: boolean}} [opts]
      */
-    const fetchPets = async () => {
-        setLoading(true);
+    const fetchPets = async (opts = {}) => {
+        if (!opts.silent) setLoading(true);
         try {
             const { data: petsList } = await supabase.from('pets').select('*').limit(500);
             

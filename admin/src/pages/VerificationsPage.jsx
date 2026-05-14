@@ -12,6 +12,7 @@ import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShieldHalved, faClock, faXmark, faEye, faUserCheck, faRotateLeft, faFileImage, faCheck, faBan } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import './VerificationsPage.css';
 
 export default function VerificationsPage() {
@@ -26,9 +27,17 @@ export default function VerificationsPage() {
         fetchVerifications();
     }, []);
 
-    /** Carga todos los usuarios con `verificationStatus` no nulo. */
-    const fetchVerifications = async () => {
-        setLoading(true);
+    // Refresco automático cada 10 s para no depender de F5.
+    useAutoRefresh(() => fetchVerifications({ silent: true }), 10000);
+
+    /**
+     * Carga todos los usuarios con `verificationStatus` no nulo.
+     * Si se pasa `{ silent: true }` no muestra el spinner.
+     *
+     * @param {{silent?: boolean}} [opts]
+     */
+    const fetchVerifications = async (opts = {}) => {
+        if (!opts.silent) setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('users')
@@ -40,7 +49,7 @@ export default function VerificationsPage() {
         } catch (err) {
             console.error('Error fetching verifications:', err);
         } finally {
-            setLoading(false);
+            if (!opts.silent) setLoading(false);
         }
     };
 

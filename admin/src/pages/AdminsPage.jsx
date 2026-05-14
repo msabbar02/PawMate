@@ -11,6 +11,7 @@ import { supabase } from '../config/supabase';
 import { AuthContext } from '../context/AuthContext';
 import { createAdminAccount } from '../config/api';
 import { isSuperadmin, SUPERADMIN_EMAIL } from '../config/superadmin';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserPlus, faShield, faTrash, faXmark, faEnvelope, faLock, faUser } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
@@ -36,9 +37,17 @@ export default function AdminsPage() {
         fetchAdmins();
     }, []);
 
-    /** Carga la lista de administradores desde la tabla `users`. */
-    const fetchAdmins = async () => {
-        setLoading(true);
+    // Refresco automático cada 10 s (sin spinner) como fallback al Realtime.
+    useAutoRefresh(() => fetchAdmins({ silent: true }), 10000);
+
+    /**
+     * Carga la lista de administradores desde la tabla `users`.
+     * Si se pasa `{ silent: true }` no muestra el spinner de carga.
+     *
+     * @param {{silent?: boolean}} [opts]
+     */
+    const fetchAdmins = async (opts = {}) => {
+        if (!opts.silent) setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('users')
@@ -49,7 +58,7 @@ export default function AdminsPage() {
         } catch (err) {
             console.error('Error fetching admins:', err);
         }
-        setLoading(false);
+        if (!opts.silent) setLoading(false);
     };
 
     /**

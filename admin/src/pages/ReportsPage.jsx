@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faTrash, faCircleCheck, faEye, faFileLines, faXmark, faImage, faFlag } from '@fortawesome/free-solid-svg-icons';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import './UsersPage.css';
 
 export default function ReportsPage() {
@@ -29,9 +30,16 @@ export default function ReportsPage() {
 
     useEffect(() => { fetchData(); }, [tab]);
 
-    /** Carga la pestaña actual (reportes o reseñas) desde Supabase. */
-    const fetchData = async () => {
-        setLoading(true);
+    // Refresco automático cada 10 s sobre la pestaña activa.
+    useAutoRefresh(() => fetchData({ silent: true }), 10000);
+
+    /**
+     * Carga la pestaña actual (reportes o reseñas) desde Supabase.
+     *
+     * @param {{silent?: boolean}} [opts]
+     */
+    const fetchData = async (opts = {}) => {
+        if (!opts.silent) setLoading(true);
         try {
             if (tab === 'reports') {
                 const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
@@ -42,7 +50,7 @@ export default function ReportsPage() {
             }
         } catch (error) {
             console.error("Error fetching data:", error);
-        } finally { setLoading(false); }
+        } finally { if (!opts.silent) setLoading(false); }
     };
 
     /** Abre el modal de vista detallada para un reporte o reseña. */

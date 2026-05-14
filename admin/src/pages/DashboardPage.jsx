@@ -14,6 +14,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faUsers, faDog, faCalendarDays, faTriangleExclamation, faWifi,
@@ -369,6 +370,9 @@ export default function DashboardPage() {
             window.removeEventListener('pawmate:wake', onWake);
         };
     }, [fetchAll]);
+
+    // Refresco automático cada 10 s como fallback al Realtime.
+    useAutoRefresh(() => fetchAll({ silent: true }), 10000);
 
     // Datos derivados del estado principal.
     const usingCustomRange = !!(customRange.from && customRange.to);

@@ -17,6 +17,7 @@ import { isSuperadmin, displayRole } from '../config/superadmin';
 import { AuthContext } from '../context/AuthContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCircleExclamation, faShield, faShieldHalved, faEye, faDog, faBan } from '@fortawesome/free-solid-svg-icons';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import './UsersPage.css';
 
 export default function UsersPage() {
@@ -54,6 +55,9 @@ export default function UsersPage() {
             setLoading(false);
         }
     }, []);
+
+    // Refresco automático cada 10 s como fallback al Realtime.
+    useAutoRefresh(fetchUsers, 10000);
 
     useEffect(() => {
         fetchUsers();

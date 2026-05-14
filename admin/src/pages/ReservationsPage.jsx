@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCalendarDays, faEye, faFileLines } from '@fortawesome/free-solid-svg-icons';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import './UsersPage.css'; // Estilos de tabla compartidos.
 
 export default function ReservationsPage() {
@@ -39,6 +40,9 @@ export default function ReservationsPage() {
             setLoading(false);
         }
     }, []);
+
+    // Refresco automático cada 10 s como fallback al Realtime.
+    useAutoRefresh(fetchReservations, 10000);
 
     useEffect(() => {
         fetchReservations();
