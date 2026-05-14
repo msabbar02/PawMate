@@ -63,7 +63,7 @@ PawMate · soporte@pawmate.app
 Para consultas sobre privacidad: privacidad@pawmate.app`;
 
 export default function SettingsScreen({ navigation }) {
-    const { userData, user, refreshUserData } = useContext(AuthContext);
+    const { userData, user, refreshUserData, signOut } = useContext(AuthContext);
     const { theme, toggleTheme, isDarkMode, isLeftHanded, toggleHandedness } = useContext(ThemeContext);
 
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -349,7 +349,7 @@ export default function SettingsScreen({ navigation }) {
     const handleSignOut = () => {
         Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
             { text: 'Cancelar', style: 'cancel' },
-            { text: 'Salir', style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
+            { text: 'Salir', style: 'destructive', onPress: () => signOut().catch(() => {}) },
         ]);
     };
 
@@ -361,7 +361,7 @@ export default function SettingsScreen({ navigation }) {
                 onPress: async () => {
                     try {
                         await supabase.from('users').delete().eq('id', user.id);
-                        await supabase.auth.signOut();
+                        await signOut();
                     } catch {
                         Alert.alert('Error', 'Vuelve a iniciar sesión antes de eliminar tu cuenta.');
                     }

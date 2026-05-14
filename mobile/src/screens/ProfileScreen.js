@@ -55,7 +55,7 @@ const Field = ({ label, value, onChangeText, placeholder, keyboardType, editable
  * preferencias, estadísticas y acciones de cuenta.
  */
 export default function ProfileScreen({ navigation }) {
-    const { userData, user, refreshUserData } = useContext(AuthContext);
+    const { userData, user, refreshUserData, signOut } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
     const { t, lang } = useTranslation();
 
@@ -247,7 +247,7 @@ export default function ProfileScreen({ navigation }) {
     const handleSignOut = () => {
         Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
             { text: t('common.cancel'), style: 'cancel' },
-            { text: t('profile.signOutBtn'), style: 'destructive', onPress: () => supabase.auth.signOut().catch(() => {}) },
+            { text: t('profile.signOutBtn'), style: 'destructive', onPress: () => signOut().catch(() => {}) },
         ]);
     };
 

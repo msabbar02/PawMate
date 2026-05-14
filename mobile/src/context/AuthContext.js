@@ -59,6 +59,24 @@ export const AuthProvider = ({ children }) => {
     }, [user]);
 
     /**
+     * Cierra la sesión del usuario registrando antes el evento USER_LOGOUT.
+     * Es importante registrarlo ANTES de llamar a `supabase.auth.signOut()`
+     * porque la política RLS de `system_logs` exige que `auth.uid()` siga
+     * activo: una vez cerrada la sesión el INSERT sería rechazado.
+     */
+    const signOut = useCallback(async () => {
+        try {
+            const current = lastUserRef.current;
+            if (current?.id && current?.email) {
+                await logSystemAction(current.id, current.email, 'USER_LOGOUT', 'Auth', { platform: Platform.OS, version: Platform.Version });
+            }
+        } catch (err) {
+            console.warn('No se pudo registrar USER_LOGOUT:', err);
+        }
+        await supabase.auth.signOut();
+    }, []);
+
+    /**
      * Marca al usuario como "presente" actualizando `last_seen` cada minuto y
      * cuando la app vuelve a primer plano. No toca `isOnline` (lo controlan
      * los cuidadores manualmente).
@@ -284,10 +302,9 @@ export const AuthProvider = ({ children }) => {
                     sendWelcomeEmail(session.user.email, fullName).catch(() => {});
                 }
             } else if (_evt === 'SIGNED_OUT') {
-                const prev = lastUserRef.current;
-                if (prev?.id && prev?.email) {
-                    logSystemAction(prev.id, prev.email, 'USER_LOGOUT', 'Auth', { event: _evt, platform: Platform.OS });
-                }
+                // Nota: no podemos registrar el USER_LOGOUT aquí porque la sesión
+                // ya está cerrada y la policy RLS de system_logs lo rechazaría.
+                // El registro se hace en `signOut()` antes de cerrar sesión.
                 lastUserRef.current = null;
             }
         });
@@ -301,7 +318,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData, updateUserOptimistic, unreadMessages, pendingBookings }}>
+        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData, updateUserOptimistic, unreadMessages, pendingBookings, signOut }}>
             {children}
         </AuthContext.Provider>
     );
