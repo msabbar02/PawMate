@@ -8,11 +8,13 @@
  * eliminar de Auth + tabla en cascada) y editar rol/estado de
  * verificación desde modales.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
-import { sendBanEmail } from '../config/api';
+import { sendBanEmail, setUserPassword } from '../config/api';
+import { isSuperadmin } from '../config/superadmin';
+import { AuthContext } from '../context/AuthContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCircleExclamation, faShield, faShieldHalved, faEye, faDog, faBan } from '@fortawesome/free-solid-svg-icons';
 import './UsersPage.css';
@@ -20,6 +22,8 @@ import './UsersPage.css';
 export default function UsersPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { adminUser } = useContext(AuthContext);
+    const callerIsSuperadmin = isSuperadmin(adminUser?.email);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +36,10 @@ export default function UsersPage() {
     const [userPets, setUserPets] = useState([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [editForm, setEditForm] = useState({ role: '', verificationStatus: '' });
+    // Cambio de contrasea desde el modal de edicin (opcional).
+    const [newPassword, setNewPassword]         = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [savingPassword, setSavingPassword]   = useState(false);
 
     /** Carga la lista completa de usuarios. */
     const fetchUsers = useCallback(async () => {
@@ -130,13 +138,17 @@ export default function UsersPage() {
             role: user.role || 'normal',
             verificationStatus: user.verificationStatus || 'pending'
         });
+        setNewPassword('');
+        setConfirmPassword('');
         setIsEditModalOpen(true);
     };
 
-    /** Cierra el modal de edición. */
+    /** Cierra el modal de edicin. */
     const closeEditModal = () => {
         setIsEditModalOpen(false);
         setSelectedUser(null);
+        setNewPassword('');
+        setConfirmPassword('');
     };
 
     /** Abre el modal de visualización cargando las mascotas del usuario. */
@@ -163,14 +175,34 @@ export default function UsersPage() {
     /** Persiste los cambios del modal de edición. */
     const handleSaveEdit = async () => {
         try {
+            // 1) Cambio de contrasea (opcional, requiere ambos campos rellenos y coincidentes).
+            if (newPassword || confirmPassword) {
+                if (newPassword.length < 6) {
+                    alert('La contrasea debe tener al menos 6 caracteres');
+                    return;
+                }
+                if (newPassword !== confirmPassword) {
+                    alert('Las contraseas no coinciden');
+                    return;
+                }
+                setSavingPassword(true);
+                const pwdResult = await setUserPassword(selectedUser.id, newPassword);
+                setSavingPassword(false);
+                if (!pwdResult.ok) {
+                    alert('No se pudo cambiar la contrasea: ' + (pwdResult.error || 'desconocido'));
+                    return;
+                }
+            }
+
+            // 2) Cambios de rol/verificacin.
             const { error } = await supabase.from('users').update(editForm).eq('id', selectedUser.id);
             if (error) throw error;
-            
+
             // Actualiza el estado local.
-            setUsers(prev => prev.map(u => 
+            setUsers(prev => prev.map(u =>
                 u.id === selectedUser.id ? { ...u, ...editForm } : u
             ));
-            
+
             closeEditModal();
         } catch (error) {
             console.error("Error updating user:", error);
@@ -294,10 +326,14 @@ export default function UsersPage() {
                                                 <button className="action-btn edit" onClick={() => openEditModal(user)} title={t('users.editUser')}>
                                                     <FontAwesomeIcon icon={faPenToSquare} style={{ fontSize: 18 }} />
                                                 </button>
-                                                <button className="action-btn delete" onClick={() => handleDeleteUser(user.id)} title={t('users.deleteUser')}>
-                                                    <FontAwesomeIcon icon={faTrash} style={{ fontSize: 18 }} />
-                                                </button>
-                                                {user.role !== 'admin' && (
+                                                {/* Borrar: oculto si target es superadmin, o si target es admin y el actor no es superadmin, o auto-borrado de cuenta. */}
+                                                {!isSuperadmin(user.email) && user.id !== adminUser?.id && (user.role !== 'admin' || callerIsSuperadmin) && (
+                                                    <button className="action-btn delete" onClick={() => handleDeleteUser(user.id)} title={t('users.deleteUser')}>
+                                                        <FontAwesomeIcon icon={faTrash} style={{ fontSize: 18 }} />
+                                                    </button>
+                                                )}
+                                                {/* Banear: solo a no-admins (los admins se banean nicamente desde la vista superadmin si se desea). */}
+                                                {user.role !== 'admin' && !isSuperadmin(user.email) && (
                                                     <button 
                                                         className="action-btn" 
                                                         onClick={() => handleBanUser(user.id, user.is_banned)} 
@@ -379,11 +415,77 @@ export default function UsersPage() {
                                 </div>
                             )}
 
+                            {/* Cambio de contraseña (opcional). El backend valida permisos según superadmin. */}
+                            {(() => {
+                                const targetIsSuperadmin = isSuperadmin(selectedUser.email);
+                                const targetIsAdmin      = selectedUser.role === 'admin';
+                                // Reglas de visibilidad: contraseña del superadmin nadie excepto él mismo;
+                                // contraseña de un admin solo el superadmin (o él mismo).
+                                if (targetIsSuperadmin && selectedUser.id !== adminUser?.id) return null;
+                                if (targetIsAdmin && !callerIsSuperadmin && selectedUser.id !== adminUser?.id) return null;
+
+                                const tooShort  = newPassword.length > 0 && newPassword.length < 6;
+                                const mismatch  = newPassword.length > 0 && confirmPassword.length > 0 && newPassword !== confirmPassword;
+                                const matchOk   = newPassword.length >= 6 && newPassword === confirmPassword;
+                                const helperMsg = tooShort
+                                    ? 'Mínimo 6 caracteres'
+                                    : mismatch
+                                        ? 'Las contraseñas no coinciden'
+                                        : matchOk
+                                            ? 'Las contraseñas coinciden'
+                                            : 'Deja en blanco para no cambiar';
+                                const helperColor = tooShort || mismatch
+                                    ? '#ef4444'
+                                    : matchOk
+                                        ? '#22c55e'
+                                        : 'var(--text-muted)';
+
+                                return (
+                                    <>
+                                        <div className="form-group" style={{ marginTop: 16 }}>
+                                            <label>Nueva contraseña</label>
+                                            <input
+                                                type="password"
+                                                className="form-control"
+                                                placeholder="Dejar vacío para no cambiar"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                autoComplete="new-password"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Confirmar contraseña</label>
+                                            <input
+                                                type="password"
+                                                className="form-control"
+                                                placeholder="Repite la nueva contraseña"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                autoComplete="new-password"
+                                                style={mismatch ? { borderColor: '#ef4444' } : matchOk ? { borderColor: '#22c55e' } : undefined}
+                                            />
+                                            <small style={{ color: helperColor, fontSize: 12, marginTop: 4, display: 'block' }}>
+                                                {helperMsg}
+                                            </small>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+
                         </div>
 
                         <div className="modal-footer">
                             <button className="btn-secondary" onClick={closeEditModal}>{t('users.cancel')}</button>
-                            <button className="btn-primary" onClick={handleSaveEdit}>{t('users.saveChanges')}</button>
+                            <button
+                                className="btn-primary"
+                                onClick={handleSaveEdit}
+                                disabled={
+                                    savingPassword ||
+                                    (newPassword.length > 0 && (newPassword.length < 6 || newPassword !== confirmPassword))
+                                }
+                            >
+                                {savingPassword ? 'Guardando...' : t('users.saveChanges')}
+                            </button>
                         </div>
                     </div>
                 </div>

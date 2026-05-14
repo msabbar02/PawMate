@@ -9,6 +9,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from '../config/supabase';
 import { AuthContext } from '../context/AuthContext';
+import { createAdminAccount } from '../config/api';
+import { isSuperadmin, SUPERADMIN_EMAIL } from '../config/superadmin';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserPlus, faShield, faTrash, faXmark, faEnvelope, faLock, faUser } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +19,7 @@ import './AdminsPage.css';
 export default function AdminsPage() {
     const { t } = useTranslation();
     const { adminUser } = useContext(AuthContext);
+    const callerIsSuperadmin = isSuperadmin(adminUser?.email);
     const [admins, setAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -68,28 +71,18 @@ export default function AdminsPage() {
             if (newAdmin.password.length < 6) {
                 throw new Error(t('admins.passwordMinLength'));
             }
+            if (!callerIsSuperadmin) {
+                throw new Error('Solo el superadministrador puede crear nuevos admins');
+            }
 
-            // Crea el usuario en Supabase Auth.
-            const { data: authData, error: authError } = await supabase.auth.signUp({
+            // Crea el admin a travs del backend (service key) para evitar disparar
+            // el Auth Hook de Supabase, que provocaba el error "Hook requires authorization token".
+            const result = await createAdminAccount({
                 email: newAdmin.email.trim().toLowerCase(),
                 password: newAdmin.password,
+                fullName: newAdmin.fullName.trim(),
             });
-
-            if (authError) throw authError;
-
-            if (authData.user) {
-                // Inserta el usuario en la tabla users con rol admin.
-                const { error: insertError } = await supabase.from('users').upsert({
-                    id: authData.user.id,
-                    email: newAdmin.email.trim().toLowerCase(),
-                    fullName: newAdmin.fullName.trim(),
-                    firstName: newAdmin.fullName.trim().split(' ')[0] || '',
-                    lastName: newAdmin.fullName.trim().split(' ').slice(1).join(' ') || '',
-                    role: 'admin',
-                });
-
-                if (insertError) throw insertError;
-            }
+            if (!result.ok) throw new Error(result.error || 'No se pudo crear el admin');
 
             setMessage({ text: t('admins.adminCreatedSuccess', { name: newAdmin.fullName }), type: 'success' });
             setNewAdmin({ email: '', password: '', fullName: '' });
@@ -112,6 +105,14 @@ export default function AdminsPage() {
             setMessage({ text: t('admins.cannotRemoveSelf'), type: 'error' });
             return;
         }
+        if (isSuperadmin(user.email)) {
+            setMessage({ text: 'No se puede degradar al superadministrador', type: 'error' });
+            return;
+        }
+        if (!callerIsSuperadmin) {
+            setMessage({ text: 'Solo el superadministrador puede degradar a otros admins', type: 'error' });
+            return;
+        }
         if (!window.confirm(t('admins.confirmRemove', { name: user.fullName || user.email }))) return;
 
         try {
@@ -127,9 +128,11 @@ export default function AdminsPage() {
         <div className="admins-page">
             <div className="page-header">
                 <h2 className="page-title">{t('admins.pageTitle')}</h2>
-                <button className="btn-primary add-admin-btn" onClick={() => setShowModal(true)}>
-                    <FontAwesomeIcon icon={faUserPlus} style={{ fontSize: 18 }} /> {t('admins.createAdmin')}
-                </button>
+                {callerIsSuperadmin && (
+                    <button className="btn-primary add-admin-btn" onClick={() => setShowModal(true)}>
+                        <FontAwesomeIcon icon={faUserPlus} style={{ fontSize: 18 }} /> {t('admins.createAdmin')}
+                    </button>
+                )}
             </div>
 
             {message.text && (
@@ -162,7 +165,7 @@ export default function AdminsPage() {
                                 <span>{t('admins.phoneLabel')} {admin.phone || t('admins.notConfigured')}</span>
                                 <span>{t('admins.sinceLabel')} {admin.created_at ? new Date(admin.created_at).toLocaleDateString('es-ES') : 'N/A'}</span>
                             </div>
-                            {admin.id !== adminUser?.id && (
+                            {admin.id !== adminUser?.id && callerIsSuperadmin && !isSuperadmin(admin.email) && (
                                 <button className="remove-admin-btn" onClick={() => handleRemoveAdmin(admin)}>
                                     <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} /> {t('admins.removePermissions')}
                                 </button>

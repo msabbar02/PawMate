@@ -7,10 +7,12 @@
  * conversaciones donde participa. Permite banear/desbanear, cambiar rol,
  * cambiar estado de verificación y eliminar al usuario vía RPC.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendBanEmail } from '../config/api';
+import { AuthContext } from '../context/AuthContext';
+import { isSuperadmin } from '../config/superadmin';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faArrowLeft, faUser, faPaw, faCalendarCheck, faTriangleExclamation,
@@ -91,6 +93,8 @@ function formatDate(d) {
 export default function UserDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { adminUser } = useContext(AuthContext);
+    const callerIsSuperadmin = isSuperadmin(adminUser?.email);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [pets, setPets] = useState([]);
@@ -139,16 +143,22 @@ export default function UserDetailPage() {
     /** Banea o desbanea al usuario; al banear emite el email de aviso. */
     const handleBan = async () => {
         if (!user) return;
+        if (isSuperadmin(user.email)) { alert('No se puede banear al superadministrador'); return; }
+        if (user.role === 'admin' && !callerIsSuperadmin) { alert('Solo el superadministrador puede banear a otros admins'); return; }
         const action = user.is_banned ? 'desbanear' : 'banear';
-        if (!window.confirm(`¿Seguro que quieres ${action} a este usuario?`)) return;
+        if (!window.confirm(`Seguro que quieres ${action} a este usuario?`)) return;
         const { error } = await supabase.from('users').update({ is_banned: !user.is_banned }).eq('id', id);
         if (error) { alert('Error: ' + error.message); return; }
         if (!user.is_banned && user.email) sendBanEmail(user.email, user.fullName);
         setUser({ ...user, is_banned: !user.is_banned });
     };
 
-    /** Borra el usuario vía RPC `admin_delete_user`. */
+    /** Borra el usuario va RPC `admin_delete_user`. */
     const handleDelete = async () => {
+        if (!user) return;
+        if (isSuperadmin(user.email)) { alert('No se puede eliminar al superadministrador'); return; }
+        if (user.id === adminUser?.id) { alert('No puedes eliminar tu propia cuenta desde aqu'); return; }
+        if (user.role === 'admin' && !callerIsSuperadmin) { alert('Solo el superadministrador puede eliminar a otros admins'); return; }
         if (!window.confirm('¿Seguro que quieres ELIMINAR este usuario? Esta acción es irreversible.')) return;
         const { error: rpcError } = await supabase.rpc('admin_delete_user', { target_uid: id });
         if (rpcError) {
@@ -174,6 +184,11 @@ export default function UserDetailPage() {
     /** Cambia el rol del usuario (normal/owner/caregiver/admin). */
     const handleRoleChange = async (role) => {
         if (!user) return;
+        if (isSuperadmin(user.email)) { alert('No se puede cambiar el rol del superadministrador'); return; }
+        if ((user.role === 'admin' || role === 'admin') && !callerIsSuperadmin) {
+            alert('Solo el superadministrador puede gestionar el rol "admin"');
+            return;
+        }
         const { error } = await supabase.from('users').update({ role }).eq('id', id);
         if (error) { alert('Error: ' + error.message); return; }
         setUser({ ...user, role });
@@ -331,12 +346,15 @@ export default function UserDetailPage() {
                     <div className="detail-card">
                         <h2><FontAwesomeIcon icon={faShield} className="icon" /> Acciones</h2>
                         <div className="detail-actions">
-                            <select className="detail-action-btn" value={user.role || 'normal'} onChange={(e) => handleRoleChange(e.target.value)}>
-                                <option value="normal">Cambiar rol: Normal</option>
-                                <option value="owner">Cambiar rol: Dueño</option>
-                                <option value="caregiver">Cambiar rol: Cuidador</option>
-                                <option value="admin">Cambiar rol: Admin</option>
-                            </select>
+                            {/* Cambio de rol: oculto para el superadmin; restringido si toca el rol admin. */}
+                            {!isSuperadmin(user.email) && (user.role !== 'admin' || callerIsSuperadmin) && (
+                                <select className="detail-action-btn" value={user.role || 'normal'} onChange={(e) => handleRoleChange(e.target.value)}>
+                                    <option value="normal">Cambiar rol: Normal</option>
+                                    <option value="owner">Cambiar rol: Dueño</option>
+                                    <option value="caregiver">Cambiar rol: Cuidador</option>
+                                    {callerIsSuperadmin && <option value="admin">Cambiar rol: Admin</option>}
+                                </select>
+                            )}
                             <button className="detail-action-btn success" onClick={() => handleVerify('approved')}>
                                 <FontAwesomeIcon icon={faCheck} /> Aprobar verificación
                             </button>
@@ -346,12 +364,18 @@ export default function UserDetailPage() {
                             <button className="detail-action-btn danger" onClick={() => handleVerify('rejected')}>
                                 <FontAwesomeIcon icon={faXmark} /> Rechazar verificación
                             </button>
-                            <button className="detail-action-btn" onClick={handleBan}>
-                                <FontAwesomeIcon icon={faBan} /> {user.is_banned ? 'Desbanear usuario' : 'Banear usuario'}
-                            </button>
-                            <button className="detail-action-btn danger" onClick={handleDelete}>
-                                <FontAwesomeIcon icon={faTrash} /> Eliminar usuario
-                            </button>
+                            {/* Banear: oculto para superadmin y para admins si el actor no es superadmin. */}
+                            {!isSuperadmin(user.email) && (user.role !== 'admin' || callerIsSuperadmin) && (
+                                <button className="detail-action-btn" onClick={handleBan}>
+                                    <FontAwesomeIcon icon={faBan} /> {user.is_banned ? 'Desbanear usuario' : 'Banear usuario'}
+                                </button>
+                            )}
+                            {/* Eliminar: oculto para superadmin, auto-eliminación y admins (salvo si el actor es superadmin). */}
+                            {!isSuperadmin(user.email) && user.id !== adminUser?.id && (user.role !== 'admin' || callerIsSuperadmin) && (
+                                <button className="detail-action-btn danger" onClick={handleDelete}>
+                                    <FontAwesomeIcon icon={faTrash} /> Eliminar usuario
+                                </button>
+                            )}
                         </div>
                     </div>
 

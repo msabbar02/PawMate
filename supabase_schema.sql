@@ -389,16 +389,46 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- ── SUPERADMIN: nico email con privilegios totales ──
+-- adminpawmate@gmail.com es el superadmin: puede borrar/banear a cualquier admin
+-- pero ningún admin (ni él mismo) puede borrarlo o cambiarle el rol.
+CREATE OR REPLACE FUNCTION public.is_superadmin(uid uuid DEFAULT auth.uid())
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = uid AND lower(email) = 'adminpawmate@gmail.com'
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.is_superadmin(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_superadmin(uuid) TO authenticated;
+
 -- ── ADMIN: borrar usuario completo (auth + cascade public) ──
 CREATE OR REPLACE FUNCTION public.admin_delete_user(target_uid uuid)
 RETURNS void AS $$
 DECLARE
-  caller_role text;
+  caller_role  text;
+  target_role  text;
+  target_email text;
 BEGIN
   SELECT role INTO caller_role FROM public.users WHERE id = auth.uid();
   IF caller_role IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'Forbidden: only admins can delete users';
   END IF;
+
+  SELECT role, lower(email) INTO target_role, target_email
+  FROM public.users WHERE id = target_uid;
+
+  -- El superadmin nunca puede ser borrado (ni siquiera por s mismo).
+  IF target_email = 'adminpawmate@gmail.com' THEN
+    RAISE EXCEPTION 'Forbidden: superadmin cannot be deleted';
+  END IF;
+
+  -- Solo el superadmin puede borrar a otros administradores.
+  IF target_role = 'admin' AND NOT public.is_superadmin(auth.uid()) THEN
+    RAISE EXCEPTION 'Forbidden: only the superadmin can delete other admins';
+  END IF;
+
   DELETE FROM auth.users WHERE id = target_uid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth;
@@ -410,12 +440,26 @@ GRANT EXECUTE ON FUNCTION public.admin_delete_user(uuid) TO authenticated;
 CREATE OR REPLACE FUNCTION public.admin_set_ban(target_uid uuid, banned boolean)
 RETURNS void AS $$
 DECLARE
-  caller_role text;
+  caller_role  text;
+  target_role  text;
+  target_email text;
 BEGIN
   SELECT role INTO caller_role FROM public.users WHERE id = auth.uid();
   IF caller_role IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'Forbidden: only admins can ban users';
   END IF;
+
+  SELECT role, lower(email) INTO target_role, target_email
+  FROM public.users WHERE id = target_uid;
+
+  IF target_email = 'adminpawmate@gmail.com' THEN
+    RAISE EXCEPTION 'Forbidden: superadmin cannot be banned';
+  END IF;
+
+  IF target_role = 'admin' AND NOT public.is_superadmin(auth.uid()) THEN
+    RAISE EXCEPTION 'Forbidden: only the superadmin can ban other admins';
+  END IF;
+
   UPDATE public.users SET is_banned = banned WHERE id = target_uid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -427,7 +471,9 @@ GRANT EXECUTE ON FUNCTION public.admin_set_ban(uuid, boolean) TO authenticated;
 CREATE OR REPLACE FUNCTION public.admin_set_role(target_uid uuid, new_role text)
 RETURNS void AS $$
 DECLARE
-  caller_role text;
+  caller_role  text;
+  target_role  text;
+  target_email text;
 BEGIN
   SELECT role INTO caller_role FROM public.users WHERE id = auth.uid();
   IF caller_role IS DISTINCT FROM 'admin' THEN
@@ -436,6 +482,21 @@ BEGIN
   IF new_role NOT IN ('normal','owner','caregiver','admin') THEN
     RAISE EXCEPTION 'Invalid role: %', new_role;
   END IF;
+
+  SELECT role, lower(email) INTO target_role, target_email
+  FROM public.users WHERE id = target_uid;
+
+  -- El superadmin nunca puede perder su rol.
+  IF target_email = 'adminpawmate@gmail.com' THEN
+    RAISE EXCEPTION 'Forbidden: cannot change the role of the superadmin';
+  END IF;
+
+  -- Solo el superadmin puede cambiar el rol de un admin (degradarlo) o
+  -- promover a un usuario normal a administrador.
+  IF (target_role = 'admin' OR new_role = 'admin') AND NOT public.is_superadmin(auth.uid()) THEN
+    RAISE EXCEPTION 'Forbidden: only the superadmin can manage admin roles';
+  END IF;
+
   UPDATE public.users SET role = new_role WHERE id = target_uid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -654,10 +715,27 @@ CREATE POLICY recent_activity_all ON public.recent_activity
   WITH CHECK ("userId" = auth.uid() OR public.is_admin());
 
 -- ── system_logs ────────────────────────────────────────────────────────────
-CREATE POLICY system_logs_all ON public.system_logs
-  FOR ALL TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+-- Cualquier usuario autenticado puede insertar entradas de log SIEMPRE que el
+-- userId que registra coincida con su propio auth.uid() (o sea sistema).
+-- La lectura/edición/borrado queda restringida a administradores.
+DROP POLICY IF EXISTS system_logs_all      ON public.system_logs;
+DROP POLICY IF EXISTS system_logs_select   ON public.system_logs;
+DROP POLICY IF EXISTS system_logs_insert   ON public.system_logs;
+DROP POLICY IF EXISTS system_logs_modify   ON public.system_logs;
+CREATE POLICY system_logs_select ON public.system_logs
+  FOR SELECT TO authenticated
+  USING (public.is_admin());
+CREATE POLICY system_logs_insert ON public.system_logs
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    "userId"::text = auth.uid()::text
+    OR "userId" = 'Sistema'
+    OR public.is_admin()
+  );
+CREATE POLICY system_logs_modify ON public.system_logs
+  FOR UPDATE TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY system_logs_delete ON public.system_logs
+  FOR DELETE TO authenticated USING (public.is_admin());
 
 -- ── posts ──────────────────────────────────────────────────────────────────
 CREATE POLICY posts_select ON public.posts

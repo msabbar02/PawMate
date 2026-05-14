@@ -8,6 +8,13 @@
 const { supabase } = require('../config/supabase');
 const { sendSuccess, sendError } = require('../utils/response');
 
+/**
+ * Email del superadministrador con privilegios totales.
+ * Solo este usuario puede crear/borrar otros administradores y nadie
+ * (ni siquiera él mismo) puede eliminarlo.
+ */
+const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || 'adminpawmate@gmail.com').toLowerCase();
+
 /** Campos seguros para exponer de cualquier usuario (perfil público). */
 const PUBLIC_USER_FIELDS = [
     'id', 'fullName', 'firstName', 'lastName', 'bio', 'city', 'province', 'country',
@@ -182,19 +189,36 @@ const deleteUser = async (req, res) => {
         const { id } = req.params;
         const isSelf = req.user.uid === id;
 
-        // Si no es auto-borrado, comprueba inline que el usuario es admin.
-        let isAdmin = false;
-        if (!isSelf) {
-            const { data: caller } = await supabase
-                .from('users')
-                .select('role')
-                .eq('id', req.user.uid)
-                .single();
-            isAdmin = caller?.role === 'admin';
-        }
+        // Carga el solicitante (rol y email) para validar reglas de superadmin.
+        const { data: caller } = await supabase
+            .from('users')
+            .select('role, email')
+            .eq('id', req.user.uid)
+            .single();
+        const callerEmail  = (caller?.email || '').toLowerCase();
+        const isAdmin      = caller?.role === 'admin';
+        const isSuperadmin = callerEmail === SUPERADMIN_EMAIL;
 
         if (!isSelf && !isAdmin) {
             return sendError(res, 'Forbidden', 403);
+        }
+
+        // Carga el objetivo para reglas de superadmin.
+        const { data: target } = await supabase
+            .from('users')
+            .select('role, email')
+            .eq('id', id)
+            .single();
+        const targetEmail = (target?.email || '').toLowerCase();
+
+        // El superadmin no puede ser borrado por nadie (ni por sí mismo).
+        if (targetEmail === SUPERADMIN_EMAIL) {
+            return sendError(res, 'El superadministrador no puede ser eliminado', 403);
+        }
+
+        // Solo el superadmin puede borrar a otros administradores.
+        if (target?.role === 'admin' && !isSuperadmin) {
+            return sendError(res, 'Solo el superadministrador puede eliminar administradores', 403);
         }
 
         // Borra primero de Supabase Auth: el ON DELETE CASCADE limpiará la fila en
@@ -221,9 +245,152 @@ const deleteUser = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/users/:id/password
+ *
+ * Cambia la contraseña de un usuario usando la service key del backend
+ * (`supabase.auth.admin.updateUserById`). Reglas de autorización:
+ *   - El propio usuario siempre puede cambiar su contraseña.
+ *   - Un admin puede cambiar la contraseña de cualquier usuario normal.
+ *   - Solo el superadministrador puede cambiar la contraseña de otro admin.
+ *   - La contraseña del superadmin solo puede cambiarla él mismo.
+ *
+ * @param {import('express').Request}  req Parámetros: `{ id }`. Cuerpo: `{ password }`.
+ * @param {import('express').Response} res Resultado del cambio.
+ */
+const setUserPassword = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { password } = req.body || {};
+        if (!password || String(password).length < 6) {
+            return sendError(res, 'La contraseña debe tener al menos 6 caracteres', 400);
+        }
+
+        const isSelf = req.user.uid === id;
+
+        const { data: caller } = await supabase
+            .from('users')
+            .select('role, email')
+            .eq('id', req.user.uid)
+            .single();
+        const callerEmail  = (caller?.email || '').toLowerCase();
+        const isAdmin      = caller?.role === 'admin';
+        const isSuperadmin = callerEmail === SUPERADMIN_EMAIL;
+
+        if (!isSelf && !isAdmin) {
+            return sendError(res, 'Forbidden', 403);
+        }
+
+        const { data: target } = await supabase
+            .from('users')
+            .select('role, email')
+            .eq('id', id)
+            .single();
+        const targetEmail = (target?.email || '').toLowerCase();
+
+        // La contraseña del superadmin solo puede cambiarla él mismo.
+        if (targetEmail === SUPERADMIN_EMAIL && !isSelf) {
+            return sendError(res, 'Solo el superadministrador puede cambiar su propia contraseña', 403);
+        }
+
+        // Solo el superadmin puede cambiar contraseñas de otros admins.
+        if (target?.role === 'admin' && !isSelf && !isSuperadmin) {
+            return sendError(res, 'Solo el superadministrador puede cambiar la contraseña de otros admins', 403);
+        }
+
+        const { error: authError } = await supabase.auth.admin.updateUserById(id, { password });
+        if (authError) {
+            console.error('setUserPassword auth.admin.updateUserById error:', authError);
+            return sendError(res, authError.message || 'No se pudo cambiar la contraseña', 500);
+        }
+
+        return sendSuccess(res, null, 'Contraseña actualizada correctamente');
+    } catch (error) {
+        console.error('setUserPassword error:', error);
+        return sendError(res, 'Error cambiando la contraseña', 500);
+    }
+};
+
+/**
+ * POST /api/users/create-admin
+ *
+ * Crea una nueva cuenta de administrador. Solo el superadministrador
+ * (`adminpawmate@gmail.com`) puede invocarlo. Usa la service key del
+ * backend para crear el usuario en Supabase Auth con email ya confirmado,
+ * evitando así disparar el Auth Hook de envío de correo de verificación
+ * (causa del error "Hook requires authorization token" cuando se intentaba
+ * crear el admin desde el cliente con `supabase.auth.signUp`).
+ *
+ * @param {import('express').Request}  req Cuerpo: `{ email, password, fullName }`.
+ * @param {import('express').Response} res Datos del admin creado.
+ */
+const createAdmin = async (req, res) => {
+    try {
+        const { email, password, fullName } = req.body || {};
+        if (!email || !password || !fullName) {
+            return sendError(res, 'Faltan campos requeridos', 400);
+        }
+        if (String(password).length < 6) {
+            return sendError(res, 'La contraseña debe tener al menos 6 caracteres', 400);
+        }
+
+        // Solo el superadmin puede crear nuevos administradores.
+        const { data: caller } = await supabase
+            .from('users')
+            .select('email')
+            .eq('id', req.user.uid)
+            .single();
+        const callerEmail = (caller?.email || '').toLowerCase();
+        if (callerEmail !== SUPERADMIN_EMAIL) {
+            return sendError(res, 'Solo el superadministrador puede crear nuevos admins', 403);
+        }
+
+        const cleanEmail    = String(email).trim().toLowerCase();
+        const cleanFullName = String(fullName).trim();
+
+        // Crea la cuenta en Auth con email confirmado para no disparar el Auth Hook.
+        const { data: created, error: authError } = await supabase.auth.admin.createUser({
+            email: cleanEmail,
+            password,
+            email_confirm: true,
+            user_metadata: { full_name: cleanFullName, role: 'admin' },
+        });
+        if (authError) {
+            console.error('createAdmin auth.admin.createUser error:', authError);
+            return sendError(res, authError.message || 'No se pudo crear el usuario en Auth', 500);
+        }
+
+        const newId = created?.user?.id;
+        if (!newId) {
+            return sendError(res, 'Auth no devolvió un id de usuario', 500);
+        }
+
+        // Upsert en la tabla pública con rol admin.
+        const { error: upsertError } = await supabase.from('users').upsert({
+            id: newId,
+            email: cleanEmail,
+            fullName: cleanFullName,
+            firstName: cleanFullName.split(' ')[0] || '',
+            lastName:  cleanFullName.split(' ').slice(1).join(' ') || '',
+            role: 'admin',
+        });
+        if (upsertError) {
+            console.error('createAdmin users upsert error:', upsertError);
+            return sendError(res, 'Usuario creado en Auth pero falló el upsert en users: ' + upsertError.message, 500);
+        }
+
+        return sendSuccess(res, { id: newId, email: cleanEmail, fullName: cleanFullName }, 'Admin creado correctamente');
+    } catch (error) {
+        console.error('createAdmin error:', error);
+        return sendError(res, 'Error creando administrador', 500);
+    }
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
     updateUser,
     deleteUser,
+    createAdmin,
+    setUserPassword,
 };

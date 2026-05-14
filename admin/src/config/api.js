@@ -55,3 +55,64 @@ export const sendBanEmail = (email, fullName) =>
 /** Solicita al backend el envío del email de petición de valoración. */
 export const sendRatingRequestEmail = (reservationId) =>
     callApi('/api/notifications/rating-request', { reservationId });
+
+/**
+ * Crea un nuevo administrador a través del backend (service key).
+ * Solo el superadministrador puede usarlo. Devuelve `{ ok, error }`
+ * para que la UI pueda mostrar un mensaje detallado al usuario.
+ *
+ * @param {{email:string, password:string, fullName:string}} payload
+ * @returns {Promise<{ok:boolean, error?:string, data?:any}>}
+ */
+export async function createAdminAccount(payload) {
+    const token = await getAdminToken();
+    if (!token) return { ok: false, error: 'No hay sesión activa' };
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/users/create-admin`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { ok: false, error: json?.error || json?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true, data: json?.data };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+}
+
+/**
+ * Cambia la contraseña de un usuario llamando al endpoint del backend
+ * (que usa la service key). El backend valida los permisos según las
+ * reglas de superadmin.
+ *
+ * @param {string} userId
+ * @param {string} password
+ * @returns {Promise<{ok:boolean, error?:string}>}
+ */
+export async function setUserPassword(userId, password) {
+    const token = await getAdminToken();
+    if (!token) return { ok: false, error: 'No hay sesión activa' };
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/users/${userId}/password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ password }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { ok: false, error: json?.error || json?.message || `HTTP ${res.status}` };
+        }
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+}
