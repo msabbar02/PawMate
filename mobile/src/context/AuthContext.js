@@ -59,20 +59,48 @@ export const AuthProvider = ({ children }) => {
     }, [user]);
 
     /**
-     * Cierra la sesión del usuario registrando antes el evento USER_LOGOUT.
-     * Es importante registrarlo ANTES de llamar a `supabase.auth.signOut()`
-     * porque la política RLS de `system_logs` exige que `auth.uid()` siga
-     * activo: una vez cerrada la sesión el INSERT sería rechazado.
+     * Cierra la sesión del usuario realizando, en este orden y mientras la
+     * sesión sigue activa (para no chocar con la policy RLS de system_logs):
+     *   1. Marca `isOnline = false` en `public.users`.
+     *   2. Registra un evento USER_LOGOUT en `system_logs`.
+     *   3. Llama a `supabase.auth.signOut()`.
+     *
+     * Si solo confiásemos en el evento `SIGNED_OUT` del listener no habría
+     * sesión activa y el INSERT se rechazaría.
      */
     const signOut = useCallback(async () => {
-        try {
-            const current = lastUserRef.current;
-            if (current?.id && current?.email) {
-                await logSystemAction(current.id, current.email, 'USER_LOGOUT', 'Auth', { platform: Platform.OS, version: Platform.Version });
-            }
-        } catch (err) {
-            console.warn('No se pudo registrar USER_LOGOUT:', err);
+        // Resolvemos el usuario actual: ref → estado → Supabase (fallback).
+        let current = lastUserRef.current;
+        if (!current?.id) {
+            try {
+                const { data } = await supabase.auth.getUser();
+                if (data?.user) current = { id: data.user.id, email: data.user.email };
+            } catch { /* ignore */ }
         }
+
+        if (current?.id) {
+            try {
+                await supabase
+                    .from('users')
+                    .update({ isOnline: false, last_seen: new Date().toISOString() })
+                    .eq('id', current.id);
+            } catch (err) {
+                console.warn('No se pudo marcar isOnline=false al cerrar sesión:', err);
+            }
+
+            try {
+                await logSystemAction(
+                    current.id,
+                    current.email || 'Desconocido',
+                    'USER_LOGOUT',
+                    'Auth',
+                    { platform: Platform.OS, version: Platform.Version }
+                );
+            } catch (err) {
+                console.warn('No se pudo registrar USER_LOGOUT:', err);
+            }
+        }
+
         await supabase.auth.signOut();
     }, []);
 
