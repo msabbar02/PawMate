@@ -236,7 +236,7 @@ npm run dev
 
 - msabbar02@yahoo.com
 - DAM — Desarrollo de Aplicaciones Multiplataforma
-- [GitHub](https://github.com/msabbar02/PawMate)
+- [GitHub](https://github.com/msabbar02)
 
 ---
 
