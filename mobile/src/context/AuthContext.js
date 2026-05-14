@@ -248,6 +248,20 @@ export const AuthProvider = ({ children }) => {
         // Lectura inicial de la sesión almacenada en AsyncStorage.
         supabase.auth.getSession().then(({ data: { session } }) => {
             handleAuthChange(session);
+            // Si ya había una sesión persistida, registramos también un USER_LOGIN
+            // con el flag `resumed:true` para que el panel de admin pueda mostrar
+            // que el usuario está activo (de lo contrario solo se loggea cuando
+            // hay un SIGNED_IN explícito y nunca al reabrir la app).
+            if (session?.user) {
+                lastUserRef.current = { id: session.user.id, email: session.user.email };
+                logSystemAction(
+                    session.user.id,
+                    session.user.email,
+                    'USER_LOGIN',
+                    'Auth',
+                    { event: 'INITIAL_SESSION', resumed: true, platform: Platform.OS, version: Platform.Version }
+                ).catch(() => {});
+            }
         });
 
         // Suscripción a los cambios de autenticación (login / logout).

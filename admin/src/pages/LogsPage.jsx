@@ -84,11 +84,44 @@ export default function LogsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [actionFilter, setActionFilter] = useState('all');
     const [autoTick, setAutoTick] = useState(0);
+    const [liveUsers, setLiveUsers] = useState([]);
 
     useEffect(() => {
         const id = setInterval(() => setAutoTick(prev => prev + 1), 30000);
         return () => clearInterval(id);
     }, []);
+
+    /**
+     * Carga los usuarios actualmente activos. Se basa en la presencia real
+     * de la tabla `public.users` (`isOnline = true` o `last_seen` en los
+     * últimos 5 min), no en los logs, para reflejar la actividad aunque la
+     * sesión se haya restaurado sin generar un USER_LOGIN nuevo.
+     */
+    const fetchLiveUsers = async () => {
+        try {
+            const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            const { data, error } = await supabase
+                .from('users')
+                .select('id, email, "fullName", "isOnline", last_seen')
+                .or(`isOnline.eq.true,last_seen.gte.${fiveMinAgo}`)
+                .limit(100);
+            if (!error && data) {
+                setLiveUsers(data.map(u => ({
+                    userId:     u.id,
+                    email:      u.email,
+                    fullName:   u.fullName,
+                    isOnline:   u.isOnline,
+                    lastSeen:   u.last_seen,
+                })));
+            }
+        } catch (err) {
+            console.error('Error fetching live users:', err);
+        }
+    };
+    useEffect(() => {
+        fetchLiveUsers();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoTick]);
 
     /** Carga los últimos 300 logs ordenados por fecha descendente. */
     const fetchLogs = async () => {
@@ -133,25 +166,6 @@ export default function LogsPage() {
         });
     }, [logs, searchTerm, actionFilter]);
 
-    const liveUsers = useMemo(() => {
-        const FIVE_MIN = 5 * 60 * 1000;
-        const now = Date.now();
-        const map = new Map();
-        for (const log of logs) {
-            const ts = new Date(log.created_at).getTime();
-            if (now - ts > FIVE_MIN) continue;
-            const entry = map.get(log.userId) || { lastLogin: 0, lastLogout: 0, email: log.userEmail, userId: log.userId };
-            if (log.actionType === 'USER_LOGIN' || log.actionType === 'USER_SIGNUP') {
-                entry.lastLogin = Math.max(entry.lastLogin, ts);
-            } else if (log.actionType === 'USER_LOGOUT') {
-                entry.lastLogout = Math.max(entry.lastLogout, ts);
-            }
-            map.set(log.userId, entry);
-        }
-        return Array.from(map.values()).filter(e => e.lastLogin > e.lastLogout);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [logs, autoTick]);
-
     const uniqueActions = useMemo(() => {
         const set = new Set(logs.map(l => l.actionType).filter(Boolean));
         return Array.from(set).sort();
@@ -186,11 +200,11 @@ export default function LogsPage() {
                                     color: 'inherit', fontSize: 13,
                                     display: 'flex', alignItems: 'center', gap: 6,
                                 }}
-                                title={`Activo desde ${timeAgo(new Date(u.lastLogin).toISOString())}`}
+                                title={u.isOnline ? 'Online ahora' : `Última actividad ${timeAgo(u.lastSeen)}`}
                             >
-                                <FontAwesomeIcon icon={faCircle} style={{ fontSize: 8, color: '#22c55e' }} />
-                                <span style={{ fontWeight: 500 }}>{u.email}</span>
-                                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{timeAgo(new Date(u.lastLogin).toISOString())}</span>
+                                <FontAwesomeIcon icon={faCircle} style={{ fontSize: 8, color: u.isOnline ? '#22c55e' : '#f59e0b' }} />
+                                <span style={{ fontWeight: 500 }}>{u.fullName || u.email}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{u.isOnline ? 'online' : timeAgo(u.lastSeen)}</span>
                             </button>
                         ))}
                     </div>
