@@ -48,7 +48,7 @@ export const logSystemAction = async (userId, userEmail, actionType, entity, det
             p_user_email:  userEmail || null,
         });
 
-        if (!rpcError) return;
+        if (!rpcError) return null;
 
         console.warn('RPC record_system_log falló, intentando INSERT directo:', rpcError.message);
 
@@ -64,8 +64,11 @@ export const logSystemAction = async (userId, userEmail, actionType, entity, det
         ]);
         if (insertError) {
             console.warn('INSERT directo en system_logs también falló:', insertError.message);
+            return insertError;
         }
+        return null;
     } catch (err) {
         console.error('Error ejecutando logSystemAction:', err);
+        return err;
     }
 };

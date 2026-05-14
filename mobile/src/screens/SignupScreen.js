@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useContext } from 'react';
 import {
     StyleSheet,
     View,
@@ -20,6 +20,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../config/supabase';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
+import { AuthContext } from '../context/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -58,6 +59,7 @@ const InputField = ({ icon, placeholder, value, fieldName, secureTextEntry, isPa
 
 export default function SignupScreen({ navigation }) {
     const { t } = useTranslation();
+    const { markSignupInProgress } = useContext(AuthContext);
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -159,6 +161,10 @@ export default function SignupScreen({ navigation }) {
                 return;
             }
 
+            // Marca que el próximo SIGNED_IN proviene de un registro recién hecho,
+            // para que se loggee como USER_SIGNUP.
+            markSignupInProgress();
+
             const { data, error } = await supabase.auth.signUp({
                 email: formData.email.toLowerCase().trim(),
                 password: formData.password,
@@ -221,6 +227,8 @@ export default function SignupScreen({ navigation }) {
     const handleGoogleSignup = async () => {
         try {
             setLoading(true);
+            // Marca que el pr\u00f3ximo SIGNED_IN proviene de un registro.
+            markSignupInProgress();
             const redirectTo = 'pawmate://signup';
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',

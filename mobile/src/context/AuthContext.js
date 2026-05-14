@@ -28,6 +28,9 @@ export const AuthProvider = ({ children }) => {
     const userDataRef = useRef(null);
     // Último usuario autenticado, necesario para registrar el SIGNED_OUT con su id real.
     const lastUserRef = useRef(null);
+    // Bandera que indica si el próximo SIGNED_IN proviene de un signUp() recién
+    // ejecutado. La activa la pantalla de registro llamando a `markSignupInProgress()`.
+    const signupInProgressRef = useRef(false);
 
     // Mantenemos un ref con userData para poder leerlo desde callbacks.
     useEffect(() => { userDataRef.current = userData; }, [userData]);
@@ -89,19 +92,31 @@ export const AuthProvider = ({ children }) => {
             }
 
             try {
-                await logSystemAction(
+                const logErr = await logSystemAction(
                     current.id,
                     current.email || 'Desconocido',
                     'USER_LOGOUT',
                     'Auth',
                     { platform: Platform.OS, version: Platform.Version }
                 );
+                if (logErr) {
+                    Alert.alert('Logout log error', String(logErr?.message || logErr));
+                }
             } catch (err) {
-                console.warn('No se pudo registrar USER_LOGOUT:', err);
+                Alert.alert('Logout log exception', String(err?.message || err));
             }
         }
 
         await supabase.auth.signOut();
+    }, []);
+
+    /**
+     * Marca que el próximo evento SIGNED_IN proviene de un registro recién
+     * realizado, para que se loggee como USER_SIGNUP en lugar de USER_LOGIN.
+     * Debe llamarse desde la pantalla de registro justo antes de `signUp()`.
+     */
+    const markSignupInProgress = useCallback(() => {
+        signupInProgressRef.current = true;
     }, []);
 
     /**
@@ -315,9 +330,8 @@ export const AuthProvider = ({ children }) => {
             handleAuthChange(session);
             if (_evt === 'SIGNED_IN' && session?.user) {
                 lastUserRef.current = { id: session.user.id, email: session.user.email };
-                const createdAt = new Date(session.user.created_at).getTime();
-                const now = Date.now();
-                const isNewUser = now - createdAt < 60000;
+                const isNewUser = signupInProgressRef.current;
+                signupInProgressRef.current = false;
                 logSystemAction(
                     session.user.id,
                     session.user.email,
@@ -346,7 +360,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData, updateUserOptimistic, unreadMessages, pendingBookings, signOut }}>
+        <AuthContext.Provider value={{ user, userData, isLoading, refreshUserData, updateUserOptimistic, unreadMessages, pendingBookings, signOut, markSignupInProgress }}>
             {children}
         </AuthContext.Provider>
     );
