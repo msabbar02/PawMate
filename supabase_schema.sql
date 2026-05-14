@@ -793,6 +793,33 @@ CREATE POLICY system_logs_modify ON public.system_logs
 CREATE POLICY system_logs_delete ON public.system_logs
   FOR DELETE TO authenticated USING (public.is_admin());
 
+-- RPC SECURITY DEFINER para que el cliente pueda registrar logs sin chocar
+-- con la RLS (el INSERT corre con permisos del owner). Solo permite registrar
+-- el log del propio usuario autenticado, o 'Sistema' si no hay sesión.
+CREATE OR REPLACE FUNCTION public.record_system_log(
+    p_action_type text,
+    p_entity      text,
+    p_details     jsonb DEFAULT '{}'::jsonb,
+    p_user_email  text  DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_uid   text;
+    v_email text;
+BEGIN
+    v_uid   := COALESCE(auth.uid()::text, 'Sistema');
+    v_email := COALESCE(p_user_email, (SELECT email FROM auth.users WHERE id = auth.uid()), 'Sistema');
+
+    INSERT INTO public.system_logs ("userId", "userEmail", "actionType", entity, details)
+    VALUES (v_uid, v_email, p_action_type, p_entity, p_details::text);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.record_system_log(text, text, jsonb, text) TO authenticated, anon;
+
 -- ── posts ──────────────────────────────────────────────────────────────────
 CREATE POLICY posts_select ON public.posts
   FOR SELECT TO authenticated USING (true);
