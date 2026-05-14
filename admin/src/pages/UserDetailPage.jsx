@@ -12,7 +12,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendBanEmail } from '../config/api';
 import { AuthContext } from '../context/AuthContext';
-import { isSuperadmin } from '../config/superadmin';
+import { isSuperadmin, displayRole } from '../config/superadmin';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faArrowLeft, faUser, faPaw, faCalendarCheck, faTriangleExclamation,
@@ -79,6 +79,11 @@ function Badge({ status }) {
         pendiente:  { cls: 'amber', label: 'Pendiente' },
         paid:       { cls: 'green', label: 'Pagado' },
         refunded:   { cls: 'gray',  label: 'Reembolsado' },
+        admin:      { cls: 'red',   label: 'Admin' },
+        superadmin: { cls: 'amber', label: 'Superadmin' },
+        owner:      { cls: 'blue',  label: 'Owner' },
+        caregiver:  { cls: 'green', label: 'Caregiver' },
+        normal:     { cls: 'gray',  label: 'Normal' },
     };
     const m = map[status] || { cls: 'gray', label: status || '-' };
     return <span className={`detail-badge ${m.cls}`}>{m.label}</span>;
@@ -226,7 +231,7 @@ export default function UserDetailPage() {
                                     <FontAwesomeIcon icon={faCircle} style={{ fontSize: 8, color: isOnline ? '#22c55e' : '#94a3b8' }} />
                                     {isOnline ? 'Online' : `Última vez: ${formatDate(user.last_seen)}`}
                                     {user.is_banned && <Badge status="rejected_es" />}
-                                    <Badge status={user.role || 'normal'} />
+                                    <Badge status={displayRole(user)} />
                                 </div>
                             </div>
                         </div>

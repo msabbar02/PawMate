@@ -1,7 +1,7 @@
 # PawMate — Documentación Técnica
 
 > Plataforma móvil + web para conectar dueños de mascotas con cuidadores verificados.
-> Versión: 1.2 · Última revisión: 2026-05
+> Versión: 1.3 · Última revisión: 2026-05
 
 ## Índice
 
@@ -479,6 +479,8 @@ flowchart LR
 - Ver chats entre usuarios (moderación)
 - Audit log de todas las acciones del sistema
 - Gestionar reportes de bugs/denuncias
+- Cambio de contraseña a otros usuarios desde el modal de edición (validación realtime mín. 6 caracteres + coincidencia)
+- **Rol Superadministrador** (`adminpawmate@gmail.com`): único con permiso para gestionar el rol `admin` (promover/degradar), banear/eliminar otros admins y cambiar contraseñas a otros admins. Se distingue con badge dorado "Superadmin" en todas las vistas. Las restricciones se replican a nivel BD mediante el trigger `protect_superadmin` para impedir bypass vía UPDATE directos.
 
 ### 6.4 Web (`web/`)
 
@@ -539,6 +541,8 @@ flowchart TB
 | **errorHandler**            | En producción sólo mensajes genéricos por código HTTP, sin`err.message` ni stack                                                                        |
 | **Borrado de cuenta**       | DELETE primero en Supabase Auth (CASCADE limpia`public.users`); evita cuentas zombie                                                                        |
 | **RLS reales**              | Políticas owner-based en todas las tablas + helper`public.is_admin()` `SECURITY DEFINER`                                                                   |
+| **system_logs RLS separada**| Políticas independientes`select/insert/modify/delete`. Cualquier `authenticated` puede insertar registros propios (`"userId"::text = auth.uid()::text` o `'Sistema'`); solo admins pueden leer/modificar/borrar.                                |
+| **Trigger protect_superadmin** | `BEFORE UPDATE` en `public.users` con `SECURITY DEFINER`. Bloquea cualquier intento de cambiar `role`/`email`/`is_banned` del superadmin y restringe que un admin no-superadmin manipule el rol o el ban de otros admins, incluso vía UPDATE directo desde el SDK. |
 | **Email auth hook**         | JWT firmado con`SUPABASE_AUTH_HOOK_SECRET`                                                                                                                  |
 | **Service key**             | Solo en server, nunca expuesta al cliente                                                                                                                   |
 | **Auto-eliminación**       | Endpoint DELETE protegido (self o admin)                                                                                                                    |

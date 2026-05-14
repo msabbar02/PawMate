@@ -504,6 +504,61 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 REVOKE ALL ON FUNCTION public.admin_set_role(uuid, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_set_role(uuid, text) TO authenticated;
 
+-- ── PROTECCIÓN: trigger que blinda al superadmin de UPDATE directos ──
+-- El cliente del panel hace `update users set role=...` directamente (no usa
+-- la función admin_set_role), por lo que la única forma fiable de impedir
+-- que otro admin degrade al superadmin es un trigger BEFORE UPDATE en la
+-- tabla. También impide cambiar el email del superadmin (lo identificamos
+-- por email) y evita que un admin no-superadmin manipule el rol/email/ban
+-- de cualquier otro admin.
+CREATE OR REPLACE FUNCTION public.protect_superadmin()
+RETURNS trigger AS $$
+DECLARE
+  caller_email text;
+  caller_role  text;
+BEGIN
+  -- Si la sesión no es authenticated (service_role/postgres) deja pasar.
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT lower(email), role INTO caller_email, caller_role
+  FROM public.users WHERE id = auth.uid();
+
+  -- Reglas sobre el superadmin: nadie puede cambiar su rol, email ni banearlo.
+  IF lower(OLD.email) = 'adminpawmate@gmail.com' THEN
+    IF NEW.role IS DISTINCT FROM OLD.role THEN
+      RAISE EXCEPTION 'No se puede cambiar el rol del superadministrador';
+    END IF;
+    IF lower(NEW.email) IS DISTINCT FROM lower(OLD.email) THEN
+      RAISE EXCEPTION 'No se puede cambiar el email del superadministrador';
+    END IF;
+    IF NEW.is_banned IS DISTINCT FROM OLD.is_banned THEN
+      RAISE EXCEPTION 'No se puede banear al superadministrador';
+    END IF;
+  END IF;
+
+  -- Solo el superadmin puede manipular el rol o el ban de otro admin
+  -- (o promover un usuario normal a admin).
+  IF caller_email IS DISTINCT FROM 'adminpawmate@gmail.com' THEN
+    IF (OLD.role = 'admin' OR NEW.role = 'admin')
+       AND NEW.role IS DISTINCT FROM OLD.role THEN
+      RAISE EXCEPTION 'Solo el superadministrador puede gestionar el rol "admin"';
+    END IF;
+    IF OLD.role = 'admin' AND NEW.is_banned IS DISTINCT FROM OLD.is_banned THEN
+      RAISE EXCEPTION 'Solo el superadministrador puede banear a otros admins';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS protect_superadmin_trg ON public.users;
+CREATE TRIGGER protect_superadmin_trg
+  BEFORE UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.protect_superadmin();
+
 -- ── Sincronizar usuarios huérfanos (auth sin public) ──
 INSERT INTO public.users (id, email, "fullName", "photoURL", avatar, role)
 SELECT
@@ -722,6 +777,7 @@ DROP POLICY IF EXISTS system_logs_all      ON public.system_logs;
 DROP POLICY IF EXISTS system_logs_select   ON public.system_logs;
 DROP POLICY IF EXISTS system_logs_insert   ON public.system_logs;
 DROP POLICY IF EXISTS system_logs_modify   ON public.system_logs;
+DROP POLICY IF EXISTS system_logs_delete   ON public.system_logs;
 CREATE POLICY system_logs_select ON public.system_logs
   FOR SELECT TO authenticated
   USING (public.is_admin());

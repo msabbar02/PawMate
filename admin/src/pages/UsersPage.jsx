@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../config/supabase';
 import { sendBanEmail, setUserPassword } from '../config/api';
-import { isSuperadmin } from '../config/superadmin';
+import { isSuperadmin, displayRole } from '../config/superadmin';
 import { AuthContext } from '../context/AuthContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faPenToSquare, faTrash, faXmark, faCircleExclamation, faShield, faShieldHalved, faEye, faDog, faBan } from '@fortawesome/free-solid-svg-icons';
@@ -175,6 +175,20 @@ export default function UsersPage() {
     /** Persiste los cambios del modal de edición. */
     const handleSaveEdit = async () => {
         try {
+            // Reglas de superadmin para el cambio de rol (defensa en profundidad: la BD también las aplica).
+            const targetIsSuperadmin = isSuperadmin(selectedUser.email);
+            const roleChanged        = editForm.role !== (selectedUser.role || 'normal');
+            if (roleChanged) {
+                if (targetIsSuperadmin) {
+                    alert('No se puede cambiar el rol del superadministrador');
+                    return;
+                }
+                if ((selectedUser.role === 'admin' || editForm.role === 'admin') && !callerIsSuperadmin) {
+                    alert('Solo el superadministrador puede gestionar el rol "admin"');
+                    return;
+                }
+            }
+
             // 1) Cambio de contrasea (opcional, requiere ambos campos rellenos y coincidentes).
             if (newPassword || confirmPassword) {
                 if (newPassword.length < 6) {
@@ -298,9 +312,9 @@ export default function UsersPage() {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`role-badge ${user.role || 'normal'}`}>
-                                                {user.role === 'admin' && <FontAwesomeIcon icon={faShield} style={{ fontSize: 14 }} />}
-                                                {user.role || 'normal'}
+                                            <span className={`role-badge ${displayRole(user)}`}>
+                                                {(user.role === 'admin' || isSuperadmin(user.email)) && <FontAwesomeIcon icon={faShield} style={{ fontSize: 14 }} />}
+                                                {displayRole(user)}
                                             </span>
                                         </td>
                                         <td>
@@ -379,16 +393,36 @@ export default function UsersPage() {
 
                             <div className="form-group">
                                 <label>{t('users.userRoleLabel')}</label>
-                                <select 
-                                    value={editForm.role}
-                                    onChange={(e) => setEditForm({...editForm, role: e.target.value})}
-                                    className="form-control"
-                                >
-                                    <option value="normal">{t('users.roleNormal')}</option>
-                                    <option value="owner">{t('users.roleOwner')}</option>
-                                    <option value="caregiver">{t('users.roleCaregiver')}</option>
-                                    <option value="admin">{t('users.roleAdmin')}</option>
-                                </select>
+                                {(() => {
+                                    const targetIsSuperadmin = isSuperadmin(selectedUser.email);
+                                    const targetIsAdmin      = selectedUser.role === 'admin';
+                                    // El rol del superadmin no se puede tocar nunca.
+                                    if (targetIsSuperadmin) {
+                                        return (
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value="Superadministrador (no editable)"
+                                                disabled
+                                            />
+                                        );
+                                    }
+                                    // Solo el superadmin puede gestionar el rol "admin" (degradar admins o promover a admin).
+                                    const canTouchAdminRole = callerIsSuperadmin;
+                                    return (
+                                        <select 
+                                            value={editForm.role}
+                                            onChange={(e) => setEditForm({...editForm, role: e.target.value})}
+                                            className="form-control"
+                                            disabled={targetIsAdmin && !callerIsSuperadmin}
+                                        >
+                                            <option value="normal">{t('users.roleNormal')}</option>
+                                            <option value="owner">{t('users.roleOwner')}</option>
+                                            <option value="caregiver">{t('users.roleCaregiver')}</option>
+                                            {canTouchAdminRole && <option value="admin">{t('users.roleAdmin')}</option>}
+                                        </select>
+                                    );
+                                })()}
                             </div>
 
                             {(editForm.role === 'owner' || editForm.role === 'caregiver') && (
@@ -514,9 +548,9 @@ export default function UsersPage() {
                                     <p className="premium-profile-subtitle">{selectedUser.email}</p>
                                 </div>
                                 <div className="premium-top-right-badge">
-                                    <span className={`role-badge ${selectedUser.role || 'normal'}`} style={{fontSize: '14px', padding: '8px 16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}}>
-                                        {selectedUser.role === 'admin' && <FontAwesomeIcon icon={faShield} style={{ fontSize: 16 }} />}
-                                        {selectedUser.role || 'normal'}
+                                    <span className={`role-badge ${displayRole(selectedUser)}`} style={{fontSize: '14px', padding: '8px 16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}}>
+                                        {(selectedUser.role === 'admin' || isSuperadmin(selectedUser.email)) && <FontAwesomeIcon icon={faShield} style={{ fontSize: 16 }} />}
+                                        {displayRole(selectedUser)}
                                     </span>
                                 </div>
                             </div>

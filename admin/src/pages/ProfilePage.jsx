@@ -11,6 +11,7 @@ import { supabase } from '../config/supabase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCamera, faFloppyDisk, faTrash, faUser, faEnvelope, faPhone, faLocationDot, faFileLines } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
+import { isSuperadmin } from '../config/superadmin';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
@@ -143,7 +144,9 @@ export default function ProfilePage() {
                     </div>
                     {uploading && <span className="upload-status">{t('profile.uploading')}</span>}
                     <h3 className="profile-display-name">{adminUser?.fullName || 'Admin'}</h3>
-                    <span className="role-badge admin">{t('profile.adminBadge')}</span>
+                    {isSuperadmin(adminUser?.email)
+                        ? <span className="role-badge superadmin">Superadmin</span>
+                        : <span className="role-badge admin">{t('profile.adminBadge')}</span>}
                 </div>
 
                 <div className="profile-details">

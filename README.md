@@ -154,6 +154,8 @@ PawMate/
 - Sistema de reportes y logs de actividad
 - Flujo de verificaciones de identidad (aprobar / rechazar con rol)
 - Gestión de administradores (crear / eliminar)
+- **Rol Superadministrador** (`adminpawmate@gmail.com`): único con permiso para crear/degradar/banear otros admins, gestionar el rol `admin` y cambiar contraseña a otros admins. Identificado con badge dorado "Superadmin" en todas las vistas.
+- Cambio de contraseña de cualquier usuario desde el modal de edición (validación realtime, mín. 6 caracteres y coincidencia)
 - Perfil de administrador editable (avatar, datos personales)
 - Dark mode / Light mode · i18n ES/EN
 - Desplegado en Vercel
@@ -220,6 +222,8 @@ npm run dev
 - **Borrado de cuenta** que limpia primero Supabase Auth (CASCADE limpia `public.users`), evitando cuentas zombie.
 - **errorHandler** que en producción sólo expone mensajes genéricos por código HTTP, sin filtrar `err.message` ni stack.
 - **RLS reales** en todas las tablas (`supabase_schema.sql`): políticas owner-based + helper `public.is_admin()` `SECURITY DEFINER`. La service key del backend hace bypass solo para tareas administrativas.
+- **Logs auditables**: `system_logs` con políticas RLS separadas (`select/insert/modify/delete`) — cualquier usuario autenticado puede insertar su propio registro (login, signup, logout…) pero solo los admins pueden leer/borrar. Lectura realtime desde el panel.
+- **Trigger `protect_superadmin`** en `public.users`: blinda a nivel BD el rol/email/ban del superadministrador y bloquea que un admin no-superadmin promueva, degrade o banee a otro admin (defensa en profundidad frente a UPDATE directos vía SDK).
 - **Resend** instanciado como singleton lazy.
 - **Sin claves hardcodeadas**: WeatherAPI key, URL del backend, etc. provienen del entorno (`EXPO_PUBLIC_*`).
 

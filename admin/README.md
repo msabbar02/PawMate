@@ -87,9 +87,11 @@ admin/
 - **Mascotas**: listado con propietario resuelto, filtro por especie, editar datos, eliminar
 - **Reservas**: listado con filtro por estado, editar estado, eliminar, Realtime (postgres_changes)
 - **Reportes**: dos pestañas — reportes de usuarios (resolver/eliminar) y reseñas (moderar/eliminar)
-- **Logs**: registro de acciones del sistema (`system_logs`), filtro por tipo de acción, auto-refresco cada 30 s
+- **Logs**: registro de acciones del sistema (`system_logs`), filtro por tipo de acción, auto-refresco cada 30 s. Las políticas RLS están separadas (`select/insert/modify/delete`): cualquier usuario autenticado puede insertar su propio registro (login, signup, logout…) y solo los admins pueden leerlos/borrarlos. Realtime activo en la vista.
 - **Verificaciones**: solicitudes de cuidadores con preview de documentos (DNI frontal/trasero, selfie, certificado), aprobar (cambia `role`) o rechazar
 - **Administradores**: listar admins, crear nuevo admin (signup + update role), revocar permisos
+- **Superadministrador** (`adminpawmate@gmail.com`): único rol con permiso para gestionar el rol `admin`, banear/eliminar otros admins y cambiar contraseñas de otros admins. Se distingue con badge dorado "Superadmin" en lista de usuarios, detalle, modal de edición, perfil y página de admins. La protección se aplica también a nivel BD mediante el trigger `protect_superadmin` (bloquea cualquier UPDATE directo malicioso).
+- **Cambio de contraseña** desde el modal de edición de usuarios (validación realtime: mínimo 6 caracteres + coincidencia). Restringido a superadmin si el destinatario es otro admin.
 - **Perfil**: editar nombre, teléfono, bio, ubicación; subir foto de perfil a Supabase Storage
 - **Internacionalización**: ES/EN con i18next, idioma persistido en localStorage
 - **Tema**: claro/oscuro con persistencia en localStorage

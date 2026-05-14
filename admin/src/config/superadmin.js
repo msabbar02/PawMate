@@ -18,3 +18,15 @@ export const SUPERADMIN_EMAIL = 'adminpawmate@gmail.com';
 export function isSuperadmin(email) {
     return (email || '').toLowerCase() === SUPERADMIN_EMAIL;
 }
+
+/**
+ * Devuelve el rol "para mostrar" del usuario. El superadministrador siempre
+ * se muestra como `superadmin` aunque en BD esté guardado como `admin`.
+ *
+ * @param {{ email?: string, role?: string }} user
+ * @returns {string}
+ */
+export function displayRole(user) {
+    if (isSuperadmin(user?.email)) return 'superadmin';
+    return user?.role || 'normal';
+}

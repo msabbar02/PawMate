@@ -160,6 +160,9 @@ export default function AdminsPage() {
                                 {admin.id === adminUser?.id && (
                                     <span className="you-badge">{t('admins.youBadge')}</span>
                                 )}
+                                {isSuperadmin(admin.email) && (
+                                    <span className="role-badge superadmin" style={{ marginLeft: 6 }}>Superadmin</span>
+                                )}
                             </div>
                             <div className="admin-card-meta">
                                 <span>{t('admins.phoneLabel')} {admin.phone || t('admins.notConfigured')}</span>

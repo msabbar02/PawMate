@@ -55,6 +55,7 @@
     text-transform: capitalize;
 }
 .role-badge.admin { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.role-badge.superadmin { background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.25)); color: #b45309; border: 1px solid rgba(217, 119, 6, 0.4); }
 .role-badge.owner { background-color: rgba(59, 130, 246, 0.2); color: #3b82f6; }
 .role-badge.caregiver { background-color: rgba(16, 185, 129, 0.2); color: #10b981; }
 .role-badge.normal { background-color: rgba(148, 163, 184, 0.2); color: #94a3b8; }
