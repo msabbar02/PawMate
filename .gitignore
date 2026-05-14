@@ -3,14 +3,14 @@
 # ============================================
 
 # ============================================
-# SENSITIVE FILES - NEVER COMMIT
+# SENSITIVE FILES & KEYS
 # ============================================
 # Supabase
 **/supabase/.branches/
 **/supabase/.temp/
 **/supabase-service-key*
 
-# Environment Variables (NEVER commit - repo is public)
+# Environment Variables 
 .env
 .env.*
 **/.env
