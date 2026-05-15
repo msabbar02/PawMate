@@ -306,27 +306,64 @@ export const AuthProvider = ({ children }) => {
             }
         };
 
+        // Detecta errores de refresh token inválido/no encontrado y limpia la
+        // sesión local para evitar bucles. Esto pasa típicamente en Expo Go
+        // cuando el refresh token persistido ya fue invalidado en el servidor.
+        const isInvalidRefreshTokenError = (err) => {
+            if (!err) return false;
+            const msg = String(err?.message || err).toLowerCase();
+            return (
+                msg.includes('refresh token not found') ||
+                msg.includes('invalid refresh token') ||
+                msg.includes('refresh_token_not_found')
+            );
+        };
+
         // Lectura inicial de la sesión almacenada en AsyncStorage.
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            handleAuthChange(session);
-            // Si ya había una sesión persistida, registramos también un USER_LOGIN
-            // con el flag `resumed:true` para que el panel de admin pueda mostrar
-            // que el usuario está activo (de lo contrario solo se loggea cuando
-            // hay un SIGNED_IN explícito y nunca al reabrir la app).
-            if (session?.user) {
-                lastUserRef.current = { id: session.user.id, email: session.user.email };
-                logSystemAction(
-                    session.user.id,
-                    session.user.email,
-                    'USER_LOGIN',
-                    'Auth',
-                    { event: 'INITIAL_SESSION', resumed: true, platform: Platform.OS, version: Platform.Version }
-                ).catch(() => {});
-            }
-        });
+        supabase.auth.getSession()
+            .then(async ({ data: { session }, error }) => {
+                if (error && isInvalidRefreshTokenError(error)) {
+                    console.warn('[Auth] Refresh token inválido, limpiando sesión local.');
+                    try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+                    handleAuthChange(null);
+                    return;
+                }
+                handleAuthChange(session);
+                // Si ya había una sesión persistida, registramos también un USER_LOGIN
+                // con el flag `resumed:true` para que el panel de admin pueda mostrar
+                // que el usuario está activo (de lo contrario solo se loggea cuando
+                // hay un SIGNED_IN explícito y nunca al reabrir la app).
+                if (session?.user) {
+                    lastUserRef.current = { id: session.user.id, email: session.user.email };
+                    logSystemAction(
+                        session.user.id,
+                        session.user.email,
+                        'USER_LOGIN',
+                        'Auth',
+                        { event: 'INITIAL_SESSION', resumed: true, platform: Platform.OS, version: Platform.Version }
+                    ).catch(() => {});
+                }
+            })
+            .catch(async (err) => {
+                if (isInvalidRefreshTokenError(err)) {
+                    console.warn('[Auth] Refresh token inválido (catch), limpiando sesión local.');
+                    try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+                    handleAuthChange(null);
+                } else {
+                    console.error('[Auth] getSession error:', err);
+                    setIsLoading(false);
+                }
+            });
 
         // Suscripción a los cambios de autenticación (login / logout).
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_evt, session) => {
+            // Si el SDK emite TOKEN_REFRESHED sin sesión o detectamos un fallo
+            // de refresh, forzamos limpieza local.
+            if (_evt === 'TOKEN_REFRESHED' && !session) {
+                try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+                handleAuthChange(null);
+                return;
+            }
             handleAuthChange(session);
             if (_evt === 'SIGNED_IN' && session?.user) {
                 lastUserRef.current = { id: session.user.id, email: session.user.email };

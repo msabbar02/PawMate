@@ -311,6 +311,8 @@ export default function BookingScreen() {
     const handleQrScanned = async ({ data: qrData }) => {
         if (cameraScanned || !user?.id) return;
         setCameraScanned(true);
+        // Cierra la cámara inmediatamente para evitar re-escaneos.
+        setIsScannerVisible(false);
         try {
             // Busca primero una reserva 'activa' (check-in → in_progress).
             let { data } = await supabase.from('reservations')
@@ -323,15 +325,14 @@ export default function BookingScreen() {
             if (data && data.length > 0) {
                 const res = data[0];
                 await supabase.from('reservations').update({ status: 'in_progress' }).eq('id', res.id);
-                await createNotification(res.ownerId, {
+                createNotification(res.ownerId, {
                     type: 'checkin_confirmed',
                     bookingId: res.id,
                     title: t('bookings.notifCheckinTitle'),
                     body: t('bookings.notifCheckinBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
                     icon: 'checkmark-circle-outline',
                     iconBg: '#DCFCE7', iconColor: '#16A34A',
-                });
-                setIsScannerVisible(false);
+                }).catch(() => {});
                 Alert.alert(t('bookings.checkInConfirm'), t('bookings.checkInMsg'));
                 return;
             }
@@ -347,55 +348,51 @@ export default function BookingScreen() {
             if (data && data.length > 0) {
                 const res = data[0];
                 await supabase.from('reservations').update({ status: 'completada', completedAt: new Date().toISOString() }).eq('id', res.id);
-
-                // Recarga la fila del cuidador para asegurar los contadores más recientes.
-                const { data: cgRow } = await supabase.from('users').select('completedServices, totalWalks, petsCaredIds').eq('id', user.id).maybeSingle();
-                const newCompleted = (cgRow?.completedServices || 0) + 1;
-                const cgPatch = { completedServices: newCompleted };
-                if (res.serviceType === 'walking') {
-                    cgPatch.totalWalks = (cgRow?.totalWalks || 0) + 1;
-                }
-                // Registra las mascotas atendidas por el cuidador (sin duplicados).
-                if (Array.isArray(res.petIds) && res.petIds.length > 0) {
-                    const existing = Array.isArray(cgRow?.petsCaredIds) ? cgRow.petsCaredIds : [];
-                    cgPatch.petsCaredIds = [...new Set([...existing, ...res.petIds])];
-                }
-                await supabase.from('users').update(cgPatch).eq('id', user.id);
-
-                // Incrementa el contador de paseos del dueño (solo servicio walking).
-                if (res.serviceType === 'walking' && res.ownerId) {
-                    const { data: ownerRow } = await supabase.from('users').select('totalWalks, saveWalks').eq('id', res.ownerId).maybeSingle();
-                    if (ownerRow?.saveWalks !== false) {
-                        await supabase.from('users').update({
-                            totalWalks: (ownerRow?.totalWalks || 0) + 1,
-                        }).eq('id', res.ownerId);
-                    }
-                    // Incrementa el contador de paseos por mascota.
-                    if (Array.isArray(res.petIds) && res.petIds.length > 0) {
-                        for (const pid of res.petIds) {
-                            const { data: petRow } = await supabase.from('pets').select('totalWalks').eq('id', pid).maybeSingle();
-                            await supabase.from('pets').update({ totalWalks: (petRow?.totalWalks || 0) + 1 }).eq('id', pid);
-                        }
-                    }
-                }
-                // Libera el pago: marca como paymentReleased para que el backend lo procese.
-                await supabase.from('reservations').update({ paymentReleased: true, paymentReleasedAt: new Date().toISOString() }).eq('id', res.id).catch(() => {});
-                await createNotification(res.ownerId, {
-                    type: 'booking_completed',
-                    bookingId: res.id,
-                    title: t('bookings.notifServiceDoneTitle'),
-                    body: t('bookings.notifServiceDoneBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
-                    icon: 'ribbon-outline',
-                    iconBg: '#E0F2FE', iconColor: '#0891b2',
-                });
-                setIsScannerVisible(false);
                 Alert.alert(t('bookings.serviceCompleted'), t('bookings.serviceCompletedMsg'));
+
+                // Tareas secundarias en background (no bloquean la UI).
+                (async () => {
+                    try {
+                        const { data: cgRow } = await supabase.from('users').select('completedServices, totalWalks, petsCaredIds').eq('id', user.id).maybeSingle();
+                        const newCompleted = (cgRow?.completedServices || 0) + 1;
+                        const cgPatch = { completedServices: newCompleted };
+                        if (res.serviceType === 'walking') cgPatch.totalWalks = (cgRow?.totalWalks || 0) + 1;
+                        if (Array.isArray(res.petIds) && res.petIds.length > 0) {
+                            const existing = Array.isArray(cgRow?.petsCaredIds) ? cgRow.petsCaredIds : [];
+                            cgPatch.petsCaredIds = [...new Set([...existing, ...res.petIds])];
+                        }
+                        await supabase.from('users').update(cgPatch).eq('id', user.id);
+
+                        if (res.serviceType === 'walking' && res.ownerId) {
+                            const { data: ownerRow } = await supabase.from('users').select('totalWalks, saveWalks').eq('id', res.ownerId).maybeSingle();
+                            if (ownerRow?.saveWalks !== false) {
+                                await supabase.from('users').update({ totalWalks: (ownerRow?.totalWalks || 0) + 1 }).eq('id', res.ownerId);
+                            }
+                            if (Array.isArray(res.petIds) && res.petIds.length > 0) {
+                                for (const pid of res.petIds) {
+                                    const { data: petRow } = await supabase.from('pets').select('totalWalks').eq('id', pid).maybeSingle();
+                                    await supabase.from('pets').update({ totalWalks: (petRow?.totalWalks || 0) + 1 }).eq('id', pid);
+                                }
+                            }
+                        }
+                        await supabase.from('reservations').update({ paymentReleased: true, paymentReleasedAt: new Date().toISOString() }).eq('id', res.id).catch(() => {});
+                        await createNotification(res.ownerId, {
+                            type: 'booking_completed',
+                            bookingId: res.id,
+                            title: t('bookings.notifServiceDoneTitle'),
+                            body: t('bookings.notifServiceDoneBody', { name: userData?.fullName || t('bookings.caregiverFallback') }),
+                            icon: 'ribbon-outline',
+                            iconBg: '#E0F2FE', iconColor: '#0891b2',
+                        }).catch(() => {});
+                    } catch (bgErr) {
+                        console.warn('Background checkout tasks error:', bgErr);
+                    }
+                })();
                 return;
             }
 
-            Alert.alert(t('bookings.invalidQR'), t('bookings.invalidQRMsg'), [
-                { text: 'OK', onPress: () => setCameraScanned(false) },
-            ]);
+            // QR no encontrado con ningún estado válido.
+            Alert.alert(t('bookings.invalidQR'), t('bookings.invalidQRMsg'));
         } catch (e) {
             console.error('QR scan error:', e);
             Alert.alert(t('common.error'), t('bookings.qrError'));
@@ -750,8 +747,8 @@ export default function BookingScreen() {
                             <Text style={[s.quickBtnText, { color: '#0891b2' }]}>Track</Text>
                         </TouchableOpacity>
                     )}
-                    {/* Activate walk for caregivers with active/in_progress reservations */}
-                    {isCaregiver && (res.status === 'activa' || res.status === 'in_progress') && (
+                    {/* Activate walk for caregivers – only after QR check-in (in_progress) and only for walking service */}
+                    {isCaregiver && res.status === 'in_progress' && res.serviceType === 'walking' && (
                         <TouchableOpacity
                             style={[s.quickBtn, { backgroundColor: res.walkActive ? '#DCFCE7' : '#FEF3C7' }]}
                             onPress={() => handleToggleWalk(res)}

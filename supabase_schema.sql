@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   "qrCode" text,
   "reviewedByOwner" boolean DEFAULT false,
   "walkActive" boolean DEFAULT false,
+  "walkHours" integer,
   "completedAt" timestamp with time zone,
   created_at timestamp with time zone DEFAULT now()
 );

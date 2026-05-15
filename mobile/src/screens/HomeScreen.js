@@ -277,10 +277,8 @@ export default function HomeScreen({ navigation }) {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
-        {/* SECCIÓN DEL MAPA - crece cuando el panel está cerrado */}
-            <Animated.View style={[styles.mapSection, {
-                flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0.65] })
-            }]}>
+        {/* SECCIÓN DEL MAPA - ocupa todo el espacio que el panel deja libre */}
+            <Animated.View style={[styles.mapSection, { flex: 1 }]}>
                 {location ? (
                     <MapView
                         ref={mapRef}
@@ -354,42 +352,42 @@ export default function HomeScreen({ navigation }) {
                 {panelOpen && <View style={[styles.mapCurveBottom, { backgroundColor: theme.background }]} />}
             </Animated.View>
 
-            {/* SECCIÓN INFERIOR: Dashboard y Cards */}
-            <Animated.View style={[styles.bottomSection, { backgroundColor: theme.background, flex: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] }) }]}>
+            {/* SECCIÓN INFERIOR: Dashboard y Cards (ajustada al contenido) */}
+            <Animated.View style={[styles.bottomSection, { backgroundColor: theme.background, paddingBottom: Platform.OS === 'ios' ? 88 : 68 }]}>
                 
                 {/* DRAG HANDLE */}
-                <TouchableOpacity onPress={togglePanel} style={{ alignItems: 'center', paddingVertical: 10 }}>
-                    <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border }} />
+                <TouchableOpacity onPress={togglePanel} style={{ alignItems: 'center', paddingVertical: 12 }} hitSlop={{ top: 12, bottom: 12, left: 40, right: 40 }}>
+                    <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: theme.border }} />
                 </TouchableOpacity>
 
                 {panelOpen && (
                   <>
                 {/* ACTION BAR */}
-                <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF', marginTop: 4, position: 'relative', top: 0, left: 16, right: 16 }]}>
+                <View style={[styles.actionBar, { backgroundColor: isDarkMode ? theme.cardBackground : '#FFF' }]}>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Messages')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
-                            <Ionicons name="chatbubbles" size={16} color="#0ea5e9" />
+                            <Ionicons name="chatbubbles" size={18} color="#0ea5e9" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.messages')}</Text>
                     </TouchableOpacity>
                     <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Reservas')}>
                         <View style={[styles.actionIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                            <Ionicons name="calendar" size={16} color="#f59e0b" />
+                            <Ionicons name="calendar" size={18} color="#f59e0b" />
                         </View>
                         <Text style={[styles.actionBtnText, { color: theme.text }]}>{t('home.bookings')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* ROLE-BASED CTA BUTTONS */}
-                <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 12, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 12, marginBottom: 16 }}>
                     {!isCaregiver && !isWalking && (
                         <TouchableOpacity 
-                            style={{ flex: 1, backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 }}
+                            style={{ flex: 1, backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 }}
                             onPress={handleStartWalk}
                         >
                             <Ionicons name="walk" size={22} color="#FFF" style={{ marginRight: 8 }} />
-                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>{t('home.startWalk')}</Text>
+                            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{t('home.startWalk')}</Text>
                         </TouchableOpacity>
                     )}
                     {!isCaregiver && isWalking && (
@@ -410,11 +408,11 @@ export default function HomeScreen({ navigation }) {
                     )}
                     {isCaregiver && (
                         <TouchableOpacity
-                            style={{ flex: 1, backgroundColor: userData?.isOnline ? '#22c55e' : (isDarkMode ? '#1e293b' : '#f0fdf4'), paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#22c55e', elevation: userData?.isOnline ? 4 : 0 }}
+                            style={{ flex: 1, backgroundColor: userData?.isOnline ? '#22c55e' : (isDarkMode ? '#1e293b' : '#f0fdf4'), paddingVertical: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#22c55e', elevation: userData?.isOnline ? 4 : 0 }}
                             onPress={handleToggleOnline}
                         >
                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: userData?.isOnline ? '#FFF' : '#22c55e', marginRight: 8 }} />
-                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 14, fontWeight: '800' }}>{userData?.isOnline ? t('home.online') + '' : t('home.goOnline')}</Text>
+                            <Text style={{ color: userData?.isOnline ? '#FFF' : '#22c55e', fontSize: 15, fontWeight: '800' }}>{userData?.isOnline ? t('home.online') + '' : t('home.goOnline')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -525,13 +523,13 @@ const styles = StyleSheet.create({
     gpsBtn: { position: 'absolute', bottom: 50, width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5 },
 
     // Dashboard Section
-    bottomSection: { flex: 0.5, position: 'relative' },
+    bottomSection: { position: 'relative' },
     
-    // Quick Action Bar (Floating)
-    actionBar: { position: 'absolute', top: -28, left: 32, right: 32, flexDirection: 'row', borderRadius: 18, padding: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10, zIndex: 20 },
-    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, gap: 6 },
-    actionIconBox: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-    actionBtnText: { fontSize: 13, fontWeight: '700' },
+    // Quick Action Bar
+    actionBar: { flexDirection: 'row', borderRadius: 18, padding: 6, marginHorizontal: 16, marginTop: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
+    actionIconBox: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+    actionBtnText: { fontSize: 14, fontWeight: '700' },
     actionDivider: { width: 1, height: '55%', alignSelf: 'center', opacity: 0.4 },
 
     // Dashboard content
