@@ -480,7 +480,6 @@ flowchart LR
 - Audit log de todas las acciones del sistema
 - Gestionar reportes de bugs/denuncias
 - Cambio de contraseña a otros usuarios desde el modal de edición (validación realtime mín. 6 caracteres + coincidencia)
-- **Rol Superadministrador** (`adminpawmate@gmail.com`): único con permiso para gestionar el rol `admin` (promover/degradar), banear/eliminar otros admins y cambiar contraseñas a otros admins. Se distingue con badge dorado "Superadmin" en todas las vistas. Las restricciones se replican a nivel BD mediante el trigger `protect_superadmin` para impedir bypass vía UPDATE directos.
 
 ### 6.4 Web (`web/`)
 
