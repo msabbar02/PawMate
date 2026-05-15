@@ -175,24 +175,24 @@ export default function SignupScreen({ navigation }) {
                         lastName: formData.fullName.trim().split(' ').slice(1).join(' ') || '',
                         email: formData.email.toLowerCase().trim(),
                     },
-                    emailRedirectTo: 'https://apppawmate.com/confirm',
+                    emailRedirectTo: 'pawmate://confirm',
                 }
             });
 
-            // Supabase devuelve error si falla el envío del email de confirmación
-            // pero el usuario SÍ queda creado — en ese caso mostramos mensaje amigable
             if (error) {
                 const msg = error.message || '';
+                console.error('Supabase signUp error:', msg);
+
                 if (
                     msg.toLowerCase().includes('sending confirmation email') ||
-                    msg.toLowerCase().includes('email') ||
-                    msg.toLowerCase().includes('smtp')
+                    msg.toLowerCase().includes('smtp') ||
+                    msg.toLowerCase().includes('email rate limit') ||
+                    msg.toLowerCase().includes('hook') ||
+                    msg.toLowerCase().includes('authorization token')
                 ) {
-                    // Usuario creado pero email de confirmación falló
-                    // Si hay sesión activa, el AuthContext redirigirá automáticamente
-                    if (!data?.session) {
-                        navigation.replace('Confirm');
-                    }
+                    // El hook de email falló (mal configurado) o el SMTP tuvo un error,
+                    // pero el usuario puede haberse creado igual — navegar a Confirm.
+                    if (!data?.session) navigation.replace('Confirm', { email: formData.email.toLowerCase().trim() });
                     return;
                 }
                 if (msg.includes('User already registered') || msg.includes('already registered')) {
@@ -203,14 +203,20 @@ export default function SignupScreen({ navigation }) {
                     setErrors({ form: t('login.networkError') });
                     return;
                 }
-                throw error;
+                if (msg.toLowerCase().includes('password') && msg.toLowerCase().includes('weak')) {
+                    setErrors({ password: t('signup.passwordMinLength') });
+                    return;
+                }
+                // Cualquier otro error de Supabase: mostrarlo directamente
+                setErrors({ form: msg || t('signup.genericError') });
+                return;
             }
 
             // Si no se requiere confirmación de email, el usuario queda logueado
             // y AuthContext lo redirige automáticamente.
             // Si se requiere confirmación, navegamos a la pantalla de confirmación.
             if (data?.user && !data?.session) {
-                navigation.replace('Confirm');
+                navigation.replace('Confirm', { email: formData.email.toLowerCase().trim() });
             }
         } catch (error) {
             console.error('Supabase Signup Error:', error.message);

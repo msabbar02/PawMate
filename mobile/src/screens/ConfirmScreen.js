@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -6,16 +6,55 @@ import {
     TouchableOpacity,
     Dimensions,
     Linking,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import Icon from '../components/Icon';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../context/LanguageContext';
+import { supabase } from '../config/supabase';
 
 const { width } = Dimensions.get('window');
+const RESEND_COOLDOWN = 60; // segundos
 
-export default function ConfirmScreen({ navigation }) {
+export default function ConfirmScreen({ navigation, route }) {
     const { t } = useTranslation();
+    const email = route?.params?.email || '';
+
+    const [resending, setResending] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
+    const timerRef = useRef(null);
+
+    useEffect(() => () => clearInterval(timerRef.current), []);
+
+    const startCooldown = () => {
+        setCooldown(RESEND_COOLDOWN);
+        timerRef.current = setInterval(() => {
+            setCooldown(prev => {
+                if (prev <= 1) { clearInterval(timerRef.current); return 0; }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    const handleResend = async () => {
+        if (!email) {
+            Alert.alert('Error', 'No se encontró el email. Vuelve a registrarte.');
+            return;
+        }
+        setResending(true);
+        try {
+            const { error } = await supabase.auth.resend({ type: 'signup', email });
+            if (error) throw error;
+            Alert.alert('✓ Enviado', `Hemos reenviado el email de confirmación a ${email}.`);
+            startCooldown();
+        } catch (err) {
+            Alert.alert('Error', err.message || 'No se pudo reenviar el email.');
+        } finally {
+            setResending(false);
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -31,7 +70,8 @@ export default function ConfirmScreen({ navigation }) {
 
                 <Text style={styles.title}>¡Revisa tu correo!</Text>
                 <Text style={styles.subtitle}>
-                    Te hemos enviado un enlace de confirmación. Ábrelo para activar tu cuenta y comenzar a usar PawMate.
+                    Te hemos enviado un enlace de confirmación a{email ? ` ${email}` : ''}.{' '}
+                    Ábrelo para activar tu cuenta.
                 </Text>
 
                 <View style={styles.stepsBox}>
@@ -46,6 +86,22 @@ export default function ConfirmScreen({ navigation }) {
                 >
                     <Icon name="mail-open-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
                     <Text style={styles.primaryBtnText}>Abrir correo</Text>
+                </TouchableOpacity>
+
+                {/* Botón reenviar con cooldown */}
+                <TouchableOpacity
+                    style={[styles.resendBtn, (resending || cooldown > 0) && styles.resendBtnDisabled]}
+                    onPress={handleResend}
+                    disabled={resending || cooldown > 0}
+                >
+                    {resending ? (
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                    ) : (
+                        <Icon name="refresh-outline" size={15} color={cooldown > 0 ? COLORS.textLight : COLORS.primary} style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={[styles.resendBtnText, cooldown > 0 && styles.resendBtnTextDisabled]}>
+                        {cooldown > 0 ? `Reenviar en ${cooldown}s` : 'Reenviar email'}
+                    </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -193,6 +249,28 @@ const styles = StyleSheet.create({
     },
     secondaryBtn: {
         paddingVertical: 12,
+    },
+    resendBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        borderWidth: 1.5,
+        borderColor: COLORS.primary,
+        borderRadius: 14,
+        height: 48,
+        marginBottom: 10,
+    },
+    resendBtnDisabled: {
+        borderColor: COLORS.border || '#E2E8F0',
+    },
+    resendBtnText: {
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    resendBtnTextDisabled: {
+        color: COLORS.textLight,
     },
     secondaryBtnText: {
         color: COLORS.textLight,
