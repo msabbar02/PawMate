@@ -1,0 +1,67 @@
+// app.config.js — reemplaza app.json para poder leer variables de entorno.
+// Las variables EXPO_PUBLIC_* las carga Expo automáticamente desde .env.local
+// en local, y desde EAS Environment Variables en los builds de la nube.
+
+const googleMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY;
+
+module.exports = {
+  expo: {
+    name: 'PawMate',
+    slug: 'pawmate',
+    scheme: 'pawmate',
+    version: '1.0.0',
+    orientation: 'portrait',
+    icon: './assets/icon.png',
+    userInterfaceStyle: 'automatic',
+    splash: {
+      image: './assets/splash-icon.png',
+      resizeMode: 'contain',
+      backgroundColor: '#FFFFFF',
+    },
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: 'com.pawmate.app',
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#ffffff',
+      },
+      edgeToEdgeEnabled: true,
+      package: 'com.pawmate.app',
+      config: {
+        googleMaps: {
+          apiKey: googleMapsKey,
+        },
+      },
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: false,
+          data: [{ scheme: 'pawmate' }],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
+    },
+    web: {
+      favicon: './assets/favicon.png',
+    },
+    plugins: [
+      '@react-native-community/datetimepicker',
+      [
+        '@stripe/stripe-react-native',
+        {
+          merchantIdentifier: 'merchant.com.pawmate',
+          enableGooglePay: true,
+        },
+      ],
+      'expo-web-browser',
+    ],
+    extra: {
+      eas: {
+        projectId: '7ff372f8-b232-4176-a8ac-3e2c58137ae1',
+      },
+    },
+    owner: 'msabbar',
+  },
+};

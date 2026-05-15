@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # Variables de entorno locales
+.env
+.env.*
 .env*.local
 
 # TypeScript

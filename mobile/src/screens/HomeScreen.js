@@ -128,8 +128,17 @@ export default function HomeScreen({ navigation }) {
 
 
     const fetchWeather = async (lat, lon) => {
+        // Valida que lat/lon sean números dentro de rangos geográficos válidos
+        // para evitar que coordenadas manipuladas generen peticiones SSRF.
+        const numLat = parseFloat(lat);
+        const numLon = parseFloat(lon);
+        if (
+            !isFinite(numLat) || !isFinite(numLon) ||
+            numLat < -90 || numLat > 90 ||
+            numLon < -180 || numLon > 180
+        ) return;
         try {
-            const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+            const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${numLat}&longitude=${numLon}&current_weather=true`);
             const dict = await resp.json();
             if (dict?.current_weather) {
                 const temp = dict.current_weather.temperature;

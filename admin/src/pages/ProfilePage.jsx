@@ -55,8 +55,9 @@ export default function ProfilePage() {
 
         setUploading(true);
         try {
-            const ext = file.name.split('.').pop();
-            const path = `avatars/${adminUser.id}.${ext}`;
+            const ext = file.name.split('.').pop().replace(/[^a-zA-Z0-9]/g, '');
+            const safeId = String(adminUser.id).replace(/\.\./g, '').replace(/[\/\\]/g, '');
+            const path = `avatars/${safeId}.${ext}`;
             const { error: uploadError } = await supabase.storage
                 .from('pawmate')
                 .upload(path, file, { upsert: true });

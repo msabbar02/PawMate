@@ -9,6 +9,24 @@ const BASE64_ENCODING = FileSystem.EncodingType?.Base64 ?? 'base64';
 const KNOWN_BUCKETS = ['avatars', 'pets', 'verifications', 'posts', 'chat', 'reports', 'gallery'];
 
 /**
+ * Elimina secuencias de path traversal de una ruta de Storage.
+ * Lanza un error si la ruta resultante contiene '..' para evitar
+ * que un atacante lea o escriba fuera del directorio previsto.
+ *
+ * @param {string} p Ruta a sanitizar.
+ * @returns {string} Ruta segura.
+ */
+function sanitizePath(p) {
+    const cleaned = String(p)
+        .replace(/\.\.\/|\.\.\\/g, '')  // elimina ../  y ..\
+        .replace(/^[\/\\]+/, '');         // elimina barras iniciales
+    if (cleaned.includes('..')) {
+        throw new Error('Invalid storage path: path traversal detected.');
+    }
+    return cleaned;
+}
+
+/**
  * Determina el bucket correcto a partir del prefijo de la ruta. Si el prefijo
  * coincide con un bucket conocido se usa ese; si no, se cae a 'posts' como
  * almacén público genérico.
@@ -58,7 +76,7 @@ async function _uploadToStorage(localUri, storagePath) {
 
     const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: BASE64_ENCODING });
     const arrayBuffer = decode(base64);
-    const { bucket, path } = resolveBucket(storagePath);
+    const { bucket, path } = resolveBucket(sanitizePath(storagePath));
 
     const { error } = await supabase.storage
         .from(bucket)

@@ -25,7 +25,7 @@
       "package": "com.pawmate.app",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCJoqac27vYcfZuhf-D3gQL7vJa7Lh6JXo"
+          "apiKey": ""
         }
       },
       "intentFilters": [
