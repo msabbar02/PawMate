@@ -279,7 +279,7 @@ erDiagram
 | `reports`                    | Reportes           | Bug reports + denuncias       |
 | `system_logs`                | Auditoría         | Trazabilidad de acciones      |
 
-> Esquema completo SQL en [supabase_schema.sql](supabase_schema.sql)
+
 
 ### Storage Buckets
 
