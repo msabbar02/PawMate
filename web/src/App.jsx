@@ -25,7 +25,7 @@ import './App.css';
 import ConfirmPage from './pages/ConfirmPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
-const APK_URL = 'https://expo.dev/accounts/msabbar/projects/pawmate/builds/a8f2a2ea-285a-4fdb-8f80-ffdf7ab03aa0';
+const APK_URL = 'https://expo.dev/accounts/msabbar/projects/pawmate/builds/0762d228-09fe-4415-b8d9-f5ee98f011d7';
 
 /** Variantes de animación de Framer Motion reutilizadas en toda la landing. */
 const fadeUp = {
