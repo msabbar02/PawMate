@@ -49,7 +49,7 @@ mindmap
 
 ## 2. Arquitectura del sistema
 
-### Diagrama de alto nivel
+### Diagrama 
 
 ```mermaid
 flowchart TB
