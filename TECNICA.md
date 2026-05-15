@@ -1,7 +1,7 @@
 # PawMate — Documentación Técnica
 
 > Plataforma móvil + web para conectar dueños de mascotas con cuidadores verificados.
-> Versión: 1.3 · Última revisión: 2026-05
+· Última revisión: 2026-05
 
 ## Índice
 
