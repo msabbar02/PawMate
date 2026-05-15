@@ -9,19 +9,23 @@ const BASE64_ENCODING = FileSystem.EncodingType?.Base64 ?? 'base64';
 const KNOWN_BUCKETS = ['avatars', 'pets', 'verifications', 'posts', 'chat', 'reports', 'gallery'];
 
 /**
- * Elimina secuencias de path traversal de una ruta de Storage.
- * Lanza un error si la ruta resultante contiene '..' para evitar
- * que un atacante lea o escriba fuera del directorio previsto.
+ * Sanitiza una ruta de Storage usando allowlist: solo permite letras, números,
+ * guiones, guiones bajos, puntos y barras. Cualquier otro carácter (incluido
+ * `..`) es eliminado. Lanza un error si la ruta resultante está vacía o sigue
+ * conteniendo `..` tras la limpieza.
  *
  * @param {string} p Ruta a sanitizar.
  * @returns {string} Ruta segura.
  */
 function sanitizePath(p) {
+    // Allowlist: solo caracteres seguros en rutas de almacenamiento.
     const cleaned = String(p)
-        .replace(/\.\.\/|\.\.\\/g, '')  // elimina ../  y ..\
-        .replace(/^[\/\\]+/, '');         // elimina barras iniciales
-    if (cleaned.includes('..')) {
-        throw new Error('Invalid storage path: path traversal detected.');
+        .replace(/[^a-zA-Z0-9\-_./]/g, '')  // elimina todo lo que no sea seguro
+        .replace(/\.{2,}/g, '.')             // colapsa ".." o "..." en "."
+        .replace(/^[/]+/, '');               // elimina barras iniciales
+
+    if (!cleaned || cleaned.includes('..')) {
+        throw new Error('Invalid storage path: unsafe characters detected.');
     }
     return cleaned;
 }
