@@ -81,6 +81,7 @@ async function _uploadToStorage(localUri, storagePath) {
     const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: BASE64_ENCODING });
     const arrayBuffer = decode(base64);
     const { bucket, path } = resolveBucket(sanitizePath(storagePath));
+    if (path.includes('..')) throw new Error('Invalid path');
 
     const { error } = await supabase.storage
         .from(bucket)
