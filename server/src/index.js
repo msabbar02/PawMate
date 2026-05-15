@@ -14,6 +14,10 @@ const { errorHandler, notFoundHandler } = require('./middleware/error.middleware
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Vercel (y cualquier proxy inverso) añade X-Forwarded-For;
+// sin esto express-rate-limit lanza ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+app.set('trust proxy', 1);
+
 /**
  * Cabeceras de seguridad HTTP (CSP mínima, HSTS, X-Frame-Options, etc.).
  * Si el paquete `helmet` no está instalado el servidor sigue arrancando.
