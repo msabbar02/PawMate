@@ -154,7 +154,6 @@ PawMate/
 - Sistema de reportes y logs de actividad
 - Flujo de verificaciones de identidad (aprobar / rechazar con rol)
 - Gestión de administradores (crear / eliminar)
-- **Rol Superadministrador** (`adminpawmate@gmail.com`): único con permiso para crear/degradar/banear otros admins, gestionar el rol `admin` y cambiar contraseña a otros admins. Identificado con badge dorado "Superadmin" en todas las vistas.
 - Cambio de contraseña de cualquier usuario desde el modal de edición (validación realtime, mín. 6 caracteres y coincidencia)
 - Perfil de administrador editable (avatar, datos personales)
 - Dark mode / Light mode · i18n ES/EN
